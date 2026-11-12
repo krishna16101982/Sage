@@ -1,0 +1,113 @@
+using System.Collections.Generic;
+using SageAdminApi.Globals;
+using SageCommonLib.AppValidations;
+using SageCommonLib.Globals;
+using SageCommonLib.Models;
+using SageCommonLib.Models.Interfaces;
+
+namespace SageAdminApi.AppValidations
+{
+    /// <summary>
+    /// Admin-specific validation built on the shared SageCommonLib validators. Returns IFunctionReturn (Status=false on failure).
+    /// </summary>
+    public class ApplicationValidationFunctions
+    {
+        private static IFunctionReturn Invalid(List<string> _messages, string _methodName)
+        {
+            return new FunctionReturn
+            {
+                Status = false,
+                MessageType = Constants.ReturnMessageTypes.ValidationError,
+                Message = _messages,
+                HttpStatusCode = Constants.HttpStatusCodes.BadRequest,
+                MethodName = _methodName
+            };
+        }
+
+        /// <summary>
+        /// Validate the common admin user fields (username, email, optional mobile).
+        /// </summary>
+        public static IFunctionReturn ValidateUserIdentity(string _username, string _email, string _mobile, string _methodName)
+        {
+            var _errors = new List<string>();
+            if (string.IsNullOrWhiteSpace(_username)) _errors.Add(ApplicationConstants.ValidationMessages.UsernameRequired);
+            else if (!ValidationFunctions.IsValidUsername(_username)) _errors.Add(ApplicationConstants.ValidationMessages.UsernameInvalid);
+            if (!ValidationFunctions.IsValidEmail(_email)) _errors.Add(ApplicationConstants.ValidationMessages.EmailInvalid);
+            if (!string.IsNullOrWhiteSpace(_mobile) && !ValidationFunctions.IsValidPhone(_mobile)) _errors.Add(ApplicationConstants.ValidationMessages.MobileInvalid);
+            return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
+        }
+
+        /// <summary>
+        /// Validate a new password and its confirmation.
+        /// </summary>
+        public static IFunctionReturn ValidateNewPassword(string _password, string _confirmPassword, string _methodName)
+        {
+            var _errors = new List<string>(ValidationFunctions.CheckPasswordStrength(_password));
+            if (_password != _confirmPassword) _errors.Add(ApplicationConstants.ValidationMessages.PasswordMismatch);
+            return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
+        }
+
+        private static void CheckText(List<string> _errors, string _value, int _max, bool _required, string _message)
+        {
+            string _trimmed = (_value ?? string.Empty).Trim();
+            if ((_required && _trimmed.Length == 0) || _trimmed.Length > _max) _errors.Add(_message);
+        }
+
+        /// <summary>
+        /// Validate a new module (code is immutable afterwards).
+        /// </summary>
+        public static IFunctionReturn ValidateModule(string _code, string _name, string _category, string _methodName)
+        {
+            var _errors = new List<string>();
+            if (!ValidationFunctions.IsValidCode(_code)) _errors.Add(ApplicationConstants.ValidationMessages.ModuleCodeInvalid);
+            CheckText(_errors, _name, 100, true, ApplicationConstants.ValidationMessages.ModuleNameRequired);
+            CheckText(_errors, _category, 100, false, ApplicationConstants.ValidationMessages.CategoryTooLong);
+            return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
+        }
+
+        /// <summary>
+        /// Validate module edits (name, category).
+        /// </summary>
+        public static IFunctionReturn ValidateModuleUpdate(string _name, string _category, string _methodName)
+        {
+            var _errors = new List<string>();
+            CheckText(_errors, _name, 100, true, ApplicationConstants.ValidationMessages.ModuleNameRequired);
+            CheckText(_errors, _category, 100, false, ApplicationConstants.ValidationMessages.CategoryTooLong);
+            return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
+        }
+
+        /// <summary>
+        /// Validate a new permission (action becomes the second half of the Module.Action code).
+        /// </summary>
+        public static IFunctionReturn ValidatePermission(string _action, string _name, string _description, string _methodName)
+        {
+            var _errors = new List<string>();
+            if (!ValidationFunctions.IsValidCode(_action)) _errors.Add(ApplicationConstants.ValidationMessages.ActionInvalid);
+            CheckText(_errors, _name, 150, true, ApplicationConstants.ValidationMessages.PermissionNameRequired);
+            CheckText(_errors, _description, 500, false, ApplicationConstants.ValidationMessages.DescriptionTooLong);
+            return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
+        }
+
+        /// <summary>
+        /// Validate permission edits (name, description).
+        /// </summary>
+        public static IFunctionReturn ValidatePermissionUpdate(string _name, string _description, string _methodName)
+        {
+            var _errors = new List<string>();
+            CheckText(_errors, _name, 150, true, ApplicationConstants.ValidationMessages.PermissionNameRequired);
+            CheckText(_errors, _description, 500, false, ApplicationConstants.ValidationMessages.DescriptionTooLong);
+            return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
+        }
+
+        /// <summary>
+        /// Validate a permission group's name and code.
+        /// </summary>
+        public static IFunctionReturn ValidateGroup(string _name, string _code, string _methodName)
+        {
+            var _errors = new List<string>();
+            if (string.IsNullOrWhiteSpace(_name)) _errors.Add(ApplicationConstants.ValidationMessages.GroupNameRequired);
+            if (!ValidationFunctions.IsValidCode(_code)) _errors.Add(ApplicationConstants.ValidationMessages.GroupCodeInvalid);
+            return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
+        }
+    }
+}

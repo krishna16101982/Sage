@@ -1,0 +1,8 @@
+bin/
+obj/
+.vs/
+logs/
+*.user
+appsettings.Local.json
+.env
+TestResults/

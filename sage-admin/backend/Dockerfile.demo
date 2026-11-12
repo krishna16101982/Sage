@@ -1,0 +1,27 @@
+# Build context MUST be the sage-admin root:  docker build -f backend/Dockerfile.demo --build-arg GIT_BUILD_TAG=<tag> .
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS builder
+ARG DOCKER_LABEL_NAME
+ARG GIT_BUILD_TAG
+LABEL stage=$DOCKER_LABEL_NAME.intermediate
+WORKDIR /build
+
+# copy csproj files and restore as distinct layers
+COPY backend/src/SageAdminApi.csproj backend/src/
+COPY sage-common-lib/src/SageCommonLib.csproj sage-common-lib/src/
+RUN dotnet restore backend/src/SageAdminApi.csproj
+
+# copy everything else and build
+COPY backend/src/ backend/src/
+COPY sage-common-lib/src/ sage-common-lib/src/
+RUN sed -i "s/GIT_PROJECT_NAME/sage-admin-api/g" backend/src/Controllers/StatusController.cs
+RUN sed -i "s/GIT_BUILD_TAG/${GIT_BUILD_TAG}/g" backend/src/Controllers/StatusController.cs
+RUN dotnet publish backend/src/SageAdminApi.csproj -c Release -o /app/out
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+WORKDIR /app
+COPY --from=builder /app/out ./
+COPY backend/src/run.sh ./
+RUN chmod +x ./run.sh
+# Secrets (DatabaseSettings__ConnectionString, JwtIssuerOptions__SecurityKey) are supplied at run time, never baked into the image.
+ENV ASPNETCORE_ENVIRONMENT=Staging
+ENTRYPOINT ["./run.sh", "SageAdminApi", "80"]
