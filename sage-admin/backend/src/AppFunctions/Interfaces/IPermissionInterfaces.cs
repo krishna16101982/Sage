@@ -54,6 +54,17 @@ namespace SageAdminApi.AppFunctions.Interfaces
         Task<IFunctionReturn> ResetPasswordAsync(Guid _id, HttpSalesUserPasswordParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
     }
 
+    public interface IAdminUserFunctions
+    {
+        Task<(PagedResult<AdminUserDto> result, IFunctionReturn functionReturn)> GetAdminUsersAsync(AdminUserFilter _filter, CancellationToken _ct = default);
+        Task<(AdminUserDto user, IFunctionReturn functionReturn)> GetAdminUserAsync(Guid _id, CancellationToken _ct = default);
+        Task<(List<GroupOption> groups, IFunctionReturn functionReturn)> GetGroupOptionsAsync(CancellationToken _ct = default);
+        Task<(AdminUserDto user, IFunctionReturn functionReturn)> CreateAdminUserAsync(HttpAdminUserPostParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
+        Task<(AdminUserDto user, IFunctionReturn functionReturn)> UpdateAdminUserAsync(Guid _id, HttpAdminUserPutParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
+        Task<(AdminUserDto user, IFunctionReturn functionReturn)> SetStatusAsync(Guid _id, HttpUserStatusParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
+        Task<IFunctionReturn> ResetPasswordAsync(Guid _id, HttpSalesUserPasswordParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
+    }
+
     public interface IAuthorizationFunctions
     {
         /// <summary>True when the user is an active Super Admin or holds the permission through an active group (always read from SQL).</summary>

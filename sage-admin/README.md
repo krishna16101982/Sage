@@ -8,7 +8,7 @@ Three application folders (do not add more without approval):
 | `backend/` | Admin API (`src/`), SQL scripts (`database/`), tests (`Tests/`) | ASP.NET Core, .NET 10, SQL Server |
 | `frontend/` | Admin Panel UI | Next.js (App Router), React, TypeScript, Tailwind |
 
-Design and plan: [SAGE_ANALYSIS.md](SAGE_ANALYSIS.md). Current status: **Sprint 6 (Sales users) implemented. Next: Sprint 7 (User Panel foundation in `../sage-user`).** Sales plan: [../SALES_DESIGN.md](../SALES_DESIGN.md).
+Design and plan: [SAGE_ANALYSIS.md](SAGE_ANALYSIS.md). Current status: **Sprint 7 (Admin users) implemented. Next: Sprint 8 (User Panel foundation in `../sage-user`).** Sales plan: [../SALES_DESIGN.md](../SALES_DESIGN.md).
 
 ## First-time local setup
 
@@ -104,6 +104,20 @@ Categories → products → plans. A plan is a price-list entry: name, duration 
 - Price and cost changes are audited (old and new values) and affect future sales only.
 - Seed (`SeedData/002`): categories **SaaS** (SHTMS, GreytHR, LinkedIn, Freshdesk) and **Cyber Security**; plans and prices are entered in the UI.
 - UI: `/products` (sidebar **Products**).
+
+## Admin users (Sprint 7)
+| Endpoint | Permission | Notes |
+|----------|------------|-------|
+| `GET /api/admin/users` | `AdminUser.View` | paged: `search`, `status`, `groupId`, `sortBy`, `sortDirection` |
+| `GET /api/admin/users/groups` · `GET .../{id}` | `AdminUser.View` | active groups for the drop-down (no `Group.View` needed); one user |
+| `POST /api/admin/users` | `AdminUser.Add` | details + optional group + temporary password; must change it at first sign-in |
+| `PUT /api/admin/users/{id}` | `AdminUser.Edit` | details and group (one group per user; none = no permissions); username fixed |
+| `PUT /api/admin/users/{id}/status` | `AdminUser.ChangeStatus` | `Active` (also unlocks) or `Inactive` (ends their sessions) |
+| `POST /api/admin/users/{id}/reset-password` | `AdminUser.ResetPassword` | temporary password; ends their sessions |
+
+- Super Admins are not created here (the deploy script creates the first one). Only a Super Admin can edit, deactivate or reset a Super Admin (403 otherwise). Nobody can deactivate or reset themselves (use Change password).
+- A group change, deactivation or reset bumps `PermissionVersion`, so the user's current access token stops working on the next request. All changes are audited without password data.
+- UI: `/users` (sidebar **Admin Users**).
 
 ## Sales users (Sprint 6)
 User Panel accounts, kept in `dbo.SalesUsers` (separate from admin users). Roles: **SalesPerson** (must report to an active SalesManager) and **SalesManager** (can also sell; has no manager). Created and managed here; they sign in only to the User Panel.

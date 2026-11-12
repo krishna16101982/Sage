@@ -55,8 +55,9 @@ Writes with rules (sale creation and totals, manager assignment, plan price chan
 |--------|-------|-------|
 | 5 | Admin | Product catalog: categories, products, plans with price and cost; seed SaaS + Cyber Security; permissions `Product.View/Add/Edit` (one module for categories, products and plans); audit of price changes |
 | 6 | Admin | Sales users: create/edit, role, manager, activate/deactivate, reset password; permissions `SalesUser.*` |
-| 7 | User | `sage-user` foundation: backend (shared common lib, same DB), sales-user login/refresh/logout/change password, frontend shell |
-| 8 | User | Customers + sale page + My sales / Team sales |
-| later | Admin | Admin Users (was Sprint 5), Dashboard & Audit log screens, Settings, sales reports |
+| 7 | Admin | Admin Users (create, group, activate/deactivate, reset password) — pulled forward, done |
+| 8 | User | `sage-user` foundation: backend (shared common lib, same DB), sales-user login/refresh/logout/change password, frontend shell |
+| 9 | User | Customers + sale page + My sales / Team sales |
+| later | Admin | Dashboard & Audit log screens, Settings, sales reports |
 
 Housekeeping with Sprint 7: rename `sage-user/bakend` → `sage-user/backend`.

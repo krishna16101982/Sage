@@ -84,6 +84,10 @@ namespace SageAdminApi.Globals
             public const string SalesStatusInvalid = "Status must be Active or Inactive";
             public const string SalesUserNotFound = "Sales user not found";
             public const string PasswordResetBySalesAdmin = "Temporary password set. The user must change it at next sign-in.";
+            public const string AdminUserNotFound = "Admin user not found";
+            public const string SuperAdminOnly = "Only a Super Admin can change a Super Admin account";
+            public const string CannotDeactivateSelf = "You cannot deactivate your own account";
+            public const string UseChangePasswordForSelf = "Use Change password to change your own password";
             public const string PermissionIdsRequired = "Permission list is required (send an empty list to remove all)";
             public const string RecordAlreadyExists = "Record already exists";
             public const string ModuleCodeInvalid = "Module code must start with a letter and contain only letters, digits, '_' or '-' (2-50 characters)";

@@ -7,6 +7,8 @@ export const Perm = {
   AdminUserView: "AdminUser.View",
   AdminUserAdd: "AdminUser.Add",
   AdminUserEdit: "AdminUser.Edit",
+  AdminUserChangeStatus: "AdminUser.ChangeStatus",
+  AdminUserResetPassword: "AdminUser.ResetPassword",
   GroupView: "Group.View",
   GroupAdd: "Group.Add",
   GroupEdit: "Group.Edit",
