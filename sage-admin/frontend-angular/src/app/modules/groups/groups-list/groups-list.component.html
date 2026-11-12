@@ -1,0 +1,61 @@
+<div class="stack">
+  <h1 class="page-title">Permission Groups</h1>
+
+  <div class="toolbar">
+    <app-groups-filter (filterChange)="onFilter($event)" />
+    <div class="toolbar-spacer"></div>
+    <a *appCan="perm.GroupAdd" class="btn btn-primary" routerLink="/groups/add">Add group</a>
+  </div>
+
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (notice()) { <app-alert kind="success">{{ notice() }}</app-alert> }
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th appSort [active]="sortBy === 'name'" [direction]="sortDirection" (sort)="sortOn('name', $event)">Name</th>
+          <th appSort [active]="sortBy === 'code'" [direction]="sortDirection" (sort)="sortOn('code', $event)">Code</th>
+          <th appSort [active]="sortBy === 'userCount'" [direction]="sortDirection" (sort)="sortOn('userCount', $event)">Users</th>
+          <th>Permissions</th>
+          <th appSort [active]="sortBy === 'status'" [direction]="sortDirection" (sort)="sortOn('status', $event)">Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (g of data()?.items ?? []; track g.id) {
+          <tr>
+            <td>
+              {{ g.name }}
+              @if (g.description) { <div class="hint">{{ g.description }}</div> }
+            </td>
+            <td class="code">{{ g.code }}</td>
+            <td>{{ g.userCount }}</td>
+            <td>{{ g.permissionCount }}</td>
+            <td>
+              {{ g.status }}
+              @if (g.isSystem) { <span class="badge">system</span> }
+            </td>
+            <td class="actions">
+              <a class="link-button" [routerLink]="['/groups', g.id, 'permissions']">Permissions</a>
+              <a *appCan="perm.GroupEdit" class="link-button" [routerLink]="['/groups', g.id, 'edit']">Edit</a>
+              @if (!g.isSystem) {
+                <button *appCan="perm.GroupDelete" type="button" class="link-button danger" (click)="deleting.set(g)">Delete</button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="6" class="table-empty">{{ loading() ? 'Loading...' : 'No groups match.' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (data(); as d) {
+    <app-pagination [page]="d.page" [totalPages]="d.totalPages" [totalCount]="d.totalCount" (pageChange)="goTo($event)" />
+  }
+</div>
+
+@if (deleting(); as g) {
+  <app-groups-delete-modal [group]="g" (closed)="deleting.set(null)" (deleted)="deleted()" />
+}

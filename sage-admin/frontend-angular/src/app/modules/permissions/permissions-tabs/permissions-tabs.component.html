@@ -1,0 +1,4 @@
+<nav class="tabs" aria-label="Permissions sections">
+  <a class="tab" routerLink="/permissions/list" routerLinkActive #p="routerLinkActive" [attr.aria-selected]="p.isActive" style="text-decoration: none">Permissions</a>
+  <a class="tab" routerLink="/permissions/modules" routerLinkActive #m="routerLinkActive" [routerLinkActiveOptions]="{ exact: true }" [attr.aria-selected]="m.isActive" style="text-decoration: none">Modules</a>
+</nav>

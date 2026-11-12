@@ -1,0 +1,7 @@
+<input class="field field-inline w-72" aria-label="Search admin users" placeholder="Search name, username, email, mobile"
+       [(ngModel)]="search" (ngModelChange)="changed(true)" />
+<select class="field field-inline" aria-label="Filter by status" [(ngModel)]="status" (ngModelChange)="changed(false)">
+  <option value="">Any status</option>
+  <option value="Active">Active</option>
+  <option value="Inactive">Inactive</option>
+</select>

@@ -1,0 +1,38 @@
+<div class="stack">
+  <h1 class="page-title">Permissions</h1>
+  <app-permissions-tabs />
+
+  <div class="toolbar">
+    <app-permissions-filter [modules]="modules()" (filterChange)="onFilter($event)" />
+    <div class="toolbar-spacer"></div>
+    <a *appCan="perm.PermissionAdd" class="btn btn-primary" routerLink="/permissions/add">Add permission</a>
+  </div>
+
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (notice()) { <app-alert kind="success">{{ notice() }}</app-alert> }
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Code</th><th>Name</th><th>Module</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        @for (p of data()?.items ?? []; track p.id) {
+          <tr>
+            <td class="code">{{ p.code }}</td>
+            <td>{{ p.name }} @if (p.description) { <div class="hint">{{ p.description }}</div> }</td>
+            <td>{{ p.moduleName }}</td>
+            <td>{{ p.isActive ? 'Active' : 'Inactive' }} @if (p.isSystem) { <span class="badge">system</span> }</td>
+            <td class="actions">
+              <a *appCan="perm.PermissionEdit" class="link-button" [routerLink]="['/permissions', p.id, 'edit']">Edit</a>
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="5" class="table-empty">{{ loading() ? 'Loading...' : 'No permissions match.' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (data(); as d) {
+    <app-pagination [page]="d.page" [totalPages]="d.totalPages" [totalCount]="d.totalCount" (pageChange)="goTo($event)" />
+  }
+</div>

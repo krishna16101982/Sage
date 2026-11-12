@@ -32,6 +32,7 @@ table { border-collapse: collapse; }
 .w-64 { width: 16rem; }
 .w-72 { width: 18rem; }
 .max-w-sm { max-width: 24rem; }
+.max-w-lg { max-width: 36rem; }   /* Add/Edit pages */
 .mt-1 { margin-top: 0.25rem; }
 .mt-2 { margin-top: 0.5rem; }
 .ml-5 { margin-left: 1.25rem; }

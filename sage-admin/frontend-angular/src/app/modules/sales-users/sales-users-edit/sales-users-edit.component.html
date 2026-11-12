@@ -1,0 +1,8 @@
+<div class="stack max-w-lg">
+  <app-page-header title="Edit sales user" backLink="/sales-users/list" />
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (!user() && !error()) { <p class="text-sm text-muted">Loading...</p> }
+  @if (user(); as u) {
+    <app-sales-users-form [user]="u" (saved)="saved($event)" />
+  }
+</div>

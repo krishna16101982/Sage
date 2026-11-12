@@ -1,0 +1,6 @@
+<div class="stack max-w-lg">
+  <app-page-header title="Edit category" backLink="/products/list" />
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (!category() && !error()) { <p class="text-sm text-muted">Loading...</p> }
+  @if (category(); as c) { <app-product-categories-form [category]="c" (saved)="saved($event)" /> }
+</div>

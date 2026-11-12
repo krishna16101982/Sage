@@ -1,0 +1,8 @@
+<div class="stack max-w-lg">
+  <app-page-header title="Edit group" backLink="/groups/list" />
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (!group() && !error()) { <p class="text-sm text-muted">Loading...</p> }
+  @if (group(); as g) {
+    <app-groups-form [group]="g" (saved)="saved($event)" />
+  }
+</div>

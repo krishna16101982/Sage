@@ -1,0 +1,35 @@
+<div class="stack">
+  <h1 class="page-title">Permissions</h1>
+  <app-permissions-tabs />
+
+  <div class="toolbar">
+    <div class="toolbar-spacer"></div>
+    <a *appCan="perm.PermissionAdd" class="btn btn-primary" routerLink="/permissions/modules/add">Add module</a>
+  </div>
+
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (notice()) { <app-alert kind="success">{{ notice() }}</app-alert> }
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Order</th><th>Permissions</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        @for (m of modules() ?? []; track m.id) {
+          <tr>
+            <td class="code">{{ m.code }}</td>
+            <td>{{ m.name }}</td>
+            <td>{{ m.category ?? '-' }}</td>
+            <td>{{ m.sortOrder }}</td>
+            <td>{{ m.permissionCount }}</td>
+            <td>{{ m.isActive ? 'Active' : 'Inactive' }} @if (m.isSystem) { <span class="badge">system</span> }</td>
+            <td class="actions">
+              <a *appCan="perm.PermissionEdit" class="link-button" [routerLink]="['/permissions/modules', m.id, 'edit']">Edit</a>
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="7" class="table-empty">{{ modules() ? 'No modules.' : 'Loading...' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

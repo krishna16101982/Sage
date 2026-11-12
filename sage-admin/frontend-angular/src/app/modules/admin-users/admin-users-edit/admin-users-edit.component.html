@@ -1,0 +1,41 @@
+<div class="stack max-w-lg">
+  <app-page-header title="Edit admin user" backLink="/users/list" />
+
+  @if (error() && !user()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (!user() && !error()) { <p class="text-sm text-muted">Loading...</p> }
+
+  @if (user(); as u) {
+    <form class="form" (ngSubmit)="submit()">
+      @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+      <div class="form-grid-2">
+        <label class="field-label">First name <input class="field" name="firstName" required maxlength="100" [(ngModel)]="firstName" /></label>
+        <label class="field-label">Last name <input class="field" name="lastName" required maxlength="100" [(ngModel)]="lastName" /></label>
+      </div>
+      <label class="field-label">Username <input class="field" name="username" [value]="u.username" disabled /></label>
+      <label class="field-label">Email <input class="field" name="email" type="email" required maxlength="256" [(ngModel)]="email" /></label>
+      <label class="field-label">Mobile <input class="field" name="mobile" maxlength="20" placeholder="+91 98765 43210" [(ngModel)]="mobileNumber" /></label>
+
+      @if (u.isSuperAdmin) {
+        <p class="text-sm text-muted">Super Admin: has every permission regardless of group.</p>
+      } @else {
+        <label class="field-label">Permission group
+          <select class="field" name="groupId" [(ngModel)]="groupId">
+            <option value="">No group (no access yet)</option>
+            @if (currentInactive()) {
+              <option [value]="u.groupId">{{ u.groupName }} (inactive)</option>
+            }
+            @for (g of groups() ?? []; track g.id) {
+              <option [value]="g.id">{{ g.name }}</option>
+            }
+          </select>
+          <span class="hint mt-1 block">The group decides which screens and actions this user can use. A new group applies on the user's next request.</span>
+        </label>
+      }
+
+      <div class="modal-footer">
+        <a class="btn btn-secondary" routerLink="/users/list">Cancel</a>
+        <button type="submit" class="btn btn-primary" [disabled]="busy()">{{ busy() ? 'Please wait...' : 'Save changes' }}</button>
+      </div>
+    </form>
+  }
+</div>

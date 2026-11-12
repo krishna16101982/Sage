@@ -1,0 +1,9 @@
+<div class="stack max-w-lg">
+  <app-page-header title="Add permission" backLink="/permissions/list" />
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (modules(); as m) {
+    <app-permissions-form [modules]="m" (saved)="saved($event)" />
+  } @else if (!error()) {
+    <p class="text-sm text-muted">Loading...</p>
+  }
+</div>

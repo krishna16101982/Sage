@@ -1,0 +1,7 @@
+<input class="field field-inline w-64" aria-label="Search groups" placeholder="Search name, code or description"
+       [(ngModel)]="search" (ngModelChange)="changed(true)" />
+<select class="field field-inline" aria-label="Filter by status" [(ngModel)]="status" (ngModelChange)="changed(false)">
+  <option value="">Any status</option>
+  <option value="Active">Active</option>
+  <option value="Inactive">Inactive</option>
+</select>

@@ -1,0 +1,6 @@
+<div class="stack max-w-lg">
+  <app-page-header title="Edit plan" backLink="/products/list" />
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (!found() && !error()) { <p class="text-sm text-muted">Loading...</p> }
+  @if (found(); as f) { <app-product-plans-form [product]="f.product" [plan]="f.plan" (saved)="saved($event)" /> }
+</div>

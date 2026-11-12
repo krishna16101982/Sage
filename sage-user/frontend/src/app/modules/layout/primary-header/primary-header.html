@@ -1,0 +1,7 @@
+<header class="app-header">
+  <span>
+    {{ auth.user()?.firstName }} {{ auth.user()?.lastName }}
+    <span class="badge">{{ auth.isManager() ? 'Sales manager' : 'Sales person' }}</span>
+  </span>
+  <button type="button" class="link-button" (click)="logout()">Sign out</button>
+</header>

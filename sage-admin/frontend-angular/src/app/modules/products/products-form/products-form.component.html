@@ -1,0 +1,19 @@
+<form class="form" (ngSubmit)="submit()">
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  <label class="field-label">Category
+    <select class="field" name="categoryId" [(ngModel)]="categoryIdValue">
+      @for (c of categoryOptions(); track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
+    </select>
+  </label>
+  <label class="field-label">Code <input class="field" name="code" required maxlength="50" placeholder="e.g. GreytHR" [disabled]="!!product()" [(ngModel)]="code" /></label>
+  <label class="field-label">Name <input class="field" name="name" required maxlength="100" [(ngModel)]="name" /></label>
+  <label class="field-label">Description <textarea class="field" name="description" rows="2" maxlength="500" [(ngModel)]="description"></textarea></label>
+  <label class="field-label">Sort order <input class="field" name="sortOrder" type="number" [(ngModel)]="sortOrder" /></label>
+  @if (product()) {
+    <label class="checkbox-label"><input type="checkbox" name="active" [(ngModel)]="active" /> Active <span class="hint">(inactive products cannot be sold)</span></label>
+  }
+  <div class="modal-footer">
+    <a class="btn btn-secondary" routerLink="/products/list">Cancel</a>
+    <button type="submit" class="btn btn-primary" [disabled]="busy()">{{ busy() ? 'Please wait...' : product() ? 'Save changes' : 'Create product' }}</button>
+  </div>
+</form>

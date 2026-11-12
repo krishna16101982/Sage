@@ -1,0 +1,28 @@
+<form class="form" (ngSubmit)="submit()">
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (!permission()) {
+    <label class="field-label">Module
+      <select class="field" name="moduleId" [ngModel]="moduleId()" (ngModelChange)="moduleId.set(+$event)">
+        @for (m of activeModules(); track m.id) { <option [value]="m.id">{{ m.name }} ({{ m.code }})</option> }
+      </select>
+    </label>
+    <label class="field-label">Action
+      <input class="field" name="action" required placeholder="e.g. View, Add, Approve" [ngModel]="action()" (ngModelChange)="action.set($event)" />
+    </label>
+    <p class="hint">Code will be <strong>{{ selectedModule()?.code ?? 'Module' }}.{{ action() || 'Action' }}</strong></p>
+  } @else {
+    <p class="text-sm"><span class="text-muted">Code:</span> <span class="code">{{ permission()!.code }}</span></p>
+  }
+  <label class="field-label">Name <input class="field" name="name" required maxlength="150" [(ngModel)]="name" /></label>
+  <label class="field-label">Description <input class="field" name="description" maxlength="500" [(ngModel)]="description" /></label>
+  @if (permission(); as p) {
+    <label class="checkbox-label">
+      <input type="checkbox" name="active" [disabled]="p.isSystem" [(ngModel)]="active" /> Active
+      @if (p.isSystem) { <span class="hint">(system permissions cannot be deactivated)</span> }
+    </label>
+  }
+  <div class="modal-footer">
+    <a class="btn btn-secondary" routerLink="/permissions/list">Cancel</a>
+    <button type="submit" class="btn btn-primary" [disabled]="busy()">{{ busy() ? 'Please wait...' : permission() ? 'Save changes' : 'Create permission' }}</button>
+  </div>
+</form>

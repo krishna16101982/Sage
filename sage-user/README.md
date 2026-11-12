@@ -5,7 +5,7 @@ The panel sales persons and sales managers sign in to. Their accounts are create
 | Folder | What | Stack |
 |--------|------|-------|
 | `backend/` | User Panel API (`src/`) and its tests (`Tests/`). Its own project, controllers and functions; shares only `../sage-admin/sage-common-lib` and the database. | ASP.NET Core, .NET 10 |
-| `frontend/` | User Panel UI. Each page/component is a `.ts` (logic) with a matching `.html` (markup); styles in `src/styles/` (same as the Admin Panel). | Angular 21 |
+| `frontend/` | User Panel UI, same folder structure as the Admin Angular app (see below). Each component is a `.ts` (logic) with a matching `.html` (markup); styles in `src/styles/` (same as the Admin Panel). | Angular 21 |
 
 Database scripts are **not** here: the schema is shared and lives in `../sage-admin/backend/database` (deploy with `Deploy-Database.ps1`).
 
@@ -22,6 +22,23 @@ Status: **Sprint 8 (foundation) done** — sign-in, session refresh, sign-out, c
    ```
 3. Run the API: `dotnet run --project backend/src --launch-profile http` → http://localhost:5090 (`GET /api/user/status`).
 4. Run the UI: `cd frontend; npm install; npm start` → http://localhost:4300 (forwards `/api` to :5090 via `proxy.conf.json`).
+
+## Frontend structure (`frontend/src/`)
+```
+environments/            environment.ts (local: apiBaseUrl '' → proxy to :5090), .dev, .qat, .prod
+app/
+  app.routes.ts          LoginLayout (sign-in) and PrimaryLayout (signed-in area)
+  component/             alert, modal, pagination, sort-header
+  services/rest/         global-rest-service.ts (API calls, token in memory, silent refresh)
+  services/auth/         auth.service.ts, auth.guard.ts
+  shared/interfaces/     API types;  shared/utils/  format.ts, password.ts
+  modules/
+    layout/              primary-layout, primary-header, primary-navigation
+    login/               login-layout, login-prompt
+    changepassword/
+    home/
+```
+New sales screens (Sprint 9) go in `modules/<feature>/` with their own `<feature>.routes.ts` and separate list / add / edit pages, like the Admin app. `ng build --configuration=dev|qat|production` picks the matching environment file.
 
 ## API (`/api/user/...`)
 | Endpoint | Auth | Notes |
