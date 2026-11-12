@@ -24,6 +24,11 @@ BEGIN
         UpdatedAtUtc = SYSUTCDATETIME(), UpdatedBy = @ActorUserId
     WHERE Id = @id;
 
+    -- Deactivation ends every User Panel session.
+    IF @Status <> 'Active'
+        UPDATE dbo.SalesUserRefreshTokens SET RevokedAtUtc = SYSUTCDATETIME(), RevokedReason = 'user_inactive'
+        WHERE SalesUserId = @id AND RevokedAtUtc IS NULL;
+
     COMMIT;
 
     SELECT CAST(1 AS BIGINT);

@@ -22,6 +22,10 @@ BEGIN
         UpdatedAtUtc = SYSUTCDATETIME(), UpdatedBy = @ActorUserId
     WHERE Id = @id;
 
+    -- The old password's sessions end.
+    UPDATE dbo.SalesUserRefreshTokens SET RevokedAtUtc = SYSUTCDATETIME(), RevokedReason = 'password_reset_by_admin'
+    WHERE SalesUserId = @id AND RevokedAtUtc IS NULL;
+
     COMMIT;
 
     SELECT CAST(1 AS BIGINT);

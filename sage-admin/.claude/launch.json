@@ -18,6 +18,18 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "frontend-angular", "start"],
       "port": 4200
+    },
+    {
+      "name": "sage-user-api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "../sage-user/backend/src", "--launch-profile", "http"],
+      "port": 5090
+    },
+    {
+      "name": "sage-user-angular",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "../sage-user/frontend", "start"],
+      "port": 4300
     }
   ]
 }

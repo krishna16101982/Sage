@@ -9,7 +9,7 @@ Three application folders (do not add more without approval):
 | `frontend/` | Admin Panel UI | Next.js (App Router), React, TypeScript, Tailwind |
 | `frontend-angular/` | Admin Panel UI, Angular version (same API and screens; both kept) — see its README | Angular 21, TypeScript |
 
-Design and plan: [SAGE_ANALYSIS.md](SAGE_ANALYSIS.md). Current status: **Sprint 7 (Admin users) implemented. Next: Sprint 8 (User Panel foundation in `../sage-user`).** Sales plan: [../SALES_DESIGN.md](../SALES_DESIGN.md).
+Design and plan: [SAGE_ANALYSIS.md](SAGE_ANALYSIS.md). Current status: **Sprint 8 (User Panel foundation, see `../sage-user/README.md`) done. Next: Sprint 9 (customers and sales).** Sales plan: [../SALES_DESIGN.md](../SALES_DESIGN.md).
 
 ## First-time local setup
 

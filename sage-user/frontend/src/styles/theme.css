@@ -1,0 +1,77 @@
+/* =====================================================================================================
+   THEME: every colour, radius and font used by the Admin Panel.
+   To restyle the app, change the values here. Components (components.css) only use these variables.
+   The first block is the light theme; the second overrides it when the device is in dark mode.
+   ===================================================================================================== */
+
+:root {
+  /* Page and surfaces */
+  --color-bg: #ffffff;              /* page background */
+  --color-surface: #ffffff;         /* cards, dialogs */
+  --color-surface-muted: #f4f4f5;   /* table headers, card headers, hover */
+  --color-backdrop: rgb(0 0 0 / 0.5); /* behind dialogs */
+
+  /* Text */
+  --color-text: #171717;            /* normal text */
+  --color-text-muted: #71717a;      /* hints, secondary text */
+
+  /* Lines */
+  --color-border: #e4e4e7;          /* card, table and divider lines */
+  --color-border-input: #d4d4d8;    /* form field borders */
+  --color-focus: #3b82f6;           /* focus ring on fields and buttons */
+
+  /* Brand / main button */
+  --color-primary: #18181b;
+  --color-primary-hover: #3f3f46;
+  --color-on-primary: #ffffff;      /* text on the main button */
+
+  /* Status colours */
+  --color-danger: #dc2626;          /* delete, deactivate, negative amounts */
+  --color-danger-hover: #b91c1c;
+  --color-error-bg: #fef2f2;
+  --color-error-border: #fca5a5;
+  --color-error-text: #991b1b;
+  --color-success-bg: #f0fdf4;
+  --color-success-border: #86efac;
+  --color-success-text: #166534;
+  --color-warning-bg: #fef3c7;
+  --color-warning-text: #78350f;
+
+  /* Shape and type */
+  --radius: 0.25rem;                /* buttons, fields, tables */
+  --radius-lg: 0.5rem;              /* dialogs, sign-in card */
+  --font-body: Arial, Helvetica, sans-serif;
+  --font-code: ui-monospace, Consolas, "Courier New", monospace;
+  --sidebar-width: 14rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0a0a0a;
+    --color-surface: #18181b;
+    --color-surface-muted: #27272a;
+    --color-backdrop: rgb(0 0 0 / 0.7);
+
+    --color-text: #ededed;
+    --color-text-muted: #a1a1aa;
+
+    --color-border: #27272a;
+    --color-border-input: #3f3f46;
+    --color-focus: #60a5fa;
+
+    --color-primary: #f4f4f5;
+    --color-primary-hover: #d4d4d8;
+    --color-on-primary: #18181b;
+
+    --color-danger: #f87171;
+    --color-danger-hover: #fca5a5;
+    --color-error-bg: #450a0a;
+    --color-error-border: #7f1d1d;
+    --color-error-text: #fecaca;
+    --color-success-bg: #052e16;
+    --color-success-border: #14532d;
+    --color-success-text: #bbf7d0;
+    --color-warning-bg: #78350f;
+    --color-warning-text: #fef3c7;
+  }
+}

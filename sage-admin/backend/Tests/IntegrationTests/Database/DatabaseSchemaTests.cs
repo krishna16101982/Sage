@@ -13,7 +13,7 @@ public class DatabaseSchemaTests
     {
         "SchemaVersions", "AdminUsers", "Modules", "Permissions", "PermissionGroups", "GroupPermissions",
         "AdminUserGroups", "RefreshTokens", "PasswordResetTokens", "LoginHistories", "AuditLogs", "Settings",
-        "ProductCategories", "Products", "ProductPlans", "SalesUsers"
+        "ProductCategories", "Products", "ProductPlans", "SalesUsers", "SalesUserRefreshTokens", "SalesUserLoginHistories"
     };
 
     [Fact]
