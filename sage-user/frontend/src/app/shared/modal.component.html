@@ -1,0 +1,9 @@
+<div class="modal-backdrop" (mousedown)="closed.emit()">
+  <div role="dialog" aria-modal="true" [attr.aria-label]="title()" [class]="'modal modal-' + size()" (mousedown)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2 class="dialog-title">{{ title() }}</h2>
+      <button type="button" aria-label="Close" class="modal-close" (click)="closed.emit()">×</button>
+    </div>
+    <ng-content />
+  </div>
+</div>

@@ -18,27 +18,7 @@ const ITEMS = [
 @Component({
   selector: 'app-shell',
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
-  template: `
-    <div class="app-layout">
-      <nav aria-label="Main" class="sidebar">
-        <div class="sidebar-title">Sage Admin</div>
-        <ul class="stack-xs">
-          @for (item of items(); track item.href) {
-            <li>
-              <a class="sidebar-link" [routerLink]="item.href" routerLinkActive #rla="routerLinkActive" [attr.aria-current]="rla.isActive ? 'page' : null">{{ item.label }}</a>
-            </li>
-          }
-        </ul>
-      </nav>
-      <div class="app-main">
-        <header class="app-header">
-          <span>{{ auth.user()?.firstName }} {{ auth.user()?.lastName }}</span>
-          <button type="button" class="link-button" (click)="signOut()">Sign out</button>
-        </header>
-        <main class="app-content"><router-outlet /></main>
-      </div>
-    </div>
-  `,
+  templateUrl: './shell.component.html',
 })
 export class ShellComponent {
   protected readonly auth = inject(AuthService);

@@ -23,4 +23,6 @@ The persistent build cache is switched off (`angular.json` → `cli.cache.enable
 | `src/app/pages/` | one folder per screen: `auth/`, `users/`, `sales-users/`, `groups/`, `permissions/`, `products/` |
 | `src/styles/` | `theme.css` (colours), `components.css` (named classes) — same files as the Next.js app; `layout.css` (reset + small layout helpers) |
 
+Every page, dialog and shared component is a `.ts` file (logic) with a matching `.html` file (markup) beside it, e.g. `pages/users/admin-users.page.ts` + `admin-users.page.html`. Files that hold several dialogs have one `.html` per dialog (e.g. `group-dialogs.ts` → `group-form.dialog.html`, `delete-group.dialog.html`). Pages use the class names from `src/styles/` in their `.html`; there are no per-page CSS files.
+
 Routes are in `src/app/app.routes.ts`. Permissions are UI hints only: the API checks every request.

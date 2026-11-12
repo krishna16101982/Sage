@@ -10,21 +10,7 @@ import { AlertComponent, ModalComponent } from '../../shared/ui';
 @Component({
   selector: 'app-category-form-dialog',
   imports: [FormsModule, ModalComponent, AlertComponent],
-  template: `
-    <app-modal [title]="category() ? 'Edit category' : 'Add category'" (closed)="closed.emit()">
-      <form class="form" (ngSubmit)="submit()">
-        @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
-        <label class="field-label">Code <input class="field" name="code" required maxlength="50" placeholder="e.g. CyberSecurity" [disabled]="!!category()" [(ngModel)]="code" /></label>
-        <label class="field-label">Name <input class="field" name="name" required maxlength="100" [(ngModel)]="name" /></label>
-        <label class="field-label">Description <textarea class="field" name="description" rows="2" maxlength="500" [(ngModel)]="description"></textarea></label>
-        <label class="field-label">Sort order <input class="field" name="sortOrder" type="number" [(ngModel)]="sortOrder" /></label>
-        @if (category()) {
-          <label class="checkbox-label"><input type="checkbox" name="active" [(ngModel)]="active" /> Active <span class="hint">(inactive categories are hidden from the sale page)</span></label>
-        }
-        <button type="submit" class="btn btn-primary btn-block" [disabled]="busy()">{{ busy() ? 'Please wait...' : category() ? 'Save changes' : 'Create category' }}</button>
-      </form>
-    </app-modal>
-  `,
+  templateUrl: './category-form.dialog.html',
 })
 export class CategoryFormDialog implements OnInit {
   readonly category = input<ProductCategory>();
@@ -71,26 +57,7 @@ export class CategoryFormDialog implements OnInit {
 @Component({
   selector: 'app-product-form-dialog',
   imports: [FormsModule, ModalComponent, AlertComponent],
-  template: `
-    <app-modal [title]="product() ? 'Edit product' : 'Add product'" (closed)="closed.emit()">
-      <form class="form" (ngSubmit)="submit()">
-        @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
-        <label class="field-label">Category
-          <select class="field" name="categoryId" [(ngModel)]="categoryIdValue">
-            @for (c of categoryOptions(); track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
-          </select>
-        </label>
-        <label class="field-label">Code <input class="field" name="code" required maxlength="50" placeholder="e.g. GreytHR" [disabled]="!!product()" [(ngModel)]="code" /></label>
-        <label class="field-label">Name <input class="field" name="name" required maxlength="100" [(ngModel)]="name" /></label>
-        <label class="field-label">Description <textarea class="field" name="description" rows="2" maxlength="500" [(ngModel)]="description"></textarea></label>
-        <label class="field-label">Sort order <input class="field" name="sortOrder" type="number" [(ngModel)]="sortOrder" /></label>
-        @if (product()) {
-          <label class="checkbox-label"><input type="checkbox" name="active" [(ngModel)]="active" /> Active <span class="hint">(inactive products cannot be sold)</span></label>
-        }
-        <button type="submit" class="btn btn-primary btn-block" [disabled]="busy()">{{ busy() ? 'Please wait...' : product() ? 'Save changes' : 'Create product' }}</button>
-      </form>
-    </app-modal>
-  `,
+  templateUrl: './product-form.dialog.html',
 })
 export class ProductFormDialog implements OnInit {
   readonly product = input<Product>();
@@ -143,40 +110,7 @@ export class ProductFormDialog implements OnInit {
 @Component({
   selector: 'app-plan-form-dialog',
   imports: [FormsModule, ModalComponent, AlertComponent],
-  template: `
-    <app-modal [title]="(plan() ? 'Edit plan: ' : 'Add plan: ') + product().name" (closed)="closed.emit()">
-      <form class="form" (ngSubmit)="submit()">
-        @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
-        <label class="field-label">Plan name <input class="field" name="name" required maxlength="100" placeholder="e.g. Business Yearly" [(ngModel)]="name" /></label>
-        <label class="field-label">Description <textarea class="field" name="description" rows="2" maxlength="500" [(ngModel)]="description"></textarea></label>
-        <div class="form-grid-2">
-          <label class="field-label">Duration <input class="field" name="durationCount" type="number" min="1" max="120" required [(ngModel)]="durationCount" /></label>
-          <label class="field-label">Unit
-            <select class="field" name="durationUnit" [(ngModel)]="durationUnit">
-              @for (u of units; track u) { <option [value]="u">{{ u }}</option> }
-            </select>
-          </label>
-          <label class="field-label">Price (₹ per unit)
-            <input class="field" name="price" type="number" min="0" step="0.01" required [ngModel]="price()" (ngModelChange)="price.set($event)" />
-          </label>
-          <label class="field-label">Cost (₹ per unit)
-            <input class="field" name="cost" type="number" min="0" step="0.01" required [ngModel]="cost()" (ngModelChange)="cost.set($event)" />
-          </label>
-        </div>
-        @if (margin(); as m) {
-          <p class="text-sm" [class.text-danger]="m.value < 0" [class.text-muted]="m.value >= 0">
-            Margin per unit: {{ m.text }}{{ m.percent !== null ? ' (' + m.percent + '%)' : '' }}
-          </p>
-        }
-        @if (plan()) { <p class="hint">Changing price or cost affects new sales only. Existing sales keep the price they were sold at.</p> }
-        <label class="field-label">Sort order <input class="field" name="sortOrder" type="number" [(ngModel)]="sortOrder" /></label>
-        @if (plan()) {
-          <label class="checkbox-label"><input type="checkbox" name="active" [(ngModel)]="active" /> Active <span class="hint">(inactive plans cannot be sold)</span></label>
-        }
-        <button type="submit" class="btn btn-primary btn-block" [disabled]="busy()">{{ busy() ? 'Please wait...' : plan() ? 'Save changes' : 'Create plan' }}</button>
-      </form>
-    </app-modal>
-  `,
+  templateUrl: './plan-form.dialog.html',
 })
 export class PlanFormDialog implements OnInit {
   readonly product = input.required<Product>();

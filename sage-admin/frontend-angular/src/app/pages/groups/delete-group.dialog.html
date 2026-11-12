@@ -1,0 +1,16 @@
+<app-modal title="Delete group" (closed)="closed.emit()">
+  <div class="stack text-sm">
+    @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+    @if (group().userCount > 0) {
+      <p><strong>{{ group().name }}</strong> has {{ group().userCount }} user(s) assigned. Move them to another group before deleting it.</p>
+    } @else {
+      <p>Delete <strong>{{ group().name }}</strong> and its {{ group().permissionCount }} permission grant(s)? This cannot be undone.</p>
+    }
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closed.emit()">Cancel</button>
+      <button type="button" class="btn btn-danger" [disabled]="busy() || group().userCount > 0" (click)="confirm()">
+        {{ busy() ? 'Deleting...' : 'Delete' }}
+      </button>
+    </div>
+  </div>
+</app-modal>

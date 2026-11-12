@@ -8,24 +8,7 @@ import { AlertComponent } from '../../shared/ui';
 @Component({
   selector: 'app-login-page',
   imports: [FormsModule, RouterLink, AlertComponent],
-  template: `
-    <main class="auth-page">
-      <div class="auth-card">
-        <h1 class="auth-title">Sage Admin</h1>
-        <form class="form" aria-label="Sign in" (ngSubmit)="submit()">
-          @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
-          <label class="field-label">Username or email
-            <input class="field" name="username" autocomplete="username" required [(ngModel)]="username" />
-          </label>
-          <label class="field-label">Password
-            <input class="field" name="password" type="password" autocomplete="current-password" required [(ngModel)]="password" />
-          </label>
-          <button type="submit" class="btn btn-primary btn-block" [disabled]="busy()">{{ busy() ? 'Please wait...' : 'Sign in' }}</button>
-        </form>
-        <a routerLink="/forgot-password" class="link-button text-sm">Forgot password?</a>
-      </div>
-    </main>
-  `,
+  templateUrl: './login.page.html',
 })
 export class LoginPage {
   private readonly auth = inject(AuthService);

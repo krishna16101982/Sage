@@ -1,0 +1,68 @@
+<div class="stack">
+  <h1 class="page-title">Permission Groups</h1>
+
+  <div class="toolbar">
+    <input class="field field-inline w-64" aria-label="Search groups" placeholder="Search name, code or description"
+           [(ngModel)]="search" (ngModelChange)="filtersChanged()" />
+    <select class="field field-inline" aria-label="Filter by status" [(ngModel)]="status" (ngModelChange)="filtersChanged()">
+      <option value="">Any status</option>
+      <option value="Active">Active</option>
+      <option value="Inactive">Inactive</option>
+    </select>
+    <div class="toolbar-spacer"></div>
+    <button *appCan="perm.GroupAdd" type="button" class="btn btn-primary" (click)="dialog.set({ kind: 'form' })">Add group</button>
+  </div>
+
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th appSort [active]="sortBy === 'name'" [direction]="sortDirection" (sort)="sortOn('name', $event)">Name</th>
+          <th appSort [active]="sortBy === 'code'" [direction]="sortDirection" (sort)="sortOn('code', $event)">Code</th>
+          <th appSort [active]="sortBy === 'userCount'" [direction]="sortDirection" (sort)="sortOn('userCount', $event)">Users</th>
+          <th>Permissions</th>
+          <th appSort [active]="sortBy === 'status'" [direction]="sortDirection" (sort)="sortOn('status', $event)">Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (g of data()?.items ?? []; track g.id) {
+          <tr>
+            <td>
+              {{ g.name }}
+              @if (g.description) { <div class="hint">{{ g.description }}</div> }
+            </td>
+            <td class="code">{{ g.code }}</td>
+            <td>{{ g.userCount }}</td>
+            <td>{{ g.permissionCount }}</td>
+            <td>
+              {{ g.status }}
+              @if (g.isSystem) { <span class="badge">system</span> }
+            </td>
+            <td class="actions">
+              <button type="button" class="link-button" (click)="dialog.set({ kind: 'permissions', group: g })">Permissions</button>
+              <button *appCan="perm.GroupEdit" type="button" class="link-button" (click)="dialog.set({ kind: 'form', group: g })">Edit</button>
+              @if (!g.isSystem) {
+                <button *appCan="perm.GroupDelete" type="button" class="link-button danger" (click)="dialog.set({ kind: 'delete', group: g })">Delete</button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="6" class="table-empty">{{ loading() ? 'Loading...' : 'No groups match.' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (data(); as d) {
+    <app-pagination [page]="d.page" [totalPages]="d.totalPages" [totalCount]="d.totalCount" (pageChange)="goTo($event)" />
+  }
+</div>
+
+@switch (dialog().kind) {
+  @case ('form') { <app-group-form-dialog [group]="dialogGroup()" (closed)="closeDialog()" (saved)="closeDialog(); load()" /> }
+  @case ('permissions') { <app-group-permissions-dialog [group]="dialogGroup()!" (closed)="closeDialog()" (saved)="load()" /> }
+  @case ('delete') { <app-delete-group-dialog [group]="dialogGroup()!" (closed)="closeDialog()" (deleted)="closeDialog(); load()" /> }
+}

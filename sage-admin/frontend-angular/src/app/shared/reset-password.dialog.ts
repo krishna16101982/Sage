@@ -7,21 +7,7 @@ import { AlertComponent, ModalComponent, PASSWORD_HINT } from './ui';
 @Component({
   selector: 'app-reset-password-dialog',
   imports: [FormsModule, ModalComponent, AlertComponent],
-  template: `
-    <app-modal [title]="'Reset password: ' + name()" (closed)="closed.emit()">
-      <form class="form" (ngSubmit)="submit()">
-        @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
-        <label class="field-label">Temporary password
-          <input class="field" name="password" type="password" autocomplete="new-password" required [(ngModel)]="password" />
-        </label>
-        <label class="field-label">Confirm password
-          <input class="field" name="confirm" type="password" autocomplete="new-password" required [(ngModel)]="confirm" />
-        </label>
-        <p class="hint">{{ hint }} Their current sessions end and any lockout is cleared.</p>
-        <button type="submit" class="btn btn-primary btn-block" [disabled]="busy()">{{ busy() ? 'Please wait...' : 'Set temporary password' }}</button>
-      </form>
-    </app-modal>
-  `,
+  templateUrl: './reset-password.dialog.html',
 })
 export class ResetPasswordDialog {
   /** The person's name, for the title and the success message. */

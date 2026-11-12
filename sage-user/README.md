@@ -5,7 +5,7 @@ The panel sales persons and sales managers sign in to. Their accounts are create
 | Folder | What | Stack |
 |--------|------|-------|
 | `backend/` | User Panel API (`src/`) and its tests (`Tests/`). Its own project, controllers and functions; shares only `../sage-admin/sage-common-lib` and the database. | ASP.NET Core, .NET 10 |
-| `frontend/` | User Panel UI | Angular 21 |
+| `frontend/` | User Panel UI. Each page/component is a `.ts` (logic) with a matching `.html` (markup); styles in `src/styles/` (same as the Admin Panel). | Angular 21 |
 
 Database scripts are **not** here: the schema is shared and lives in `../sage-admin/backend/database` (deploy with `Deploy-Database.ps1`).
 

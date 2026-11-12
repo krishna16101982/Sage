@@ -1,0 +1,1 @@
+<button type="button" class="sort-button" (click)="sort.emit(active() && direction() === 'asc' ? 'desc' : 'asc')"><ng-content />{{ active() ? (direction() === 'asc' ? ' ▲' : ' ▼') : '' }}</button>

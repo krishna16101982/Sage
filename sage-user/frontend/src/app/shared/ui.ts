@@ -3,7 +3,7 @@ import { Component, HostListener, input, output } from '@angular/core';
 /** Error or success message box. Styles: .alert in components.css. */
 @Component({
   selector: 'app-alert',
-  template: `<div [attr.role]="kind() === 'error' ? 'alert' : 'status'" [class]="'alert alert-' + kind()"><ng-content /></div>`,
+  templateUrl: './alert.component.html',
 })
 export class AlertComponent {
   readonly kind = input<'error' | 'success'>('error');
@@ -12,17 +12,7 @@ export class AlertComponent {
 /** Dialog over the page; closes on Escape or a click on the backdrop. size "md" for forms, "xl" for wide content. */
 @Component({
   selector: 'app-modal',
-  template: `
-    <div class="modal-backdrop" (mousedown)="closed.emit()">
-      <div role="dialog" aria-modal="true" [attr.aria-label]="title()" [class]="'modal modal-' + size()" (mousedown)="$event.stopPropagation()">
-        <div class="modal-header">
-          <h2 class="dialog-title">{{ title() }}</h2>
-          <button type="button" aria-label="Close" class="modal-close" (click)="closed.emit()">×</button>
-        </div>
-        <ng-content />
-      </div>
-    </div>
-  `,
+  templateUrl: './modal.component.html',
 })
 export class ModalComponent {
   readonly title = input.required<string>();
@@ -38,16 +28,7 @@ export class ModalComponent {
 /** "N total · Previous · Page x of y · Next" under a list. */
 @Component({
   selector: 'app-pagination',
-  template: `
-    <div class="pagination">
-      <span>{{ totalCount() }} total</span>
-      <div class="pagination-buttons">
-        <button type="button" class="btn btn-secondary" [disabled]="page() <= 1" (click)="pageChange.emit(page() - 1)">Previous</button>
-        <span>Page {{ page() }} of {{ totalPages() || 1 }}</span>
-        <button type="button" class="btn btn-secondary" [disabled]="page() >= totalPages()" (click)="pageChange.emit(page() + 1)">Next</button>
-      </div>
-    </div>
-  `,
+  templateUrl: './pagination.component.html',
 })
 export class PaginationComponent {
   readonly page = input.required<number>();
@@ -60,7 +41,7 @@ export class PaginationComponent {
 @Component({
   selector: 'th[appSort]',
   host: { '[attr.aria-sort]': "active() ? (direction() === 'asc' ? 'ascending' : 'descending') : 'none'" },
-  template: `<button type="button" class="sort-button" (click)="sort.emit(active() && direction() === 'asc' ? 'desc' : 'asc')"><ng-content />{{ active() ? (direction() === 'asc' ? ' ▲' : ' ▼') : '' }}</button>`,
+  templateUrl: './sort-header.component.html',
 })
 export class SortHeaderComponent {
   readonly active = input.required<boolean>();

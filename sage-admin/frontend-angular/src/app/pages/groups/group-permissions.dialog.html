@@ -1,0 +1,80 @@
+<app-modal [title]="'Permissions: ' + group().name" size="xl" (closed)="closed.emit()">
+  <div class="stack-sm text-sm">
+    @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+    @if (savedOk() && !dirty()) { <app-alert kind="success">Permissions saved. Members get the new access on their next request.</app-alert> }
+    @if (group().status === 'Inactive') { <app-alert kind="error">This group is inactive, so it grants nothing until it is activated again.</app-alert> }
+    @if (!canAssign()) { <p class="text-muted">Read-only: you do not have permission to change group permissions.</p> }
+
+    <div class="toolbar">
+      <input class="field field-inline w-56" aria-label="Filter modules" placeholder="Filter modules" [ngModel]="filter()" (ngModelChange)="filter.set($event)" />
+      <span class="text-muted">{{ selected().size }} selected{{ dirty() ? ' (' + added() + ' added, ' + removed() + ' removed)' : '' }}</span>
+    </div>
+
+    @if (!detail() && !error()) { <p class="table-empty">Loading...</p> }
+
+    @if (detail()) {
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Module</th>
+              <th class="center">All</th>
+              @for (a of actions(); track a) {
+                <th class="center">
+                  <label class="stack-xs" style="align-items: center">
+                    <span>{{ a }}</span>
+                    @if (canAssign()) {
+                      <input type="checkbox" [attr.aria-label]="'All ' + a + ' permissions'"
+                             [checked]="allOn(grantable(columnPermissions(a)))" [disabled]="grantable(columnPermissions(a)).length === 0"
+                             (change)="toggleMany(grantable(columnPermissions(a)), $any($event.target).checked)" />
+                    }
+                  </label>
+                </th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (cat of byCategory(); track cat.category) {
+              <tr class="group-row"><td [attr.colspan]="actions().length + 2">{{ cat.category }}</td></tr>
+              @for (m of cat.modules; track m.id) {
+                <tr>
+                  <td>
+                    {{ m.name }}
+                    @if (!m.isActive) { <span class="badge">inactive module</span> }
+                  </td>
+                  <td class="center">
+                    @if (canAssign()) {
+                      <input type="checkbox" [attr.aria-label]="'All ' + m.name + ' permissions'"
+                             [checked]="allOn(grantable(m.permissions))" [disabled]="grantable(m.permissions).length === 0"
+                             (change)="toggleMany(grantable(m.permissions), $any($event.target).checked)" />
+                    }
+                  </td>
+                  @for (a of actions(); track a) {
+                    <td class="center">
+                      @if (permissionFor(m, a); as p) {
+                        <input type="checkbox" [attr.aria-label]="p.code" [class.dim]="!p.isActive"
+                               [title]="p.isActive ? (p.description ?? p.name) : p.name + ' (inactive: can be removed, not granted again)'"
+                               [checked]="selected().has(p.id)" [disabled]="!canToggle(p)"
+                               (change)="toggleMany([p], $any($event.target).checked)" />
+                      }
+                    </td>
+                  }
+                </tr>
+              }
+            } @empty {
+              <tr><td [attr.colspan]="actions().length + 2" class="table-empty">No modules match.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closed.emit()">{{ canAssign() && dirty() ? 'Cancel' : 'Close' }}</button>
+      @if (canAssign()) {
+        <button type="button" class="btn btn-secondary" [disabled]="!dirty() || busy()" (click)="reset()">Reset</button>
+        <button type="button" class="btn btn-primary" [disabled]="!dirty() || busy()" (click)="save()">{{ busy() ? 'Saving...' : 'Save permissions' }}</button>
+      }
+    </div>
+  </div>
+</app-modal>

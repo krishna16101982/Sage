@@ -9,33 +9,7 @@ import { AlertComponent, ModalComponent } from '../../shared/ui';
 @Component({
   selector: 'app-group-form-dialog',
   imports: [FormsModule, ModalComponent, AlertComponent],
-  template: `
-    <app-modal [title]="group() ? 'Edit group' : 'Add group'" (closed)="closed.emit()">
-      <form class="form" (ngSubmit)="submit()">
-        @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
-        <label class="field-label">Code
-          <input class="field" name="code" required maxlength="50" placeholder="e.g. HR_Manager" [disabled]="!!group()" [(ngModel)]="code" />
-        </label>
-        <label class="field-label">Name <input class="field" name="name" required maxlength="100" placeholder="e.g. HR Manager" [(ngModel)]="name" /></label>
-        <label class="field-label">Description
-          <textarea class="field" name="description" rows="3" maxlength="500" [(ngModel)]="description"></textarea>
-        </label>
-        @if (group(); as g) {
-          <label class="checkbox-label">
-            <input type="checkbox" name="active" [disabled]="g.isSystem" [(ngModel)]="active" /> Active
-            @if (g.isSystem) {
-              <span class="hint">(system groups cannot be deactivated)</span>
-            } @else if (g.userCount > 0) {
-              <span class="hint">(an inactive group grants nothing to its {{ g.userCount }} user(s))</span>
-            }
-          </label>
-        }
-        <button type="submit" class="btn btn-primary btn-block" [disabled]="busy()">
-          {{ busy() ? 'Please wait...' : group() ? 'Save changes' : 'Create group' }}
-        </button>
-      </form>
-    </app-modal>
-  `,
+  templateUrl: './group-form.dialog.html',
 })
 export class GroupFormDialog implements OnInit {
   readonly group = input<GroupItem>();
@@ -81,24 +55,7 @@ export class GroupFormDialog implements OnInit {
 @Component({
   selector: 'app-delete-group-dialog',
   imports: [ModalComponent, AlertComponent],
-  template: `
-    <app-modal title="Delete group" (closed)="closed.emit()">
-      <div class="stack text-sm">
-        @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
-        @if (group().userCount > 0) {
-          <p><strong>{{ group().name }}</strong> has {{ group().userCount }} user(s) assigned. Move them to another group before deleting it.</p>
-        } @else {
-          <p>Delete <strong>{{ group().name }}</strong> and its {{ group().permissionCount }} permission grant(s)? This cannot be undone.</p>
-        }
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" (click)="closed.emit()">Cancel</button>
-          <button type="button" class="btn btn-danger" [disabled]="busy() || group().userCount > 0" (click)="confirm()">
-            {{ busy() ? 'Deleting...' : 'Delete' }}
-          </button>
-        </div>
-      </div>
-    </app-modal>
-  `,
+  templateUrl: './delete-group.dialog.html',
 })
 export class DeleteGroupDialog {
   readonly group = input.required<GroupItem>();

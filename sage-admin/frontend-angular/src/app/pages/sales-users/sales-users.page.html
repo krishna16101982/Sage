@@ -1,0 +1,105 @@
+<div class="stack">
+  <h1 class="page-title">Sales Users</h1>
+  <p class="text-sm text-muted">Accounts for the User Panel. Sales persons report to a sales manager; managers can also sell.</p>
+
+  <div class="toolbar">
+    <input class="field field-inline w-72" aria-label="Search sales users" placeholder="Search name, username, email, mobile"
+           [(ngModel)]="search" (ngModelChange)="filtersChanged()" />
+    <select class="field field-inline" aria-label="Filter by role" [(ngModel)]="role" (ngModelChange)="filtersChanged()">
+      <option value="">Any role</option>
+      <option value="SalesPerson">Sales persons</option>
+      <option value="SalesManager">Sales managers</option>
+    </select>
+    <select class="field field-inline" aria-label="Filter by status" [(ngModel)]="status" (ngModelChange)="filtersChanged()">
+      <option value="">Any status</option>
+      <option value="Active">Active</option>
+      <option value="Inactive">Inactive</option>
+    </select>
+    @if (team(); as t) {
+      <span class="chip">Team of {{ t.firstName }} {{ t.lastName }}
+        <button type="button" class="modal-close" aria-label="Clear team filter" (click)="showTeam(null)">×</button>
+      </span>
+    }
+    <div class="toolbar-spacer"></div>
+    <button *appCan="perm.SalesUserAdd" type="button" class="btn btn-primary" (click)="dialog.set({ kind: 'form' })">Add sales user</button>
+  </div>
+
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (notice()) { <app-alert kind="success">{{ notice() }}</app-alert> }
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th appSort [active]="sortBy === 'name'" [direction]="sortDirection" (sort)="sortOn('name', $event)">Name</th>
+          <th appSort [active]="sortBy === 'username'" [direction]="sortDirection" (sort)="sortOn('username', $event)">Username</th>
+          <th appSort [active]="sortBy === 'role'" [direction]="sortDirection" (sort)="sortOn('role', $event)">Role</th>
+          <th appSort [active]="sortBy === 'manager'" [direction]="sortDirection" (sort)="sortOn('manager', $event)">Manager / Team</th>
+          <th appSort [active]="sortBy === 'status'" [direction]="sortDirection" (sort)="sortOn('status', $event)">Status</th>
+          <th appSort [active]="sortBy === 'lastLoginAtUtc'" [direction]="sortDirection" (sort)="sortOn('lastLoginAtUtc', $event)">Last sign-in</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (u of data()?.items ?? []; track u.id) {
+          <tr>
+            <td>
+              {{ u.firstName }} {{ u.lastName }}
+              <div class="hint">{{ u.email }}{{ u.mobileNumber ? ' · ' + u.mobileNumber : '' }}</div>
+            </td>
+            <td class="code">{{ u.username }}</td>
+            <td>{{ roleLabel[u.role] }}</td>
+            <td>
+              @if (u.role === 'SalesManager') {
+                <button type="button" class="link-button" [disabled]="u.teamSize === 0" (click)="showTeam(u)">Team: {{ u.teamSize }}</button>
+              } @else {
+                {{ u.managerName ?? '-' }}
+              }
+            </td>
+            <td>
+              {{ u.status }}
+              @if (u.isLockedOut) { <span class="badge badge-danger">locked out</span> }
+              @if (u.mustChangePassword) { <div class="hint">must change password</div> }
+            </td>
+            <td class="date">{{ formatDate(u.lastLoginAtUtc) }}</td>
+            <td class="actions">
+              @if (auth.can(perm.SalesUserEdit)) {
+                <button type="button" class="link-button" (click)="dialog.set({ kind: 'form', user: u })">Edit</button>
+              }
+              @if (auth.can(perm.SalesUserResetPassword)) {
+                <button type="button" class="link-button" (click)="dialog.set({ kind: 'password', user: u })">Reset password</button>
+              }
+              @if (auth.can(perm.SalesUserChangeStatus) && u.status === 'Active' && u.isLockedOut) {
+                <button type="button" class="link-button" (click)="changeStatus(u, 'Active')">Unlock</button>
+              }
+              @if (auth.can(perm.SalesUserChangeStatus)) {
+                <button type="button" class="link-button" [class.danger]="u.status === 'Active'"
+                        (click)="changeStatus(u, u.status === 'Active' ? 'Inactive' : 'Active')">
+                  {{ u.status === 'Active' ? 'Deactivate' : 'Activate' }}
+                </button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="7" class="table-empty">
+            {{ loading() ? 'Loading...' : 'No sales users match. Create a sales manager first, then the sales persons who report to them.' }}
+          </td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (data(); as d) {
+    <app-pagination [page]="d.page" [totalPages]="d.totalPages" [totalCount]="d.totalCount" (pageChange)="goTo($event)" />
+  }
+</div>
+
+@switch (dialog().kind) {
+  @case ('form') {
+    <app-sales-user-form-dialog [user]="formUser()" (closed)="closeDialog()" (saved)="closeDialog(); load()" />
+  }
+  @case ('password') {
+    <app-reset-password-dialog [name]="fullName(passwordUser()!)" [reset]="resetFor(passwordUser()!)"
+                               (closed)="closeDialog()" (done)="notice.set($event); closeDialog(); load()" />
+  }
+}

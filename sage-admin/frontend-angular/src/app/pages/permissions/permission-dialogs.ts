@@ -9,24 +9,7 @@ import { AlertComponent, ModalComponent } from '../../shared/ui';
 @Component({
   selector: 'app-module-form-dialog',
   imports: [FormsModule, ModalComponent, AlertComponent],
-  template: `
-    <app-modal [title]="module() ? 'Edit module' : 'Add module'" (closed)="closed.emit()">
-      <form class="form" (ngSubmit)="submit()">
-        @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
-        <label class="field-label">Code <input class="field" name="code" required placeholder="e.g. Inventory" [disabled]="!!module()" [(ngModel)]="code" /></label>
-        <label class="field-label">Name <input class="field" name="name" required maxlength="100" [(ngModel)]="name" /></label>
-        <label class="field-label">Category <input class="field" name="category" maxlength="100" placeholder="e.g. HR, Sales" [(ngModel)]="category" /></label>
-        <label class="field-label">Sort order <input class="field" name="sortOrder" type="number" [(ngModel)]="sortOrder" /></label>
-        @if (module(); as m) {
-          <label class="checkbox-label">
-            <input type="checkbox" name="active" [disabled]="m.isSystem" [(ngModel)]="active" /> Active
-            @if (m.isSystem) { <span class="hint">(system modules cannot be deactivated)</span> }
-          </label>
-        }
-        <button type="submit" class="btn btn-primary btn-block" [disabled]="busy()">{{ busy() ? 'Please wait...' : module() ? 'Save changes' : 'Create module' }}</button>
-      </form>
-    </app-modal>
-  `,
+  templateUrl: './module-form.dialog.html',
 })
 export class ModuleFormDialog implements OnInit {
   readonly module = input<ModuleItemDto>();
@@ -74,33 +57,7 @@ export class ModuleFormDialog implements OnInit {
 @Component({
   selector: 'app-permission-form-dialog',
   imports: [FormsModule, ModalComponent, AlertComponent],
-  template: `
-    <app-modal [title]="permission() ? 'Edit ' + permission()!.code : 'Add permission'" (closed)="closed.emit()">
-      <form class="form" (ngSubmit)="submit()">
-        @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
-        @if (!permission()) {
-          <label class="field-label">Module
-            <select class="field" name="moduleId" [ngModel]="moduleId()" (ngModelChange)="moduleId.set(+$event)">
-              @for (m of activeModules(); track m.id) { <option [value]="m.id">{{ m.name }} ({{ m.code }})</option> }
-            </select>
-          </label>
-          <label class="field-label">Action
-            <input class="field" name="action" required placeholder="e.g. View, Add, Approve" [ngModel]="action()" (ngModelChange)="action.set($event)" />
-          </label>
-          <p class="hint">Code will be <strong>{{ selectedModule()?.code ?? 'Module' }}.{{ action() || 'Action' }}</strong></p>
-        }
-        <label class="field-label">Name <input class="field" name="name" required maxlength="150" [(ngModel)]="name" /></label>
-        <label class="field-label">Description <input class="field" name="description" maxlength="500" [(ngModel)]="description" /></label>
-        @if (permission(); as p) {
-          <label class="checkbox-label">
-            <input type="checkbox" name="active" [disabled]="p.isSystem" [(ngModel)]="active" /> Active
-            @if (p.isSystem) { <span class="hint">(system permissions cannot be deactivated)</span> }
-          </label>
-        }
-        <button type="submit" class="btn btn-primary btn-block" [disabled]="busy()">{{ busy() ? 'Please wait...' : permission() ? 'Save changes' : 'Create permission' }}</button>
-      </form>
-    </app-modal>
-  `,
+  templateUrl: './permission-form.dialog.html',
 })
 export class PermissionFormDialog implements OnInit {
   readonly permission = input<PermissionItem>();
