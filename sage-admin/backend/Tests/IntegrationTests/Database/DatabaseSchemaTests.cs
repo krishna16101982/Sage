@@ -12,7 +12,8 @@ public class DatabaseSchemaTests
     private static readonly string[] ExpectedTables =
     {
         "SchemaVersions", "AdminUsers", "Modules", "Permissions", "PermissionGroups", "GroupPermissions",
-        "AdminUserGroups", "RefreshTokens", "PasswordResetTokens", "LoginHistories", "AuditLogs", "Settings"
+        "AdminUserGroups", "RefreshTokens", "PasswordResetTokens", "LoginHistories", "AuditLogs", "Settings",
+        "ProductCategories", "Products", "ProductPlans"
     };
 
     [Fact]

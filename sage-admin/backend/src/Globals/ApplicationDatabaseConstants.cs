@@ -41,6 +41,12 @@ namespace SageAdminApi.Globals
             public const string GroupUpdate = "dbo.usp_Group_Update";
             public const string GroupDelete = "dbo.usp_Group_Delete";
             public const string GroupSetPermissions = "dbo.usp_Group_SetPermissions";
+            public const string ProductCategoryCreate = "dbo.usp_ProductCategory_Create";
+            public const string ProductCategoryUpdate = "dbo.usp_ProductCategory_Update";
+            public const string ProductCreate = "dbo.usp_Product_Create";
+            public const string ProductUpdate = "dbo.usp_Product_Update";
+            public const string ProductPlanCreate = "dbo.usp_ProductPlan_Create";
+            public const string ProductPlanUpdate = "dbo.usp_ProductPlan_Update";
         }
 
         public static class ColumnNames

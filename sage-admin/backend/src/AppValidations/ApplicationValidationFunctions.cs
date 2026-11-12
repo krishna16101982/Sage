@@ -111,6 +111,53 @@ namespace SageAdminApi.AppValidations
             return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
         }
 
+        /// <summary>Plan durations allowed by dbo.ProductPlans (CK_ProductPlans_DurationUnit).</summary>
+        public static readonly string[] DurationUnits = { "Month", "Quarter", "Year" };
+
+        private const decimal MaxAmount = 9_999_999_999_999_999.99m;
+
+        private static bool IsValidAmount(decimal? _value) => _value.HasValue && _value.Value >= 0 && _value.Value <= MaxAmount && decimal.Round(_value.Value, 2) == _value.Value;
+
+        /// <summary>
+        /// Validate a product category (code only on create: pass null to skip it).
+        /// </summary>
+        public static IFunctionReturn ValidateProductCategory(string _code, bool _checkCode, string _name, string _description, string _methodName)
+        {
+            var _errors = new List<string>();
+            if (_checkCode && !ValidationFunctions.IsValidCode(_code)) _errors.Add(ApplicationConstants.ValidationMessages.CategoryCodeInvalid);
+            CheckText(_errors, _name, 100, true, ApplicationConstants.ValidationMessages.CategoryNameRequired);
+            CheckText(_errors, _description, 500, false, ApplicationConstants.ValidationMessages.DescriptionTooLong);
+            return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
+        }
+
+        /// <summary>
+        /// Validate a product (code only on create).
+        /// </summary>
+        public static IFunctionReturn ValidateProduct(long _categoryId, string _code, bool _checkCode, string _name, string _description, string _methodName)
+        {
+            var _errors = new List<string>();
+            if (_categoryId <= 0) _errors.Add(ApplicationConstants.ValidationMessages.CategoryRequired);
+            if (_checkCode && !ValidationFunctions.IsValidCode(_code)) _errors.Add(ApplicationConstants.ValidationMessages.ProductCodeInvalid);
+            CheckText(_errors, _name, 100, true, ApplicationConstants.ValidationMessages.ProductNameRequired);
+            CheckText(_errors, _description, 500, false, ApplicationConstants.ValidationMessages.DescriptionTooLong);
+            return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
+        }
+
+        /// <summary>
+        /// Validate a plan: name, duration, and price/cost (required, 0 or more, at most 2 decimals).
+        /// </summary>
+        public static IFunctionReturn ValidateProductPlan(string _name, string _description, string _durationUnit, int _durationCount, decimal? _price, decimal? _cost, string _methodName)
+        {
+            var _errors = new List<string>();
+            CheckText(_errors, _name, 100, true, ApplicationConstants.ValidationMessages.PlanNameRequired);
+            CheckText(_errors, _description, 500, false, ApplicationConstants.ValidationMessages.DescriptionTooLong);
+            if (System.Array.IndexOf(DurationUnits, _durationUnit) < 0) _errors.Add(ApplicationConstants.ValidationMessages.DurationUnitInvalid);
+            if (_durationCount < 1 || _durationCount > 120) _errors.Add(ApplicationConstants.ValidationMessages.DurationCountInvalid);
+            if (!IsValidAmount(_price)) _errors.Add(ApplicationConstants.ValidationMessages.PriceInvalid);
+            if (!IsValidAmount(_cost)) _errors.Add(ApplicationConstants.ValidationMessages.CostInvalid);
+            return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
+        }
+
         /// <summary>
         /// Validate group edits (name, description, status).
         /// </summary>

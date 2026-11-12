@@ -10,7 +10,10 @@ namespace SageAdminApi.Globals
             Module,
             AuditLog,
             Setting,
-            Dashboard
+            Dashboard,
+            ProductCategory,
+            Product,
+            ProductPlan
         }
 
         public enum AuditAction

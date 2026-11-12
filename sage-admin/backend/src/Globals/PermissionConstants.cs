@@ -28,6 +28,11 @@ namespace SageAdminApi.Globals
         internal const string PermissionAdd = "Permission.Add";
         internal const string PermissionEdit = "Permission.Edit";
 
+        //Product catalog (categories, products, plans / price list)
+        internal const string ProductView = "Product.View";
+        internal const string ProductAdd = "Product.Add";
+        internal const string ProductEdit = "Product.Edit";
+
         //Audit logs
         internal const string AuditLogView = "AuditLog.View";
 

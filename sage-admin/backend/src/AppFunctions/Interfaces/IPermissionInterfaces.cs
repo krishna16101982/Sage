@@ -31,6 +31,18 @@ namespace SageAdminApi.AppFunctions.Interfaces
         Task<(GroupDetailDto group, IFunctionReturn functionReturn)> SetGroupPermissionsAsync(Guid _id, HttpGroupPermissionsPutParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
     }
 
+    public interface IProductFunctions
+    {
+        /// <summary>Categories -> products -> plans. includeInactive=false returns only what can be sold.</summary>
+        Task<(List<ProductCategoryDto> catalog, IFunctionReturn functionReturn)> GetCatalogAsync(bool _includeInactive, CancellationToken _ct = default);
+        Task<(ProductCategoryDto category, IFunctionReturn functionReturn)> CreateCategoryAsync(HttpProductCategoryPostParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
+        Task<(ProductCategoryDto category, IFunctionReturn functionReturn)> UpdateCategoryAsync(long _id, HttpProductCategoryPutParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
+        Task<(ProductDto product, IFunctionReturn functionReturn)> CreateProductAsync(HttpProductPostParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
+        Task<(ProductDto product, IFunctionReturn functionReturn)> UpdateProductAsync(long _id, HttpProductPutParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
+        Task<(ProductPlanDto plan, IFunctionReturn functionReturn)> CreatePlanAsync(long _productId, HttpProductPlanPostParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
+        Task<(ProductPlanDto plan, IFunctionReturn functionReturn)> UpdatePlanAsync(long _id, HttpProductPlanPutParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
+    }
+
     public interface IAuthorizationFunctions
     {
         /// <summary>True when the user is an active Super Admin or holds the permission through an active group (always read from SQL).</summary>

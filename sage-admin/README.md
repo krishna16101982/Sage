@@ -8,7 +8,7 @@ Three application folders (do not add more without approval):
 | `backend/` | Admin API (`src/`), SQL scripts (`database/`), tests (`Tests/`) | ASP.NET Core, .NET 10, SQL Server |
 | `frontend/` | Admin Panel UI | Next.js (App Router), React, TypeScript, Tailwind |
 
-Design and plan: [SAGE_ANALYSIS.md](SAGE_ANALYSIS.md). Current status: **Sprint 4 (Permission Groups) implemented. Next: Sprint 5 (Admin Users).**
+Design and plan: [SAGE_ANALYSIS.md](SAGE_ANALYSIS.md). Current status: **Sprint 5 (Product catalog) implemented. Next: Sprint 6 (Sales users).** Sales plan: [../SALES_DESIGN.md](../SALES_DESIGN.md).
 
 ## First-time local setup
 
@@ -89,6 +89,21 @@ Integration tests create and drop their own database `SageAdmin_Test_<guid>` on 
 - Changing a group's permissions or status bumps `PermissionVersion` for its members, so their current access token stops working and the next session gets the new access. Unchanged saves do nothing (no bump, no audit row).
 - Create, update, status change, delete and permission changes are audited; permission changes record the added and removed codes.
 - UI: `/groups` lists groups; **Permissions** opens the matrix (modules by category × actions, row/column select-all). It is read-only without `Group.AssignPermissions`.
+
+## Product catalog (Sprint 5)
+Categories → products → plans. A plan is a price-list entry: name, duration (count × Month/Quarter/Year), **price** and **cost** per unit in INR. The User Panel will sell from this catalog.
+
+| Endpoint | Permission | Notes |
+|----------|------------|-------|
+| `GET /api/admin/products/catalog?includeInactive=` | `Product.View` | full tree; without `includeInactive` only what can be sold |
+| `POST /api/admin/products/categories` · `PUT .../categories/{id}` | `Product.Add` · `Product.Edit` | code fixed after create; name unique |
+| `POST /api/admin/products` · `PUT .../{id}` | `Product.Add` · `Product.Edit` | code unique, name unique per category; may move to another active category |
+| `POST /api/admin/products/{productId}/plans` · `PUT .../plans/{id}` | `Product.Add` · `Product.Edit` | price/cost required, ≥ 0, max 2 decimals; duration 1–120 |
+
+- Nothing is deleted: categories, products and plans are deactivated. Nothing can be added under an inactive parent.
+- Price and cost changes are audited (old and new values) and affect future sales only.
+- Seed (`SeedData/002`): categories **SaaS** (SHTMS, GreytHR, LinkedIn, Freshdesk) and **Cyber Security**; plans and prices are entered in the UI.
+- UI: `/products` (sidebar **Products**).
 
 ## Writing SQL (ixcheck pattern)
 Build the statement with `StringBuilder _sqlQuery`, then call the shared wrappers: `ExecuteInsertAsync` (returns the new id), `ExecuteUpdateAsync` / `ExecuteDeleteAsync` (rows affected), `ExecuteCheckExistsAndInsertAsync` (409 if it exists). They return `(IFunctionReturn, long)` and never throw for duplicates, foreign-key conflicts or SQL errors. Unlike ixcheck, values are always `@parameters`, never concatenated into the SQL text.
