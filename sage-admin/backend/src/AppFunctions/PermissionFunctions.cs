@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -17,6 +18,7 @@ using SageCommonLib.Globals;
 using SageCommonLib.Models;
 using SageCommonLib.Models.Interfaces;
 using SageCommonLib.Models.Paging;
+using SP = SageAdminApi.Globals.ApplicationDatabaseConstants.StoredProcedures;
 
 namespace SageAdminApi.AppFunctions
 {
@@ -27,17 +29,9 @@ namespace SageAdminApi.AppFunctions
         private const string ModuleSelect = "SELECT m.Id, m.Code, m.Name, m.Category, m.SortOrder, m.IsActive, m.IsSystem, (SELECT COUNT(*) FROM dbo.Permissions px WHERE px.ModuleId = m.Id) FROM dbo.Modules m";
 
         /// <summary>
-        /// Sort keys the client may request mapped to fixed SQL. Client text is never concatenated into SQL.
+        /// Sort keys the client may request. dbo.usp_Permission_GetPaged maps each key to a fixed ORDER BY; anything else falls back to "module".
         /// </summary>
-        private static readonly Dictionary<string, string> SortExpressions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            { "module", "m.SortOrder {0}, m.Name {0}, p.Code" },
-            { "code", "p.Code {0}" },
-            { "name", "p.Name {0}, p.Code" },
-            { "action", "p.Action {0}, p.Code" },
-            { "isActive", "p.IsActive {0}, p.Code" },
-            { "createdAtUtc", "p.CreatedAtUtc {0}, p.Id" }
-        };
+        private static readonly string[] SortKeys = { "module", "code", "name", "action", "isActive", "createdAtUtc" };
 
         private readonly ILoggerFunctions _loggerFunctions;
         private readonly IDatabaseFunctions _databaseFunctions;
@@ -80,6 +74,13 @@ namespace SageAdminApi.AppFunctions
             IsSystem = r.GetBoolean(9)
         };
 
+        /// <summary>A 409 from a create procedure carries a generic message; replace it with the screen's own wording.</summary>
+        private static IFunctionReturn WithConflictMessage(IFunctionReturn _functionReturn, string _message)
+        {
+            if (_functionReturn.HttpStatusCode == Constants.HttpStatusCodes.Conflict) _functionReturn.Message = new List<string> { _message };
+            return _functionReturn;
+        }
+
         private static string Clean(string _value) => string.IsNullOrWhiteSpace(_value) ? null : Sanitization.Sanitize(_value.Trim());
 
         private Task<ModuleDto> GetModuleByIdAsync(long _id, CancellationToken _ct)
@@ -98,39 +99,24 @@ namespace SageAdminApi.AppFunctions
         {
             #region Local Variables
             string _methodName = "F:Permission:GetPermissions";
-            StringBuilder _sqlQuery;
             #endregion
             try
             {
                 _filter = _filter ?? new PermissionFilter();
-                PaginationParams _paging = new Pagination().GetPagingParams(_filter, SortExpressions.Keys, "module");
+                PaginationParams _paging = new Pagination().GetPagingParams(_filter, SortKeys, "module");
                 // Default direction for browsing the catalogue is ascending.
                 if (string.IsNullOrWhiteSpace(_filter.SortDirection)) _paging.SortDirection = "ASC";
 
-                var _where = new StringBuilder(" WHERE 1 = 1");
-                var _parameters = new List<SqlParameter>();
-                if (_filter.ModuleId.HasValue) { _where.Append(" AND p.ModuleId = @moduleId"); _parameters.Add(P("@moduleId", _filter.ModuleId.Value)); }
-                if (_filter.IsActive.HasValue) { _where.Append(" AND p.IsActive = @isActive"); _parameters.Add(P("@isActive", _filter.IsActive.Value)); }
-                if (!string.IsNullOrWhiteSpace(_filter.Search))
+                string _search = string.IsNullOrWhiteSpace(_filter.Search) ? null : "%" + _filter.Search.Trim().EscapeLike() + "%";
+                var _totalCount = new SqlParameter("@TotalCount", SqlDbType.Int) { Direction = ParameterDirection.Output };
+                var _parameters = new List<SqlParameter>
                 {
-                    _where.Append(" AND (p.Code LIKE @search ESCAPE '\\' OR p.Name LIKE @search ESCAPE '\\' OR m.Name LIKE @search ESCAPE '\\')");
-                    _parameters.Add(P("@search", "%" + _filter.Search.Trim().EscapeLike() + "%"));
-                }
-
-                // Total rows. (The wrappers copy the parameter list per command, so one list can be reused safely.)
-                _sqlQuery = new StringBuilder();
-                _sqlQuery.Append(" SELECT COUNT(*) ").Append(PermissionFrom).Append(_where);
-                int _total = await _databaseFunctions.ExecuteScalarAsync<int>(_sqlQuery.ToString(), _parameters.Select(x => new SqlParameter(x.ParameterName, x.Value)).ToList(), _ct);
-
-                // One page
-                string _orderBy = string.Format(SortExpressions[_paging.SortBy], _paging.SortDirection);
-                _sqlQuery = new StringBuilder();
-                _sqlQuery.Append(" SELECT ").Append(PermissionColumns).Append(' ').Append(PermissionFrom).Append(_where);
-                _sqlQuery.Append(" ORDER BY ").Append(_orderBy);
-                _sqlQuery.Append(" OFFSET @offset ROWS FETCH NEXT @size ROWS ONLY ");
-                _parameters.Add(P("@offset", _paging.Offset));
-                _parameters.Add(P("@size", _paging.PageSize));
-                IReadOnlyList<PermissionDto> _items = await _databaseFunctions.QueryAsync(_sqlQuery.ToString(), MapPermission, _parameters, _ct);
+                    P("@ModuleId", _filter.ModuleId), P("@IsActive", _filter.IsActive), P("@Search", _search),
+                    P("@SortBy", _paging.SortBy), P("@SortDirection", _paging.SortDirection),
+                    P("@Offset", _paging.Offset), P("@PageSize", _paging.PageSize), _totalCount
+                };
+                IReadOnlyList<PermissionDto> _items = await _databaseFunctions.QueryProcedureAsync(SP.PermissionGetPaged, MapPermission, _parameters, _ct);
+                int _total = _totalCount.Value is int _count ? _count : 0;
 
                 return (new PagedResult<PermissionDto> { Items = _items, Page = _paging.Page, PageSize = _paging.PageSize, TotalCount = _total }, new FunctionReturn { MethodName = _methodName });
             }
@@ -167,7 +153,6 @@ namespace SageAdminApi.AppFunctions
         {
             #region Local Variables
             string _methodName = "F:Permission:CreateModule";
-            StringBuilder _sqlQuery;
             IFunctionReturn _functionReturn;
             long _id;
             #endregion
@@ -176,16 +161,12 @@ namespace SageAdminApi.AppFunctions
                 _functionReturn = ApplicationValidationFunctions.ValidateModule(_params?.Code, _params?.Name, _params?.Category, _methodName);
                 if (!_functionReturn.Status) return (null, _functionReturn);
 
-                // INSERT (blocked with a 409 when the code already exists)
-                _sqlQuery = new StringBuilder();
-                _sqlQuery.Append(" INSERT dbo.Modules (Code, Name, Category, SortOrder, IsActive, IsSystem) ");
-                _sqlQuery.Append(" VALUES (@code, @name, @category, @sortOrder, 1, 0) ");
-                var _parameters = new[] { P("@code", _params.Code.Trim()), P("@name", Clean(_params.Name)), P("@category", Clean(_params.Category)), P("@sortOrder", _params.SortOrder) };
-
-                (_functionReturn, _id) = await _databaseFunctions.ExecuteCheckExistsAndInsertAsync(
-                    "SELECT COUNT(*) FROM dbo.Modules WHERE Code = @code", _sqlQuery.ToString(), _parameters, _methodName,
-                    ApplicationConstants.ValidationMessages.ModuleCodeExists, "Module created.", _ct);
-                if (!_functionReturn.Status) return (null, _functionReturn);
+                // The procedure checks and inserts under one lock; a duplicate code comes back as a 409.
+                (_functionReturn, _id) = await _databaseFunctions.ExecuteProcedureWriteAsync(SP.ModuleCreate, new[]
+                {
+                    P("@Code", _params.Code.Trim()), P("@Name", Clean(_params.Name)), P("@Category", Clean(_params.Category)), P("@SortOrder", _params.SortOrder)
+                }, _methodName, "Module created.", _ct);
+                if (!_functionReturn.Status) return (null, WithConflictMessage(_functionReturn, ApplicationConstants.ValidationMessages.ModuleCodeExists));
 
                 ModuleDto _created = await GetModuleByIdAsync(_id, _ct);
                 await _auditFunctions.LogAsync(_actorUserId, ApplicationEnumeration.AuditAction.Create.ToString(), ApplicationEnumeration.ObjectType.Module.ToString(), _id.ToString(), null, Snapshot(_created), _ipAddress, _ct);
@@ -203,7 +184,6 @@ namespace SageAdminApi.AppFunctions
         {
             #region Local Variables
             string _methodName = "F:Permission:UpdateModule";
-            StringBuilder _sqlQuery;
             IFunctionReturn _functionReturn;
             long _retValue;
             #endregion
@@ -218,24 +198,14 @@ namespace SageAdminApi.AppFunctions
 
                 bool _activeChanged = _existing.IsActive != _params.IsActive;
 
-                // UPDATE. Changing a module's active flag changes effective access: bump the permission version of every
-                // user who holds one of its permissions so their tokens are re-evaluated on the next request.
-                _sqlQuery = new StringBuilder();
-                _sqlQuery.Append(" SET XACT_ABORT ON; BEGIN TRAN; ");
-                _sqlQuery.Append(" UPDATE dbo.Modules SET Name = @name, Category = @category, SortOrder = @sortOrder, IsActive = @isActive, UpdatedAtUtc = SYSUTCDATETIME() WHERE Id = @id; ");
-                _sqlQuery.Append(" IF @changed = 1 ");
-                _sqlQuery.Append("   UPDATE dbo.AdminUsers SET PermissionVersion = PermissionVersion + 1 ");
-                _sqlQuery.Append("   WHERE Id IN (SELECT ug.UserId FROM dbo.AdminUserGroups ug ");
-                _sqlQuery.Append("                JOIN dbo.GroupPermissions gp ON gp.GroupId = ug.GroupId ");
-                _sqlQuery.Append("                JOIN dbo.Permissions p ON p.Id = gp.PermissionId WHERE p.ModuleId = @id); ");
-                _sqlQuery.Append(" COMMIT; ");
-
-                (_functionReturn, _retValue) = await _databaseFunctions.ExecuteUpdateAsync(_sqlQuery.ToString(), new[]
+                // When the active flag changes, the procedure bumps the permission version of every user who holds one of the
+                // module's permissions, so their tokens are re-evaluated on the next request.
+                (_functionReturn, _retValue) = await _databaseFunctions.ExecuteProcedureWriteAsync(SP.ModuleUpdate, new[]
                 {
-                    P("@name", Clean(_params.Name)), P("@category", Clean(_params.Category)), P("@sortOrder", _params.SortOrder),
-                    P("@isActive", _params.IsActive), P("@id", _id), P("@changed", _activeChanged)
+                    P("@Id", _id), P("@Name", Clean(_params.Name)), P("@Category", Clean(_params.Category)), P("@SortOrder", _params.SortOrder), P("@IsActive", _params.IsActive)
                 }, _methodName, "Module updated.", _ct);
                 if (!_functionReturn.Status) return (null, _functionReturn);
+                if (_retValue == 0) return (null, ApplicationCommonFunctions.NotFound(ApplicationConstants.ValidationMessages.ModuleNotFound, _methodName));
 
                 ModuleDto _updated = await GetModuleByIdAsync(_id, _ct);
                 await _auditFunctions.LogAsync(_actorUserId, (_activeChanged ? ApplicationEnumeration.AuditAction.StatusChange : ApplicationEnumeration.AuditAction.Update).ToString(),
@@ -253,7 +223,6 @@ namespace SageAdminApi.AppFunctions
         {
             #region Local Variables
             string _methodName = "F:Permission:CreatePermission";
-            StringBuilder _sqlQuery;
             IFunctionReturn _functionReturn;
             long _id;
             #endregion
@@ -266,21 +235,17 @@ namespace SageAdminApi.AppFunctions
                 if (_module == null) return (null, ApplicationCommonFunctions.NotFound(ApplicationConstants.ValidationMessages.ModuleNotFound, _methodName));
                 if (!_module.IsActive) return (null, ApplicationCommonFunctions.BadRequest(ApplicationConstants.ValidationMessages.ModuleInactive, _methodName));
 
-                // INSERT (blocked with a 409 when Module.Action already exists)
-                string _action = _params.Action.Trim();
-                _sqlQuery = new StringBuilder();
-                _sqlQuery.Append(" INSERT dbo.Permissions (ModuleId, Action, Code, Name, Description, IsActive, IsSystem) ");
-                _sqlQuery.Append(" VALUES (@moduleId, @action, @code, @name, @description, 1, 0) ");
-                var _parameters = new[]
+                // The procedure builds Code = Module.Action, then checks and inserts under one lock; a duplicate comes back as a 409.
+                (_functionReturn, _id) = await _databaseFunctions.ExecuteProcedureWriteAsync(SP.PermissionCreate, new[]
                 {
-                    P("@moduleId", _module.Id), P("@action", _action), P("@code", _module.Code + "." + _action),
-                    P("@name", Clean(_params.Name)), P("@description", Clean(_params.Description))
-                };
-
-                (_functionReturn, _id) = await _databaseFunctions.ExecuteCheckExistsAndInsertAsync(
-                    "SELECT COUNT(*) FROM dbo.Permissions WHERE Code = @code", _sqlQuery.ToString(), _parameters, _methodName,
-                    ApplicationConstants.ValidationMessages.PermissionCodeExists, "Permission created.", _ct);
-                if (!_functionReturn.Status) return (null, _functionReturn);
+                    P("@ModuleId", _module.Id), P("@Action", _params.Action.Trim()), P("@Name", Clean(_params.Name)), P("@Description", Clean(_params.Description))
+                }, _methodName, "Permission created.", _ct);
+                if (!_functionReturn.Status)
+                {
+                    if (_functionReturn.HttpStatusCode == Constants.HttpStatusCodes.NotFound)
+                        return (null, ApplicationCommonFunctions.NotFound(ApplicationConstants.ValidationMessages.ModuleNotFound, _methodName));
+                    return (null, WithConflictMessage(_functionReturn, ApplicationConstants.ValidationMessages.PermissionCodeExists));
+                }
 
                 PermissionDto _created = await GetPermissionByIdAsync(_id, _ct);
                 await _auditFunctions.LogAsync(_actorUserId, ApplicationEnumeration.AuditAction.Create.ToString(), ApplicationEnumeration.ObjectType.Permission.ToString(), _id.ToString(), null, Snapshot(_created), _ipAddress, _ct);
@@ -298,7 +263,6 @@ namespace SageAdminApi.AppFunctions
         {
             #region Local Variables
             string _methodName = "F:Permission:UpdatePermission";
-            StringBuilder _sqlQuery;
             IFunctionReturn _functionReturn;
             long _retValue;
             #endregion
@@ -313,20 +277,13 @@ namespace SageAdminApi.AppFunctions
 
                 bool _activeChanged = _existing.IsActive != _params.IsActive;
 
-                // UPDATE (+ permission-version bump for users holding it when the active flag changes)
-                _sqlQuery = new StringBuilder();
-                _sqlQuery.Append(" SET XACT_ABORT ON; BEGIN TRAN; ");
-                _sqlQuery.Append(" UPDATE dbo.Permissions SET Name = @name, Description = @description, IsActive = @isActive, UpdatedAtUtc = SYSUTCDATETIME() WHERE Id = @id; ");
-                _sqlQuery.Append(" IF @changed = 1 ");
-                _sqlQuery.Append("   UPDATE dbo.AdminUsers SET PermissionVersion = PermissionVersion + 1 ");
-                _sqlQuery.Append("   WHERE Id IN (SELECT ug.UserId FROM dbo.AdminUserGroups ug JOIN dbo.GroupPermissions gp ON gp.GroupId = ug.GroupId WHERE gp.PermissionId = @id); ");
-                _sqlQuery.Append(" COMMIT; ");
-
-                (_functionReturn, _retValue) = await _databaseFunctions.ExecuteUpdateAsync(_sqlQuery.ToString(), new[]
+                // The procedure also bumps the permission version of users holding it when the active flag changes.
+                (_functionReturn, _retValue) = await _databaseFunctions.ExecuteProcedureWriteAsync(SP.PermissionUpdate, new[]
                 {
-                    P("@name", Clean(_params.Name)), P("@description", Clean(_params.Description)), P("@isActive", _params.IsActive), P("@id", _id), P("@changed", _activeChanged)
+                    P("@Id", _id), P("@Name", Clean(_params.Name)), P("@Description", Clean(_params.Description)), P("@IsActive", _params.IsActive)
                 }, _methodName, "Permission updated.", _ct);
                 if (!_functionReturn.Status) return (null, _functionReturn);
+                if (_retValue == 0) return (null, ApplicationCommonFunctions.NotFound(ApplicationConstants.ValidationMessages.PermissionNotFound, _methodName));
 
                 PermissionDto _updated = await GetPermissionByIdAsync(_id, _ct);
                 await _auditFunctions.LogAsync(_actorUserId, (_activeChanged ? ApplicationEnumeration.AuditAction.StatusChange : ApplicationEnumeration.AuditAction.Update).ToString(),

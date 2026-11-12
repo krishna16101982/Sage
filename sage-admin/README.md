@@ -8,7 +8,7 @@ Three application folders (do not add more without approval):
 | `backend/` | Admin API (`src/`), SQL scripts (`database/`), tests (`Tests/`) | ASP.NET Core, .NET 10, SQL Server |
 | `frontend/` | Admin Panel UI | Next.js (App Router), React, TypeScript, Tailwind |
 
-Design and plan: [SAGE_ANALYSIS.md](SAGE_ANALYSIS.md). Current status: **Sprint 2 (Authentication) complete, awaiting approval for Sprint 3.**
+Design and plan: [SAGE_ANALYSIS.md](SAGE_ANALYSIS.md). Current status: **Sprint 3 (Permissions) implemented; stored procedures added for transactional and rule-bearing queries.**
 
 ## First-time local setup
 
@@ -44,6 +44,8 @@ Integration tests create and drop their own database `SageAdmin_Test_<guid>` on 
 - Schema is managed only by numbered scripts in `backend/database/DDL` (no EF migrations). Applied scripts are checksummed in `dbo.SchemaVersions`; never edit one after it is applied, add a new `ALTER` script.
 - `Views/`, `Functions/`, `StoredProcedures/` use `CREATE OR ALTER` and re-run on every deploy; `SeedData/` is tracked like DDL.
 - All SQL from application code is parameterized and lives in the data layer, never in controllers.
+- Stored procedures (`StoredProcedures/`, one `dbo.usp_<Entity>_<Action>.sql` per file) hold anything that must be atomic or carries a business rule: multi-statement transactions, check-then-insert, lockout counting, permission-version bumps, the paged permission list, and the `/me` permission lookup. Simple single-row reads and inserts stay inline. Procedure names live in `ApplicationDatabaseConstants.StoredProcedures`; a test fails if one is missing from the database.
+- After pulling new or changed procedures, re-run `Deploy-Database.ps1` (or `Setup-Local.ps1`) on your dev database.
 
 ## Backend layout (mirrors ixcheck-centre-planning-api)
 `backend/src`: `Program.cs` (`--port=NNNNN`), `Startup.cs`, `Controllers/`, `AppFunctions/` (+`Interfaces/`; business logic and SQL via `IDatabaseFunctions`), `AppValidations/` (`ApplicationCommonFunctions`, `ApplicationValidationFunctions`), `Globals/` (`Application*Constants`, `ApplicationEnumeration`, `PermissionConstants`), `Models/` (`Filter/`, `HttpPost/`, `Interfaces/`), `Properties/`, `run.sh`. Dockerfiles (`backend/Dockerfile.{dev,qat,demo,prod}`) are built from the sage-admin root.
@@ -75,6 +77,8 @@ Integration tests create and drop their own database `SageAdmin_Test_<guid>` on 
 
 ## Writing SQL (ixcheck pattern)
 Build the statement with `StringBuilder _sqlQuery`, then call the shared wrappers: `ExecuteInsertAsync` (returns the new id), `ExecuteUpdateAsync` / `ExecuteDeleteAsync` (rows affected), `ExecuteCheckExistsAndInsertAsync` (409 if it exists). They return `(IFunctionReturn, long)` and never throw for duplicates, foreign-key conflicts or SQL errors. Unlike ixcheck, values are always `@parameters`, never concatenated into the SQL text.
+
+Stored procedures: `ExecuteProcedureWriteAsync` (same `(IFunctionReturn, long)` shape; `long` = the procedure's `SELECT`ed value, by convention the new id or rows affected), `ExecuteProcedureScalarAsync`, `QueryProcedureAsync` (OUTPUT parameters are filled when it returns), `ExecuteProcedureAsync`. A procedure reports expected errors with `THROW 50404` (-> 404) or `THROW 50409` (-> 409); other `THROW` numbers reach C# as `DatabaseException.SqlErrorNumber` (e.g. `50001` for an already-used refresh token).
 
 ## Frontend layout
 `frontend/src/app/(admin)/<module>/page.tsx` is one folder per module (dashboard, users, groups, permissions, audit-logs, profile, settings, change-password); pages are thin and import their screens from `frontend/src/features/<module>/`. Shared UI is in `components/`, API calls in `services/`, types in `types/`.

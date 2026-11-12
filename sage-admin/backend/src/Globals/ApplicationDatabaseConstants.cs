@@ -22,6 +22,22 @@ namespace SageAdminApi.Globals
             public const string AdminUserEffectivePermissions = "dbo.vw_AdminUserEffectivePermissions";
         }
 
+        /// <summary>Stored procedures (backend/database/StoredProcedures). Use these names, never build a procedure name from input.</summary>
+        public static class StoredProcedures
+        {
+            public const string AdminUserRecordFailedLogin = "dbo.usp_AdminUser_RecordFailedLogin";
+            public const string AdminUserRecordSuccessfulLogin = "dbo.usp_AdminUser_RecordSuccessfulLogin";
+            public const string AdminUserSetPassword = "dbo.usp_AdminUser_SetPassword";
+            public const string AdminUserGetEffectivePermissions = "dbo.usp_AdminUser_GetEffectivePermissions";
+            public const string RefreshTokenRotate = "dbo.usp_RefreshToken_Rotate";
+            public const string PasswordResetTokenCreate = "dbo.usp_PasswordResetToken_Create";
+            public const string ModuleCreate = "dbo.usp_Module_Create";
+            public const string ModuleUpdate = "dbo.usp_Module_Update";
+            public const string PermissionCreate = "dbo.usp_Permission_Create";
+            public const string PermissionUpdate = "dbo.usp_Permission_Update";
+            public const string PermissionGetPaged = "dbo.usp_Permission_GetPaged";
+        }
+
         public static class ColumnNames
         {
             public const string Id = "Id";

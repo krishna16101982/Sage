@@ -65,6 +65,18 @@ public class DatabaseSchemaTests
     }
 
     [Fact]
+    public async Task StoredProcedures_EveryProcedureTheApiCallsExists()
+    {
+        var db = TestDb.Create(_fx.ConnectionString);
+        var names = typeof(SageAdminApi.Globals.ApplicationDatabaseConstants.StoredProcedures)
+            .GetFields().Where(f => f.IsLiteral).Select(f => (string)f.GetRawConstantValue()!).ToList();
+        names.ShouldNotBeEmpty();
+        foreach (var name in names)
+            (await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM sys.procedures WHERE object_id = OBJECT_ID(@n)", new[] { TestDb.P("@n", name) }))
+                .ShouldBe(1, $"missing stored procedure {name}");
+    }
+
+    [Fact]
     public async Task Scripts_AreIdempotent_RerunningAllScriptsSucceedsWithoutDuplicates()
     {
         var before = TestDb.Create(_fx.ConnectionString);

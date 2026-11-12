@@ -18,6 +18,7 @@ using SageCommonLib.Globals;
 using SageCommonLib.Models;
 using SageCommonLib.Models.Interfaces;
 using SageCommonLib.Security;
+using SP = SageAdminApi.Globals.ApplicationDatabaseConstants.StoredProcedures;
 
 namespace SageAdminApi.AppFunctions
 {
@@ -156,11 +157,10 @@ namespace SageAdminApi.AppFunctions
 
         private async Task<CurrentUserResponse> BuildCurrentUserAsync(AdminUser _user, CancellationToken _ct)
         {
-            string _sql = _user.IsSuperAdmin
-                ? "SELECT p.Code, m.Code, m.Name FROM dbo.Permissions p JOIN dbo.Modules m ON m.Id = p.ModuleId WHERE p.IsActive = 1 AND m.IsActive = 1 ORDER BY m.SortOrder, p.Code"
-                : "SELECT v.PermissionCode, v.ModuleCode, m.Name FROM dbo.vw_AdminUserEffectivePermissions v JOIN dbo.Modules m ON m.Id = v.ModuleId WHERE v.UserId = @id ORDER BY m.SortOrder, v.PermissionCode";
-            var _rows = await _databaseFunctions.QueryAsync(_sql, r => (Permission: r.GetString(0), ModuleCode: r.GetString(1), ModuleName: r.GetString(2)),
-                _user.IsSuperAdmin ? null : new[] { P("@id", _user.Id) }, _ct);
+            // The procedure applies the Super Admin rule (all active permissions) itself.
+            var _rows = await _databaseFunctions.QueryProcedureAsync(SP.AdminUserGetEffectivePermissions,
+                r => (Permission: r.GetString(0), ModuleCode: r.GetString(1), ModuleName: r.GetString(2)),
+                new[] { P("@UserId", _user.Id) }, _ct);
 
             return new CurrentUserResponse
             {
@@ -193,15 +193,8 @@ namespace SageAdminApi.AppFunctions
         /// </summary>
         private async Task SetPasswordAsync(long _userId, string _newHash, string _revokeReason, CancellationToken _ct)
         {
-            var _sqlQuery = new StringBuilder();
-            _sqlQuery.Append(" SET XACT_ABORT ON; BEGIN TRAN; ");
-            _sqlQuery.Append(" UPDATE dbo.AdminUsers SET PasswordHash = @hash, PasswordUpdatedAtUtc = @now, MustChangePassword = 0, FailedLoginCount = 0, LockoutEndUtc = NULL, ");
-            _sqlQuery.Append("        PermissionVersion = PermissionVersion + 1, UpdatedAtUtc = @now WHERE Id = @uid; ");
-            _sqlQuery.Append(" UPDATE dbo.PasswordResetTokens SET UsedAtUtc = @now WHERE UserId = @uid AND UsedAtUtc IS NULL; ");
-            _sqlQuery.Append(" UPDATE dbo.RefreshTokens SET RevokedAtUtc = @now, RevokedReason = @reason WHERE UserId = @uid AND RevokedAtUtc IS NULL; ");
-            _sqlQuery.Append(" COMMIT; ");
-            EnsureOk(await _databaseFunctions.ExecuteUpdateAsync(_sqlQuery.ToString(),
-                new[] { P("@hash", _newHash), Dt("@now", DateTime.UtcNow), P("@uid", _userId), P("@reason", _revokeReason) }, "F:Auth:SetPassword", null, _ct));
+            EnsureOk(await _databaseFunctions.ExecuteProcedureWriteAsync(SP.AdminUserSetPassword,
+                new[] { P("@UserId", _userId), P("@PasswordHash", _newHash), Dt("@NowUtc", DateTime.UtcNow), P("@RevokeReason", _revokeReason) }, "F:Auth:SetPassword", null, _ct));
         }
 
         #endregion
@@ -246,15 +239,10 @@ namespace SageAdminApi.AppFunctions
 
                 if (!SecurityHash.VerifyHashedPassword(_user.PasswordHash, _password))
                 {
-                    // UPDATE: count the failure; at the limit start the lockout and reset the counter (one statement, no race).
-                    var _sqlQuery = new StringBuilder();
-                    _sqlQuery.Append(" UPDATE dbo.AdminUsers SET ");
-                    _sqlQuery.Append("  LockoutEndUtc = CASE WHEN FailedLoginCount + 1 >= @max THEN @lockEnd ELSE LockoutEndUtc END, ");
-                    _sqlQuery.Append("  FailedLoginCount = CASE WHEN FailedLoginCount + 1 >= @max THEN 0 ELSE FailedLoginCount + 1 END ");
-                    _sqlQuery.Append(" WHERE Id = @id ");
-                    EnsureOk(await _databaseFunctions.ExecuteUpdateAsync(_sqlQuery.ToString(), new[]
+                    // Count the failure; at the limit the procedure starts the lockout and resets the counter.
+                    EnsureOk(await _databaseFunctions.ExecuteProcedureWriteAsync(SP.AdminUserRecordFailedLogin, new[]
                     {
-                        P("@max", _authSettings.MaxFailedLoginAttempts), Dt("@lockEnd", _now.AddMinutes(_authSettings.LockoutMinutes)), P("@id", _user.Id)
+                        P("@UserId", _user.Id), P("@MaxFailedAttempts", _authSettings.MaxFailedLoginAttempts), Dt("@LockoutEndUtc", _now.AddMinutes(_authSettings.LockoutMinutes))
                     }, _methodName, null, _ct));
                     await RecordLoginAsync(_user.Id, _identifier, false, "BadPassword", _ipAddress, _userAgent, _ct);
                     return (null, Unauthorized(ApplicationConstants.Auth.InvalidCredentials, _methodName));
@@ -262,12 +250,9 @@ namespace SageAdminApi.AppFunctions
 
                 // success: reset counters, upgrade the hash if the policy has been raised
                 bool _rehash = SecurityHash.NeedsRehash(_user.PasswordHash, _authSettings.PasswordHashIterations);
-                var _okQuery = new StringBuilder();
-                _okQuery.Append(" UPDATE dbo.AdminUsers SET FailedLoginCount = 0, LockoutEndUtc = NULL, LastLoginAtUtc = @now, ");
-                _okQuery.Append(" PasswordHash = CASE WHEN @rehash IS NULL THEN PasswordHash ELSE @rehash END WHERE Id = @id ");
-                EnsureOk(await _databaseFunctions.ExecuteUpdateAsync(_okQuery.ToString(), new[]
+                EnsureOk(await _databaseFunctions.ExecuteProcedureWriteAsync(SP.AdminUserRecordSuccessfulLogin, new[]
                 {
-                    Dt("@now", _now), P("@rehash", _rehash ? SecurityHash.HashPassword(_password, _authSettings.PasswordHashIterations) : null), P("@id", _user.Id)
+                    P("@UserId", _user.Id), Dt("@NowUtc", _now), P("@NewPasswordHash", _rehash ? SecurityHash.HashPassword(_password, _authSettings.PasswordHashIterations) : null)
                 }, _methodName, null, _ct));
 
                 (string _rawRefresh, DateTime _refreshExpires) = await CreateRefreshTokenAsync(_user.Id, Guid.NewGuid(), _ipAddress, _userAgent, _ct);
@@ -324,17 +309,12 @@ namespace SageAdminApi.AppFunctions
                 // Rotate: new token in the same family; the old one can be used exactly once.
                 string _newRaw = TokenGenerator.CreateSecureToken();
                 DateTime _newExpires = DateTime.UtcNow.AddDays(_jwtIssuerOptions.RefreshTokenDays);
-                const string _rotateSql = @"SET XACT_ABORT ON; BEGIN TRAN;
-INSERT dbo.RefreshTokens (UserId, TokenHash, FamilyId, ExpiresAtUtc, CreatedByIp, UserAgent) VALUES (@u, @h, @f, @exp, @ip, @ua);
-UPDATE dbo.RefreshTokens SET RevokedAtUtc = @now, RevokedReason = 'rotated', ReplacedByTokenId = SCOPE_IDENTITY() WHERE Id = @oldId AND RevokedAtUtc IS NULL;
-IF @@ROWCOUNT = 0 THROW 50001, 'Refresh token already used.', 1;
-COMMIT;";
                 try
                 {
-                    await _databaseFunctions.ExecuteNonQueryAsync(_rotateSql, new[]
+                    await _databaseFunctions.ExecuteProcedureScalarAsync<long>(SP.RefreshTokenRotate, new[]
                     {
-                        P("@u", _user.Id), P("@h", TokenGenerator.Hash(_newRaw)), P("@f", _token.FamilyId), Dt("@exp", _newExpires), Dt("@now", DateTime.UtcNow),
-                        P("@ip", Truncate(_ipAddress, 45)), P("@ua", Truncate(_userAgent, 500)), P("@oldId", _token.Id)
+                        P("@OldTokenId", _token.Id), P("@UserId", _user.Id), P("@TokenHash", TokenGenerator.Hash(_newRaw)), P("@FamilyId", _token.FamilyId),
+                        Dt("@ExpiresAtUtc", _newExpires), Dt("@NowUtc", DateTime.UtcNow), P("@CreatedByIp", Truncate(_ipAddress, 45)), P("@UserAgent", Truncate(_userAgent, 500))
                     }, _ct);
                 }
                 catch (DatabaseException ex) when (ex.SqlErrorNumber == SqlErrorTokenAlreadyUsed)
@@ -392,14 +372,9 @@ COMMIT;";
                         string _raw = TokenGenerator.CreateSecureToken();
                         DateTime _now = DateTime.UtcNow;
                         DateTime _expires = _now.AddMinutes(_authSettings.PasswordResetMinutes);
-                        // UPDATE old tokens + INSERT the new one in one transaction
-                        var _sqlQuery = new StringBuilder();
-                        _sqlQuery.Append(" SET XACT_ABORT ON; BEGIN TRAN; ");
-                        _sqlQuery.Append(" UPDATE dbo.PasswordResetTokens SET UsedAtUtc = @now WHERE UserId = @u AND UsedAtUtc IS NULL; ");
-                        _sqlQuery.Append(" INSERT dbo.PasswordResetTokens (UserId, TokenHash, ExpiresAtUtc, RequestedIp) VALUES (@u, @h, @exp, @ip); ");
-                        _sqlQuery.Append(" COMMIT; ");
-                        EnsureOk(await _databaseFunctions.ExecuteUpdateAsync(_sqlQuery.ToString(),
-                            new[] { Dt("@now", _now), P("@u", _user.Id), P("@h", TokenGenerator.Hash(_raw)), Dt("@exp", _expires), P("@ip", Truncate(_ipAddress, 45)) }, _methodName, null, _ct));
+                        // Invalidates the user's older reset tokens and inserts the new one in one transaction.
+                        EnsureOk(await _databaseFunctions.ExecuteProcedureWriteAsync(SP.PasswordResetTokenCreate,
+                            new[] { P("@UserId", _user.Id), P("@TokenHash", TokenGenerator.Hash(_raw)), Dt("@ExpiresAtUtc", _expires), Dt("@NowUtc", _now), P("@RequestedIp", Truncate(_ipAddress, 45)) }, _methodName, null, _ct));
                         await _passwordResetNotifier.SendAsync(_user.Email, _user.FirstName, _raw, _expires, _ct);
                         await _auditFunctions.LogAsync(_user.Id, ApplicationEnumeration.AuditAction.PasswordReset.ToString() + "Requested", ApplicationEnumeration.ObjectType.AdminUser.ToString(), _user.PublicId.ToString(), null, null, _ipAddress, _ct);
                     }

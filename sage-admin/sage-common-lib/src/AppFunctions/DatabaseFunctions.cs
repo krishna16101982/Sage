@@ -18,40 +18,89 @@ public class DatabaseFunctions : IDatabaseFunctions
         _databaseSettings = __databaseSettings;
     }
 
-    public Task<int> ExecuteNonQueryAsync(string sql, IEnumerable<SqlParameter>? parameters = null, CancellationToken ct = default)
+    #region Core execution (text or stored procedure)
+
+    private Task<int> NonQueryCoreAsync(string commandText, CommandType commandType, IEnumerable<SqlParameter>? parameters, CancellationToken ct)
         => WithRetryAsync(async () =>
         {
             await using var conn = await _connectionFactory.OpenConnectionAsync(ct).ConfigureAwait(false);
-            await using var cmd = CreateCommand(conn, null, sql, parameters);
-            return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            await using var cmd = CreateCommand(conn, null, commandText, parameters, commandType);
+            try { return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false); }
+            finally { cmd.Parameters.Clear(); }
         });
 
-    public Task<T?> ExecuteScalarAsync<T>(string sql, IEnumerable<SqlParameter>? parameters = null, CancellationToken ct = default)
+    private Task<T?> ScalarCoreAsync<T>(string commandText, CommandType commandType, IEnumerable<SqlParameter>? parameters, CancellationToken ct)
         => WithRetryAsync(async () =>
         {
             await using var conn = await _connectionFactory.OpenConnectionAsync(ct).ConfigureAwait(false);
-            await using var cmd = CreateCommand(conn, null, sql, parameters);
-            var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            await using var cmd = CreateCommand(conn, null, commandText, parameters, commandType);
+            object? result;
+            try { result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false); }
+            finally { cmd.Parameters.Clear(); }
             if (result is null || result is DBNull) return default;
             return (T)Convert.ChangeType(result, Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T));
         });
 
-    public Task<IReadOnlyList<T>> QueryAsync<T>(string sql, Func<SqlDataReader, T> map, IEnumerable<SqlParameter>? parameters = null, CancellationToken ct = default)
+    private Task<IReadOnlyList<T>> QueryCoreAsync<T>(string commandText, CommandType commandType, Func<SqlDataReader, T> map, IEnumerable<SqlParameter>? parameters, CancellationToken ct)
         => WithRetryAsync<IReadOnlyList<T>>(async () =>
         {
             await using var conn = await _connectionFactory.OpenConnectionAsync(ct).ConfigureAwait(false);
-            await using var cmd = CreateCommand(conn, null, sql, parameters);
-            await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            await using var cmd = CreateCommand(conn, null, commandText, parameters, commandType);
             var list = new List<T>();
-            while (await reader.ReadAsync(ct).ConfigureAwait(false)) list.Add(map(reader));
+            try
+            {
+                // OUTPUT parameters are filled in only once the reader is closed, so it is disposed before the parameters are released.
+                await using (var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false))
+                {
+                    while (await reader.ReadAsync(ct).ConfigureAwait(false)) list.Add(map(reader));
+                }
+            }
+            finally { cmd.Parameters.Clear(); }
             return list;
         });
+
+    #endregion
+
+    public Task<int> ExecuteNonQueryAsync(string sql, IEnumerable<SqlParameter>? parameters = null, CancellationToken ct = default)
+        => NonQueryCoreAsync(sql, CommandType.Text, parameters, ct);
+
+    public Task<T?> ExecuteScalarAsync<T>(string sql, IEnumerable<SqlParameter>? parameters = null, CancellationToken ct = default)
+        => ScalarCoreAsync<T>(sql, CommandType.Text, parameters, ct);
+
+    public Task<IReadOnlyList<T>> QueryAsync<T>(string sql, Func<SqlDataReader, T> map, IEnumerable<SqlParameter>? parameters = null, CancellationToken ct = default)
+        => QueryCoreAsync(sql, CommandType.Text, map, parameters, ct);
 
     public async Task<T?> QuerySingleOrDefaultAsync<T>(string sql, Func<SqlDataReader, T> map, IEnumerable<SqlParameter>? parameters = null, CancellationToken ct = default)
     {
         var rows = await QueryAsync(sql, map, parameters, ct).ConfigureAwait(false);
         return rows.Count == 0 ? default : rows[0];
     }
+
+    #region Stored procedures
+
+    public Task<int> ExecuteProcedureAsync(string procedureName, IEnumerable<SqlParameter>? parameters = null, CancellationToken ct = default)
+        => NonQueryCoreAsync(procedureName, CommandType.StoredProcedure, parameters, ct);
+
+    public Task<T?> ExecuteProcedureScalarAsync<T>(string procedureName, IEnumerable<SqlParameter>? parameters = null, CancellationToken ct = default)
+        => ScalarCoreAsync<T>(procedureName, CommandType.StoredProcedure, parameters, ct);
+
+    public Task<IReadOnlyList<T>> QueryProcedureAsync<T>(string procedureName, Func<SqlDataReader, T> map, IEnumerable<SqlParameter>? parameters = null, CancellationToken ct = default)
+        => QueryCoreAsync(procedureName, CommandType.StoredProcedure, map, parameters, ct);
+
+    public async Task<(IFunctionReturn functionReturn, long retValue)> ExecuteProcedureWriteAsync(string procedureName, IEnumerable<SqlParameter>? parameters, string methodName, string? successMessage = null, CancellationToken ct = default)
+    {
+        try
+        {
+            long value = await ScalarCoreAsync<long>(procedureName, CommandType.StoredProcedure, Clone(parameters), ct).ConfigureAwait(false);
+            return (Success(methodName, successMessage), value);
+        }
+        catch (AppException ex)
+        {
+            return (FunctionReturn.Fail(ex.MessageType, ex.Message, ex.HttpStatusCode, methodName), 0);
+        }
+    }
+
+    #endregion
 
     public async Task<T> ExecuteInTransactionAsync<T>(Func<SqlConnection, SqlTransaction, Task<T>> work, CancellationToken ct = default)
     {
@@ -79,7 +128,7 @@ public class DatabaseFunctions : IDatabaseFunctions
 
     /// <summary>Each command needs its own parameter objects (a SqlParameter belongs to one command).</summary>
     private static List<SqlParameter> Clone(IEnumerable<SqlParameter>? parameters)
-        => parameters == null ? new List<SqlParameter>() : parameters.Select(p => new SqlParameter(p.ParameterName, p.Value) { SqlDbType = p.SqlDbType, Size = p.Size }).ToList();
+        => parameters == null ? new List<SqlParameter>() : parameters.Select(p => new SqlParameter(p.ParameterName, p.Value) { SqlDbType = p.SqlDbType, Size = p.Size, Direction = p.Direction }).ToList();
 
     private static IFunctionReturn Success(string methodName, string? message)
     {
@@ -143,10 +192,14 @@ public class DatabaseFunctions : IDatabaseFunctions
 
     /// <summary>Helper for transactional callers to build commands on the shared connection.</summary>
     public SqlCommand CreateCommand(SqlConnection conn, SqlTransaction? tx, string sql, IEnumerable<SqlParameter>? parameters)
+        => CreateCommand(conn, tx, sql, parameters, CommandType.Text);
+
+    /// <summary>Same as above; commandType = StoredProcedure when commandText is a procedure name.</summary>
+    public SqlCommand CreateCommand(SqlConnection conn, SqlTransaction? tx, string commandText, IEnumerable<SqlParameter>? parameters, CommandType commandType)
     {
         var cmd = conn.CreateCommand();
-        cmd.CommandText = sql;
-        cmd.CommandType = CommandType.Text;
+        cmd.CommandText = commandText;
+        cmd.CommandType = commandType;
         cmd.CommandTimeout = _databaseSettings.CommandTimeoutSeconds;
         cmd.Transaction = tx;
         if (parameters is not null) foreach (var p in parameters) cmd.Parameters.Add(p);
@@ -176,8 +229,10 @@ public class DatabaseFunctions : IDatabaseFunctions
     /// <summary>Maps SQL errors to app exceptions without leaking server details to clients.</summary>
     public static AppException Map(SqlException ex) => ex.Number switch
     {
-        2627 or 2601 => new ConflictException("A record with the same unique value already exists."),
-        547 => new ConflictException("The operation conflicts with related data."),
+        DatabaseConstants.SqlErrorNumbers.UniqueConstraintViolation or DatabaseConstants.SqlErrorNumbers.UniqueIndexViolation or DatabaseConstants.SqlErrorNumbers.ProcedureAlreadyExists
+            => new ConflictException("A record with the same unique value already exists."),
+        DatabaseConstants.SqlErrorNumbers.ForeignKeyViolation => new ConflictException("The operation conflicts with related data."),
+        DatabaseConstants.SqlErrorNumbers.ProcedureNotFound => new NotFoundException("The record was not found."),
         _ => new DatabaseException("A database error occurred.", ex.Number, ex)
     };
 }

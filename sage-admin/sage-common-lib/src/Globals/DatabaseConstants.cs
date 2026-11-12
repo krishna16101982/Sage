@@ -32,6 +32,12 @@ namespace SageCommonLib.Globals
             public const int UniqueIndexViolation = 2601;
             public const int ForeignKeyViolation = 547;
             public const int Deadlock = 1205;
+
+            // Raised by our stored procedures with THROW (user error numbers start at 50000).
+            /// <summary>THROW 50404: the referenced record does not exist.</summary>
+            public const int ProcedureNotFound = 50404;
+            /// <summary>THROW 50409: the record already exists.</summary>
+            public const int ProcedureAlreadyExists = 50409;
         }
     }
 }
