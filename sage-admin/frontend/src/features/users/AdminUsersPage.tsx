@@ -84,10 +84,10 @@ export function AdminUsersPage() {
   const sortHeader = (key: SortKey, label: string) => {
     const active = sortBy === key;
     return (
-      <th className="px-3 py-2" aria-sort={active ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
+      <th aria-sort={active ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
         <button
           type="button"
-          className="font-semibold"
+          className="sort-button"
           onClick={() => {
             if (active) setSortDirection(sortDirection === "asc" ? "desc" : "asc");
             else {
@@ -104,14 +104,14 @@ export function AdminUsersPage() {
     );
   };
 
-  const field = "rounded border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700";
+  const field = "field field-inline";
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Admin Users</h1>
-      <p className="text-sm text-zinc-500">Accounts for this Admin Panel. A user&apos;s permission group decides what they can see and do.</p>
+      <h1 className="page-title">Admin Users</h1>
+      <p className="text-sm text-muted">Accounts for this Admin Panel. A user&apos;s permission group decides what they can see and do.</p>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="toolbar">
         <input
           aria-label="Search admin users"
           placeholder="Search name, username, email, mobile"
@@ -132,15 +132,15 @@ export function AdminUsersPage() {
           }}
         >
           <option value="">Any status</option>
-          <option value="Active" className="text-black">Active</option>
-          <option value="Inactive" className="text-black">Inactive</option>
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
         </select>
-        <div className="flex-1" />
+        <div className="toolbar-spacer" />
         <Can permission={Perm.AdminUserAdd}>
           <button
             type="button"
             onClick={() => setDialog({ kind: "form" })}
-            className="rounded bg-zinc-900 px-3 py-2 text-sm text-white dark:bg-zinc-100 dark:text-zinc-900"
+            className="btn btn-primary"
           >
             Add admin user
           </button>
@@ -150,70 +150,70 @@ export function AdminUsersPage() {
       {error && <Alert kind="error">{error}</Alert>}
       {notice && <Alert kind="success">{notice}</Alert>}
 
-      <div className="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-50 dark:bg-zinc-900">
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
             <tr>
               {sortHeader("name", "Name")}
               {sortHeader("username", "Username")}
               {sortHeader("group", "Group")}
               {sortHeader("status", "Status")}
               {sortHeader("lastLoginAtUtc", "Last sign-in")}
-              <th className="px-3 py-2" />
+              <th />
             </tr>
           </thead>
           <tbody>
             {data?.items.map((u) => (
-              <tr key={u.id} className="border-t border-zinc-200 dark:border-zinc-800">
-                <td className="px-3 py-2">
+              <tr key={u.id}>
+                <td>
                   {u.firstName} {u.lastName}
-                  {isMe(u) && <span className="ml-2 text-xs text-zinc-500">(you)</span>}
-                  <div className="text-xs text-zinc-500">
+                  {isMe(u) && <span className="badge">(you)</span>}
+                  <div className="hint">
                     {u.email}
                     {u.mobileNumber && ` · ${u.mobileNumber}`}
                   </div>
                 </td>
-                <td className="px-3 py-2 font-mono">{u.username}</td>
-                <td className="px-3 py-2">
+                <td className="code">{u.username}</td>
+                <td>
                   {u.isSuperAdmin ? (
-                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900 dark:bg-amber-900 dark:text-amber-100">Super Admin</span>
+                    <span className="badge badge-warning">Super Admin</span>
                   ) : u.groupName ? (
                     <>
                       {u.groupName}
-                      {!u.groupIsActive && <span className="ml-2 text-xs text-red-600">group inactive</span>}
+                      {!u.groupIsActive && <span className="badge badge-danger">group inactive</span>}
                     </>
                   ) : (
-                    <span className="text-zinc-500">No group</span>
+                    <span className="text-muted">No group</span>
                   )}
                 </td>
-                <td className="px-3 py-2">
+                <td>
                   {u.status}
-                  {u.isLockedOut && <span className="ml-2 text-xs text-red-600">locked out</span>}
-                  {u.mustChangePassword && <div className="text-xs text-zinc-500">must change password</div>}
+                  {u.isLockedOut && <span className="badge badge-danger">locked out</span>}
+                  {u.mustChangePassword && <div className="hint">must change password</div>}
                 </td>
-                <td className="px-3 py-2 text-xs">{formatDate(u.lastLoginAtUtc)}</td>
-                <td className="space-x-3 whitespace-nowrap px-3 py-2 text-right">
+                <td className="date">{formatDate(u.lastLoginAtUtc)}</td>
+                <td className="actions">
                   {canManage(u) && (
                     <>
                       {canEdit && (
-                        <button type="button" className="underline" onClick={() => setDialog({ kind: "form", user: u })}>
+                        <button type="button" className="link-button" onClick={() => setDialog({ kind: "form", user: u })}>
                           Edit
                         </button>
                       )}
                       {canReset && !isMe(u) && (
-                        <button type="button" className="underline" onClick={() => setDialog({ kind: "password", user: u })}>
+                        <button type="button" className="link-button" onClick={() => setDialog({ kind: "password", user: u })}>
                           Reset password
                         </button>
                       )}
                       {canChangeStatus && u.status === "Active" && u.isLockedOut && (
-                        <button type="button" className="underline" onClick={() => changeStatus(u, "Active")}>
+                        <button type="button" className="link-button" onClick={() => changeStatus(u, "Active")}>
                           Unlock
                         </button>
                       )}
                       {canChangeStatus && !isMe(u) && (
                         <button
                           type="button"
-                          className={`underline ${u.status === "Active" ? "text-red-600" : ""}`}
+                          className={`link-button ${u.status === "Active" ? "danger" : ""}`}
                           onClick={() => changeStatus(u, u.status === "Active" ? "Inactive" : "Active")}
                         >
                           {u.status === "Active" ? "Deactivate" : "Activate"}
@@ -226,14 +226,14 @@ export function AdminUsersPage() {
             ))}
             {!loading && data?.items.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-zinc-500">
+                <td colSpan={6} className="table-empty">
                   No admin users match.
                 </td>
               </tr>
             )}
             {loading && !data && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-zinc-500">
+                <td colSpan={6} className="table-empty">
                   Loading...
                 </td>
               </tr>

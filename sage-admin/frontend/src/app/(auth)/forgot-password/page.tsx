@@ -35,7 +35,7 @@ export default function ForgotPasswordPage() {
         <TextField label="Email" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
         <SubmitButton busy={busy}>Send reset link</SubmitButton>
       </form>
-      <Link href="/login" className="block text-sm underline">
+      <Link href="/login" className="link-button text-sm">
         Back to sign in
       </Link>
     </AuthCard>

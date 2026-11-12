@@ -44,19 +44,16 @@ export function PermissionsPage() {
     loadModules();
   };
 
-  const tabClass = (t: Tab) =>
-    `border-b-2 px-4 py-2 text-sm ${tab === t ? "border-zinc-900 font-semibold dark:border-zinc-100" : "border-transparent text-zinc-500"}`;
-
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Permissions</h1>
+      <h1 className="page-title">Permissions</h1>
       {error && <Alert kind="error">{error}</Alert>}
 
-      <div role="tablist" className="flex border-b border-zinc-200 dark:border-zinc-800">
-        <button role="tab" aria-selected={tab === "permissions"} className={tabClass("permissions")} onClick={() => setTab("permissions")}>
+      <div role="tablist" className="tabs">
+        <button role="tab" aria-selected={tab === "permissions"} className="tab" onClick={() => setTab("permissions")}>
           Permissions
         </button>
-        <button role="tab" aria-selected={tab === "modules"} className={tabClass("modules")} onClick={() => setTab("modules")}>
+        <button role="tab" aria-selected={tab === "modules"} className="tab" onClick={() => setTab("modules")}>
           Modules
         </button>
       </div>

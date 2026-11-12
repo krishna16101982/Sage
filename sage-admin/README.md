@@ -142,5 +142,16 @@ Build the statement with `StringBuilder _sqlQuery`, then call the shared wrapper
 
 Stored procedures: `ExecuteProcedureWriteAsync` (same `(IFunctionReturn, long)` shape; `long` = the procedure's `SELECT`ed value, by convention the new id or rows affected), `ExecuteProcedureScalarAsync`, `QueryProcedureAsync` (OUTPUT parameters are filled when it returns), `ExecuteProcedureAsync`. A procedure reports expected errors with `THROW 50400` (-> 400), `THROW 50404` (-> 404) or `THROW 50409` (-> 409), and the THROW message is returned to the client, so write it for the user. Other `THROW` numbers reach C# as `DatabaseException.SqlErrorNumber` (e.g. `50001` for an already-used refresh token).
 
+## Frontend styling (how to change the look)
+All styling lives in three files under `frontend/src/styles/`:
+
+| File | Change it to... |
+|------|-----------------|
+| `theme.css` | change colours, corner radius, fonts, sidebar width. Every colour is a named variable (`--color-primary`, `--color-danger`, ...) with a light value and a dark-mode value. |
+| `components.css` | change how a kind of element looks everywhere: buttons (`btn btn-primary`, `btn-secondary`, `btn-danger`, `link-button`), form fields (`field`, `field-label`, `checkbox-label`), tables (`table-wrap`, `data-table`, `amount`, `actions`, `date`), `badge`, `alert`, `card`, `tabs`, dialogs (`modal`), sidebar and header. |
+| `globals.css` | entry point only (imports the two files above and Tailwind). |
+
+Screens use these class names, plus a few plain Tailwind utilities for layout (`flex`, `gap-2`, `w-64`, `space-y-4`). Example: to make every main button blue, set `--color-primary` (and `--color-primary-hover`) in `theme.css`; nothing else changes.
+
 ## Frontend layout
 `frontend/src/app/(admin)/<module>/page.tsx` is one folder per module (dashboard, users, groups, permissions, audit-logs, profile, settings, change-password); pages are thin and import their screens from `frontend/src/features/<module>/`. Shared UI is in `components/`, API calls in `services/`, types in `types/`.

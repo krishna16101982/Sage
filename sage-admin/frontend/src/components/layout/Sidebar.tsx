@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { hasPermission } from "@/utils/permissions";
 
@@ -19,13 +20,14 @@ const ITEMS = [
 
 export function Sidebar() {
   const { user } = useAuth();
+  const pathname = usePathname();
   return (
-    <nav aria-label="Main" className="w-56 shrink-0 border-r border-zinc-200 p-4 dark:border-zinc-800">
-      <div className="mb-6 text-lg font-semibold">Sage Admin</div>
+    <nav aria-label="Main" className="sidebar">
+      <div className="sidebar-title">Sage Admin</div>
       <ul className="space-y-1">
         {ITEMS.filter((i) => hasPermission(user, i.permission)).map((i) => (
           <li key={i.href}>
-            <Link className="block rounded px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800" href={i.href}>
+            <Link className="sidebar-link" href={i.href} aria-current={pathname.startsWith(i.href) ? "page" : undefined}>
               {i.label}
             </Link>
           </li>

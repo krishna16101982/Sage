@@ -7,7 +7,7 @@ import { createSalesUser, getSalesManagers, resetSalesUserPassword, updateSalesU
 import { ApiError } from "@/types/api";
 import { SALES_ROLE_LABEL, type SalesManagerOption, type SalesRole, type SalesUser } from "@/types/salesUser";
 
-const field = "mt-1 w-full rounded border border-zinc-300 bg-transparent px-3 py-2 dark:border-zinc-700";
+const field = "field";
 const errorText = (err: unknown) => (err instanceof ApiError ? err.messages.join(" ") : "Something went wrong. Please try again.");
 const PASSWORD_HINT = "At least 10 characters with upper and lower case letters, a digit and a symbol.";
 
@@ -69,7 +69,7 @@ export function SalesUserFormDialog({ user, onClose, onSaved }: { user?: SalesUs
     <Modal title={editing ? "Edit sales user" : "Add sales user"} onClose={onClose}>
       <form onSubmit={onSubmit} className="space-y-4">
         {error && <Alert kind="error">{error}</Alert>}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="form-grid-2">
           <TextField label="First name" required value={firstName} onChange={(e) => setFirstName(e.target.value)} maxLength={100} />
           <TextField label="Last name" required value={lastName} onChange={(e) => setLastName(e.target.value)} maxLength={100} />
         </div>
@@ -87,26 +87,26 @@ export function SalesUserFormDialog({ user, onClose, onSaved }: { user?: SalesUs
               </label>
             ))}
           </div>
-          <p className="text-xs text-zinc-500">A sales manager can also sell, and sees their team&apos;s sales.</p>
+          <p className="hint">A sales manager can also sell, and sees their team&apos;s sales.</p>
         </fieldset>
         {demotingManagerWithTeam && (
           <Alert kind="error">This manager has {user?.teamSize} sales person(s). Move them to another manager before changing the role.</Alert>
         )}
 
         {role === "SalesPerson" && (
-          <label className="block text-sm">
+          <label className="field-label">
             Sales manager
             <select required value={managerId} onChange={(e) => setManagerId(e.target.value)} className={field}>
-              <option value="" className="text-black">
+              <option value="">
                 {managers === null ? "Loading..." : managerOptions.length === 0 ? "No active sales managers yet" : "Select a manager"}
               </option>
               {currentMissing && user?.managerId && (
-                <option value={user.managerId} className="text-black">
+                <option value={user.managerId}>
                   {user.managerName} (inactive)
                 </option>
               )}
               {managerOptions.map((m) => (
-                <option key={m.id} value={m.id} className="text-black">
+                <option key={m.id} value={m.id}>
                   {m.name} ({m.username}) · team {m.teamSize}
                 </option>
               ))}
@@ -118,7 +118,7 @@ export function SalesUserFormDialog({ user, onClose, onSaved }: { user?: SalesUs
           <>
             <TextField label="Temporary password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
             <TextField label="Confirm password" type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" />
-            <p className="text-xs text-zinc-500">{PASSWORD_HINT} The user must change it at first sign-in to the User Panel.</p>
+            <p className="hint">{PASSWORD_HINT} The user must change it at first sign-in to the User Panel.</p>
           </>
         )}
         <SubmitButton busy={busy}>{editing ? "Save changes" : "Create sales user"}</SubmitButton>
@@ -154,7 +154,7 @@ export function ResetPasswordDialog({ user, onClose, onDone }: { user: SalesUser
         {error && <Alert kind="error">{error}</Alert>}
         <TextField label="Temporary password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
         <TextField label="Confirm password" type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" />
-        <p className="text-xs text-zinc-500">{PASSWORD_HINT} Their current sessions end and any lockout is cleared.</p>
+        <p className="hint">{PASSWORD_HINT} Their current sessions end and any lockout is cleared.</p>
         <SubmitButton busy={busy}>Set temporary password</SubmitButton>
       </form>
     </Modal>

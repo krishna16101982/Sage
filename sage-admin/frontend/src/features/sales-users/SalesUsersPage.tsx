@@ -90,10 +90,10 @@ export function SalesUsersPage() {
   const sortHeader = (key: SortKey, label: string) => {
     const active = sortBy === key;
     return (
-      <th className="px-3 py-2" aria-sort={active ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
+      <th aria-sort={active ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
         <button
           type="button"
-          className="font-semibold"
+          className="sort-button"
           onClick={() => {
             if (active) setSortDirection(sortDirection === "asc" ? "desc" : "asc");
             else {
@@ -110,15 +110,15 @@ export function SalesUsersPage() {
     );
   };
 
-  const field = "rounded border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700";
+  const field = "field field-inline";
   const resetPage = () => setPage(1);
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Sales Users</h1>
-      <p className="text-sm text-zinc-500">Accounts for the User Panel. Sales persons report to a sales manager; managers can also sell.</p>
+      <h1 className="page-title">Sales Users</h1>
+      <p className="text-sm text-muted">Accounts for the User Panel. Sales persons report to a sales manager; managers can also sell.</p>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="toolbar">
         <input
           aria-label="Search sales users"
           placeholder="Search name, username, email, mobile"
@@ -139,8 +139,8 @@ export function SalesUsersPage() {
           }}
         >
           <option value="">Any role</option>
-          <option value="SalesPerson" className="text-black">Sales persons</option>
-          <option value="SalesManager" className="text-black">Sales managers</option>
+          <option value="SalesPerson">Sales persons</option>
+          <option value="SalesManager">Sales managers</option>
         </select>
         <select
           aria-label="Filter by status"
@@ -152,11 +152,11 @@ export function SalesUsersPage() {
           }}
         >
           <option value="">Any status</option>
-          <option value="Active" className="text-black">Active</option>
-          <option value="Inactive" className="text-black">Inactive</option>
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
         </select>
         {team && (
-          <span className="flex items-center gap-2 rounded bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-800">
+          <span className="chip">
             Team of {team.firstName} {team.lastName}
             <button
               type="button"
@@ -170,12 +170,12 @@ export function SalesUsersPage() {
             </button>
           </span>
         )}
-        <div className="flex-1" />
+        <div className="toolbar-spacer" />
         <Can permission={Perm.SalesUserAdd}>
           <button
             type="button"
             onClick={() => setDialog({ kind: "form" })}
-            className="rounded bg-zinc-900 px-3 py-2 text-sm text-white dark:bg-zinc-100 dark:text-zinc-900"
+            className="btn btn-primary"
           >
             Add sales user
           </button>
@@ -185,9 +185,9 @@ export function SalesUsersPage() {
       {error && <Alert kind="error">{error}</Alert>}
       {notice && <Alert kind="success">{notice}</Alert>}
 
-      <div className="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-50 dark:bg-zinc-900">
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
             <tr>
               {sortHeader("name", "Name")}
               {sortHeader("username", "Username")}
@@ -195,26 +195,26 @@ export function SalesUsersPage() {
               {sortHeader("manager", "Manager / Team")}
               {sortHeader("status", "Status")}
               {sortHeader("lastLoginAtUtc", "Last sign-in")}
-              <th className="px-3 py-2" />
+              <th />
             </tr>
           </thead>
           <tbody>
             {data?.items.map((u) => (
-              <tr key={u.id} className="border-t border-zinc-200 dark:border-zinc-800">
-                <td className="px-3 py-2">
+              <tr key={u.id}>
+                <td>
                   {u.firstName} {u.lastName}
-                  <div className="text-xs text-zinc-500">
+                  <div className="hint">
                     {u.email}
                     {u.mobileNumber && ` · ${u.mobileNumber}`}
                   </div>
                 </td>
-                <td className="px-3 py-2 font-mono">{u.username}</td>
-                <td className="px-3 py-2">{SALES_ROLE_LABEL[u.role]}</td>
-                <td className="px-3 py-2">
+                <td className="code">{u.username}</td>
+                <td>{SALES_ROLE_LABEL[u.role]}</td>
+                <td>
                   {u.role === "SalesManager" ? (
                     <button
                       type="button"
-                      className="underline disabled:no-underline disabled:opacity-60"
+                      className="link-button"
                       disabled={u.teamSize === 0}
                       onClick={() => {
                         setTeam(u);
@@ -228,32 +228,32 @@ export function SalesUsersPage() {
                     (u.managerName ?? "-")
                   )}
                 </td>
-                <td className="px-3 py-2">
+                <td>
                   {u.status}
-                  {u.isLockedOut && <span className="ml-2 text-xs text-red-600">locked out</span>}
-                  {u.mustChangePassword && <div className="text-xs text-zinc-500">must change password</div>}
+                  {u.isLockedOut && <span className="badge badge-danger">locked out</span>}
+                  {u.mustChangePassword && <div className="hint">must change password</div>}
                 </td>
-                <td className="px-3 py-2 text-xs">{formatDate(u.lastLoginAtUtc)}</td>
-                <td className="space-x-3 whitespace-nowrap px-3 py-2 text-right">
+                <td className="date">{formatDate(u.lastLoginAtUtc)}</td>
+                <td className="actions">
                   <Can permission={Perm.SalesUserEdit}>
-                    <button type="button" className="underline" onClick={() => setDialog({ kind: "form", user: u })}>
+                    <button type="button" className="link-button" onClick={() => setDialog({ kind: "form", user: u })}>
                       Edit
                     </button>
                   </Can>
                   <Can permission={Perm.SalesUserResetPassword}>
-                    <button type="button" className="underline" onClick={() => setDialog({ kind: "password", user: u })}>
+                    <button type="button" className="link-button" onClick={() => setDialog({ kind: "password", user: u })}>
                       Reset password
                     </button>
                   </Can>
                   {canChangeStatus && u.status === "Active" && u.isLockedOut && (
-                    <button type="button" className="underline" onClick={() => changeStatus(u, "Active")}>
+                    <button type="button" className="link-button" onClick={() => changeStatus(u, "Active")}>
                       Unlock
                     </button>
                   )}
                   {canChangeStatus && (
                     <button
                       type="button"
-                      className={`underline ${u.status === "Active" ? "text-red-600" : ""}`}
+                      className={`link-button ${u.status === "Active" ? "danger" : ""}`}
                       onClick={() => changeStatus(u, u.status === "Active" ? "Inactive" : "Active")}
                     >
                       {u.status === "Active" ? "Deactivate" : "Activate"}
@@ -264,14 +264,14 @@ export function SalesUsersPage() {
             ))}
             {!loading && data?.items.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-zinc-500">
+                <td colSpan={7} className="table-empty">
                   No sales users match. Create a sales manager first, then the sales persons who report to them.
                 </td>
               </tr>
             )}
             {loading && !data && (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-zinc-500">
+                <td colSpan={7} className="table-empty">
                   Loading...
                 </td>
               </tr>

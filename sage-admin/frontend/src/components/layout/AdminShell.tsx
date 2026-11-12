@@ -17,19 +17,19 @@ export function AdminShell({ children }: { children: ReactNode }) {
     else if (user.mustChangePassword && pathname !== "/change-password") router.replace("/change-password");
   }, [user, loading, pathname, router]);
 
-  if (loading || !user) return <div className="p-6 text-sm text-zinc-500">Loading...</div>;
+  if (loading || !user) return <div className="page-loading">Loading...</div>;
 
   return (
-    <div className="flex min-h-screen">
+    <div className="app-layout">
       <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-end gap-4 border-b border-zinc-200 px-6 py-3 text-sm dark:border-zinc-800">
+      <div className="app-main">
+        <header className="app-header">
           <span>
             {user.firstName} {user.lastName}
           </span>
           <button
             type="button"
-            className="underline"
+            className="link-button"
             onClick={async () => {
               await logout();
               router.replace("/login");
@@ -38,7 +38,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             Sign out
           </button>
         </header>
-        <main className="flex-1 p-6">{children}</main>
+        <main className="app-content">{children}</main>
       </div>
     </div>
   );

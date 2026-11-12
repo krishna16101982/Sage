@@ -55,11 +55,11 @@ export function PermissionsTab({
     return () => clearTimeout(t);
   }, [load, refreshKey]);
 
-  const field = "rounded border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700";
+  const field = "field field-inline";
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="toolbar">
         <input
           aria-label="Search permissions"
           placeholder="Search code, name or module"
@@ -81,7 +81,7 @@ export function PermissionsTab({
         >
           <option value="">All modules</option>
           {modules.map((m) => (
-            <option key={m.id} value={m.id} className="text-black">
+            <option key={m.id} value={m.id}>
               {m.name}
             </option>
           ))}
@@ -96,12 +96,12 @@ export function PermissionsTab({
           }}
         >
           <option value="">Any status</option>
-          <option value="true" className="text-black">Active</option>
-          <option value="false" className="text-black">Inactive</option>
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
         </select>
-        <div className="flex-1" />
+        <div className="toolbar-spacer" />
         <Can permission={Perm.PermissionAdd}>
-          <button type="button" onClick={onAdd} className="rounded bg-zinc-900 px-3 py-2 text-sm text-white dark:bg-zinc-100 dark:text-zinc-900">
+          <button type="button" onClick={onAdd} className="btn btn-primary">
             Add permission
           </button>
         </Can>
@@ -109,33 +109,33 @@ export function PermissionsTab({
 
       {error && <Alert kind="error">{error}</Alert>}
 
-      <div className="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-50 dark:bg-zinc-900">
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
             <tr>
-              <th className="px-3 py-2">Code</th>
-              <th className="px-3 py-2">Name</th>
-              <th className="px-3 py-2">Module</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2" />
+              <th>Code</th>
+              <th>Name</th>
+              <th>Module</th>
+              <th>Status</th>
+              <th />
             </tr>
           </thead>
           <tbody>
             {data?.items.map((p) => (
-              <tr key={p.id} className="border-t border-zinc-200 dark:border-zinc-800">
-                <td className="px-3 py-2 font-mono">{p.code}</td>
-                <td className="px-3 py-2">
+              <tr key={p.id}>
+                <td className="code">{p.code}</td>
+                <td>
                   {p.name}
-                  {p.description && <div className="text-xs text-zinc-500">{p.description}</div>}
+                  {p.description && <div className="hint">{p.description}</div>}
                 </td>
-                <td className="px-3 py-2">{p.moduleName}</td>
-                <td className="px-3 py-2">
+                <td>{p.moduleName}</td>
+                <td>
                   {p.isActive ? "Active" : "Inactive"}
-                  {p.isSystem && <span className="ml-2 text-xs text-zinc-500">system</span>}
+                  {p.isSystem && <span className="badge">system</span>}
                 </td>
-                <td className="px-3 py-2 text-right">
+                <td className="actions">
                   <Can permission={Perm.PermissionEdit}>
-                    <button type="button" className="underline" onClick={() => onEdit(p)}>
+                    <button type="button" className="link-button" onClick={() => onEdit(p)}>
                       Edit
                     </button>
                   </Can>
@@ -144,14 +144,14 @@ export function PermissionsTab({
             ))}
             {!loading && data?.items.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-zinc-500">
+                <td colSpan={5} className="table-empty">
                   No permissions match.
                 </td>
               </tr>
             )}
             {loading && !data && (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-zinc-500">
+                <td colSpan={5} className="table-empty">
                   Loading...
                 </td>
               </tr>

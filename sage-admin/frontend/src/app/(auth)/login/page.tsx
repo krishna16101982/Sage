@@ -37,7 +37,7 @@ export default function LoginPage() {
         <TextField label="Password" name="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         <SubmitButton busy={busy}>Sign in</SubmitButton>
       </form>
-      <Link href="/forgot-password" className="block text-sm underline">
+      <Link href="/forgot-password" className="link-button text-sm">
         Forgot password?
       </Link>
     </AuthCard>

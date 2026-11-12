@@ -108,7 +108,7 @@ export function GroupPermissionsDialog({ group, onClose, onSaved }: { group: Gro
     }
   }
 
-  const cell = "px-2 py-2 text-center";
+  const cell = "center";
 
   return (
     <Modal title={`Permissions: ${group.name}`} onClose={onClose} size="xl">
@@ -116,29 +116,29 @@ export function GroupPermissionsDialog({ group, onClose, onSaved }: { group: Gro
         {error && <Alert kind="error">{error}</Alert>}
         {saved && !dirty && <Alert kind="success">Permissions saved. Members get the new access on their next request.</Alert>}
         {group.status === "Inactive" && <Alert kind="error">This group is inactive, so it grants nothing until it is activated again.</Alert>}
-        {!canAssign && <p className="text-zinc-500">Read-only: you do not have permission to change group permissions.</p>}
+        {!canAssign && <p className="text-muted">Read-only: you do not have permission to change group permissions.</p>}
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="toolbar">
           <input
             aria-label="Filter modules"
             placeholder="Filter modules"
-            className="w-56 rounded border border-zinc-300 bg-transparent px-3 py-2 dark:border-zinc-700"
+            className="field field-inline w-56"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
-          <span className="text-zinc-500">
+          <span className="text-muted">
             {selected.size} selected{dirty && ` (${added} added, ${removed} removed)`}
           </span>
         </div>
 
-        {!detail && !error && <p className="py-6 text-center text-zinc-500">Loading...</p>}
+        {!detail && !error && <p className="table-empty">Loading...</p>}
 
         {detail && (
-          <div className="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
-            <table className="w-full text-sm">
-              <thead className="bg-zinc-50 dark:bg-zinc-900">
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <th className="px-3 py-2 text-left">Module</th>
+                  <th>Module</th>
                   <th className={cell}>All</th>
                   {actions.map((a) => {
                     const perms = grantable(columnPermissions(a));
@@ -164,8 +164,8 @@ export function GroupPermissionsDialog({ group, onClose, onSaved }: { group: Gro
               </thead>
               <tbody>
                 {byCategory.map(({ category, modules }) => [
-                  <tr key={`c-${category}`} className="border-t border-zinc-200 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-900/50">
-                    <td colSpan={actions.length + 2} className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  <tr key={`c-${category}`} className="group-row">
+                    <td colSpan={actions.length + 2}>
                       {category}
                     </td>
                   </tr>,
@@ -173,10 +173,10 @@ export function GroupPermissionsDialog({ group, onClose, onSaved }: { group: Gro
                     const perms = grantable(m.permissions);
                     const allOn = perms.length > 0 && perms.every((p) => selected.has(p.id));
                     return (
-                      <tr key={m.id} className="border-t border-zinc-200 dark:border-zinc-800">
-                        <td className="px-3 py-2">
+                      <tr key={m.id}>
+                        <td>
                           {m.name}
-                          {!m.isActive && <span className="ml-2 text-xs text-zinc-500">inactive module</span>}
+                          {!m.isActive && <span className="badge">inactive module</span>}
                         </td>
                         <td className={cell}>
                           {canAssign && (
@@ -214,7 +214,7 @@ export function GroupPermissionsDialog({ group, onClose, onSaved }: { group: Gro
                 ])}
                 {visibleModules.length === 0 && (
                   <tr>
-                    <td colSpan={actions.length + 2} className="px-3 py-6 text-center text-zinc-500">
+                    <td colSpan={actions.length + 2} className="table-empty">
                       No modules match.
                     </td>
                   </tr>
@@ -224,20 +224,20 @@ export function GroupPermissionsDialog({ group, onClose, onSaved }: { group: Gro
           </div>
         )}
 
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded border px-3 py-2">
+        <div className="modal-footer">
+          <button type="button" onClick={onClose} className="btn btn-secondary">
             {canAssign && dirty ? "Cancel" : "Close"}
           </button>
           {canAssign && (
             <>
-              <button type="button" disabled={!dirty || busy} onClick={() => detail && apply(detail)} className="rounded border px-3 py-2 disabled:opacity-40">
+              <button type="button" disabled={!dirty || busy} onClick={() => detail && apply(detail)} className="btn btn-secondary">
                 Reset
               </button>
               <button
                 type="button"
                 disabled={!dirty || busy}
                 onClick={onSave}
-                className="rounded bg-zinc-900 px-3 py-2 text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+                className="btn btn-primary"
               >
                 {busy ? "Saving..." : "Save permissions"}
               </button>

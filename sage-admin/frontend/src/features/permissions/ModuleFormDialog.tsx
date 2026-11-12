@@ -43,9 +43,9 @@ export function ModuleFormDialog({ module, onClose, onSaved }: { module?: Module
         <TextField label="Category" value={category} onChange={(e) => setCategory(e.target.value)} maxLength={100} placeholder="e.g. HR, Sales" />
         <TextField label="Sort order" type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
         {editing && (
-          <label className="flex items-center gap-2 text-sm">
+          <label className="checkbox-label">
             <input type="checkbox" checked={isActive} disabled={module?.isSystem} onChange={(e) => setIsActive(e.target.checked)} />
-            Active {module?.isSystem && <span className="text-xs text-zinc-500">(system modules cannot be deactivated)</span>}
+            Active {module?.isSystem && <span className="hint">(system modules cannot be deactivated)</span>}
           </label>
         )}
         <SubmitButton busy={busy}>{editing ? "Save changes" : "Create module"}</SubmitButton>

@@ -39,15 +39,15 @@ export function DeleteGroupDialog({ group, onClose, onDeleted }: { group: GroupI
             Delete <strong>{group.name}</strong> and its {group.permissionCount} permission grant(s)? This cannot be undone.
           </p>
         )}
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded border px-3 py-2">
+        <div className="modal-footer">
+          <button type="button" onClick={onClose} className="btn btn-secondary">
             Cancel
           </button>
           <button
             type="button"
             onClick={onDelete}
             disabled={busy || hasUsers}
-            className="rounded bg-red-600 px-3 py-2 text-white disabled:opacity-50"
+            className="btn btn-danger"
           >
             {busy ? "Deleting..." : "Delete"}
           </button>

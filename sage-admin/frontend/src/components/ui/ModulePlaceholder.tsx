@@ -1,9 +1,9 @@
 /** Temporary body for module screens that are delivered in a later sprint. */
-export function ModulePlaceholder({ title, sprint }: { title: string; sprint: number }) {
+export function ModulePlaceholder({ title }: { title: string }) {
   return (
     <div className="space-y-2">
-      <h1 className="text-2xl font-semibold">{title}</h1>
-      <p className="text-sm text-zinc-500">This screen is delivered in Sprint {sprint}.</p>
+      <h1 className="page-title">{title}</h1>
+      <p className="text-muted text-sm">This screen is coming in a later sprint.</p>
     </div>
   );
 }

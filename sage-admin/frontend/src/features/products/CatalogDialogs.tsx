@@ -8,7 +8,7 @@ import { ApiError } from "@/types/api";
 import { DURATION_UNITS, type DurationUnit, type Product, type ProductCategory, type ProductPlan } from "@/types/product";
 import { formatInr } from "@/utils/format";
 
-const field = "mt-1 w-full rounded border border-zinc-300 bg-transparent px-3 py-2 dark:border-zinc-700";
+const field = "field";
 const errorText = (err: unknown) => (err instanceof ApiError ? err.messages.join(" ") : "Something went wrong. Please try again.");
 
 /** Shared shell: submit handling, error display, busy state. */
@@ -33,7 +33,7 @@ function useSubmit(onSaved: () => void) {
 
 function Description({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <label className="block text-sm">
+    <label className="field-label">
       Description
       <textarea value={value} onChange={(e) => onChange(e.target.value)} maxLength={500} rows={2} className={field} />
     </label>
@@ -42,9 +42,9 @@ function Description({ value, onChange }: { value: string; onChange: (v: string)
 
 function ActiveToggle({ checked, onChange, note }: { checked: boolean; onChange: (v: boolean) => void; note?: ReactNode }) {
   return (
-    <label className="flex items-center gap-2 text-sm">
+    <label className="checkbox-label">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      Active {note && <span className="text-xs text-zinc-500">{note}</span>}
+      Active {note && <span className="hint">{note}</span>}
     </label>
   );
 }
@@ -113,13 +113,13 @@ export function ProductFormDialog({
     <Modal title={product ? "Edit product" : "Add product"} onClose={onClose}>
       <form onSubmit={onSubmit} className="space-y-4">
         {error && <Alert kind="error">{error}</Alert>}
-        <label className="block text-sm">
+        <label className="field-label">
           Category
           <select value={category} onChange={(e) => setCategory(Number(e.target.value))} className={field}>
             {categories
               .filter((c) => c.isActive || c.id === category)
               .map((c) => (
-                <option key={c.id} value={c.id} className="text-black">
+                <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
@@ -171,13 +171,13 @@ export function PlanFormDialog({ product, plan, onClose, onSaved }: { product: P
         {error && <Alert kind="error">{error}</Alert>}
         <TextField label="Plan name" required value={name} onChange={(e) => setName(e.target.value)} maxLength={100} placeholder="e.g. Business Yearly" />
         <Description value={description} onChange={setDescription} />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="form-grid-2">
           <TextField label="Duration" type="number" min={1} max={120} required value={durationCount} onChange={(e) => setDurationCount(e.target.value)} />
-          <label className="block text-sm">
+          <label className="field-label">
             Unit
             <select value={durationUnit} onChange={(e) => setDurationUnit(e.target.value as DurationUnit)} className={field}>
               {DURATION_UNITS.map((u) => (
-                <option key={u} value={u} className="text-black">
+                <option key={u} value={u}>
                   {u}
                 </option>
               ))}
@@ -187,12 +187,12 @@ export function PlanFormDialog({ product, plan, onClose, onSaved }: { product: P
           <TextField label="Cost (₹ per unit)" type="number" min={0} step="0.01" required value={cost} onChange={(e) => setCost(e.target.value)} />
         </div>
         {showMargin && (
-          <p className={`text-sm ${priceNum - costNum < 0 ? "text-red-600" : "text-zinc-500"}`}>
+          <p className={`text-sm ${priceNum - costNum < 0 ? "text-danger" : "text-muted"}`}>
             Margin per unit: {formatInr(priceNum - costNum)}
             {priceNum > 0 && ` (${(((priceNum - costNum) / priceNum) * 100).toFixed(1)}%)`}
           </p>
         )}
-        {plan && <p className="text-xs text-zinc-500">Changing price or cost affects new sales only. Existing sales keep the price they were sold at.</p>}
+        {plan && <p className="hint">Changing price or cost affects new sales only. Existing sales keep the price they were sold at.</p>}
         <TextField label="Sort order" type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
         {plan && <ActiveToggle checked={isActive} onChange={setIsActive} note="(inactive plans cannot be sold)" />}
         <SubmitButton busy={busy}>{plan ? "Save changes" : "Create plan"}</SubmitButton>

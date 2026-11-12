@@ -36,7 +36,7 @@ function ResetForm() {
       {error && <Alert kind="error">{error}</Alert>}
       <TextField label="New password" type="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
       <TextField label="Confirm password" type="password" autoComplete="new-password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-      <p className="text-xs text-zinc-500">At least 10 characters with upper and lower case letters, a digit and a symbol.</p>
+      <p className="hint">At least 10 characters with upper and lower case letters, a digit and a symbol.</p>
       <SubmitButton busy={busy}>Reset password</SubmitButton>
     </form>
   );
@@ -48,7 +48,7 @@ export default function ResetPasswordPage() {
       <Suspense>
         <ResetForm />
       </Suspense>
-      <Link href="/login" className="block text-sm underline">
+      <Link href="/login" className="link-button text-sm">
         Back to sign in
       </Link>
     </AuthCard>

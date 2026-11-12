@@ -7,7 +7,7 @@ import { createAdminUser, getGroupOptions, resetAdminUserPassword, updateAdminUs
 import { ApiError } from "@/types/api";
 import type { AdminUserItem, GroupOption } from "@/types/adminUser";
 
-const field = "mt-1 w-full rounded border border-zinc-300 bg-transparent px-3 py-2 dark:border-zinc-700";
+const field = "field";
 const errorText = (err: unknown) => (err instanceof ApiError ? err.messages.join(" ") : "Something went wrong. Please try again.");
 const PASSWORD_HINT = "At least 10 characters with upper and lower case letters, a digit and a symbol.";
 
@@ -59,7 +59,7 @@ export function AdminUserFormDialog({ user, onClose, onSaved }: { user?: AdminUs
     <Modal title={editing ? "Edit admin user" : "Add admin user"} onClose={onClose}>
       <form onSubmit={onSubmit} className="space-y-4">
         {error && <Alert kind="error">{error}</Alert>}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="form-grid-2">
           <TextField label="First name" required value={firstName} onChange={(e) => setFirstName(e.target.value)} maxLength={100} />
           <TextField label="Last name" required value={lastName} onChange={(e) => setLastName(e.target.value)} maxLength={100} />
         </div>
@@ -67,33 +67,33 @@ export function AdminUserFormDialog({ user, onClose, onSaved }: { user?: AdminUs
         <TextField label="Email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} maxLength={256} />
         <TextField label="Mobile" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} maxLength={20} placeholder="+91 98765 43210" />
         {user?.isSuperAdmin ? (
-          <p className="text-sm text-zinc-500">Super Admin: has every permission regardless of group.</p>
+          <p className="text-sm text-muted">Super Admin: has every permission regardless of group.</p>
         ) : (
-          <label className="block text-sm">
+          <label className="field-label">
             Permission group
             <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className={field}>
-              <option value="" className="text-black">
+              <option value="">
                 {groups === null ? "Loading..." : "No group (no access yet)"}
               </option>
               {currentInactive && user?.groupId && (
-                <option value={user.groupId} className="text-black">
+                <option value={user.groupId}>
                   {user.groupName} (inactive)
                 </option>
               )}
               {(groups ?? []).map((g) => (
-                <option key={g.id} value={g.id} className="text-black">
+                <option key={g.id} value={g.id}>
                   {g.name}
                 </option>
               ))}
             </select>
-            <span className="mt-1 block text-xs text-zinc-500">The group decides which screens and actions this user can use.</span>
+            <span className="hint mt-1 block">The group decides which screens and actions this user can use.</span>
           </label>
         )}
         {!editing && (
           <>
             <TextField label="Temporary password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
             <TextField label="Confirm password" type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" />
-            <p className="text-xs text-zinc-500">{PASSWORD_HINT} The user must change it at first sign-in.</p>
+            <p className="hint">{PASSWORD_HINT} The user must change it at first sign-in.</p>
           </>
         )}
         <SubmitButton busy={busy}>{editing ? "Save changes" : "Create admin user"}</SubmitButton>
@@ -129,7 +129,7 @@ export function AdminResetPasswordDialog({ user, onClose, onDone }: { user: Admi
         {error && <Alert kind="error">{error}</Alert>}
         <TextField label="Temporary password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
         <TextField label="Confirm password" type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" />
-        <p className="text-xs text-zinc-500">{PASSWORD_HINT} Their current sessions end and any lockout is cleared.</p>
+        <p className="hint">{PASSWORD_HINT} Their current sessions end and any lockout is cleared.</p>
         <SubmitButton busy={busy}>Set temporary password</SubmitButton>
       </form>
     </Modal>

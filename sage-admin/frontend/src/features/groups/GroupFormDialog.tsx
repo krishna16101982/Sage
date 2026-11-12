@@ -38,18 +38,18 @@ export function GroupFormDialog({ group, onClose, onSaved }: { group?: GroupItem
         {error && <Alert kind="error">{error}</Alert>}
         <TextField label="Code" required disabled={editing} value={code} onChange={(e) => setCode(e.target.value)} maxLength={50} placeholder="e.g. HR_Manager" />
         <TextField label="Name" required value={name} onChange={(e) => setName(e.target.value)} maxLength={100} placeholder="e.g. HR Manager" />
-        <label className="block text-sm">
+        <label className="field-label">
           Description
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             maxLength={500}
             rows={3}
-            className="mt-1 w-full rounded border border-zinc-300 bg-transparent px-3 py-2 dark:border-zinc-700"
+            className="field"
           />
         </label>
         {editing && (
-          <label className="flex items-center gap-2 text-sm">
+          <label className="checkbox-label">
             <input
               type="checkbox"
               checked={status === "Active"}
@@ -58,9 +58,9 @@ export function GroupFormDialog({ group, onClose, onSaved }: { group?: GroupItem
             />
             Active
             {group?.isSystem ? (
-              <span className="text-xs text-zinc-500">(system groups cannot be deactivated)</span>
+              <span className="hint">(system groups cannot be deactivated)</span>
             ) : (
-              group && group.userCount > 0 && <span className="text-xs text-zinc-500">(an inactive group grants nothing to its {group.userCount} user(s))</span>
+              group && group.userCount > 0 && <span className="hint">(an inactive group grants nothing to its {group.userCount} user(s))</span>
             )}
           </label>
         )}

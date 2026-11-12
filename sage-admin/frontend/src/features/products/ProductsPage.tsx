@@ -16,11 +16,11 @@ type Dialog =
   | { kind: "product"; categoryId: number; product?: Product }
   | { kind: "plan"; product: Product; plan?: ProductPlan };
 
-const button = "rounded bg-zinc-900 px-3 py-2 text-sm text-white dark:bg-zinc-100 dark:text-zinc-900";
-const link = "underline";
+const button = "btn btn-primary"; // styles/components.css
+const link = "link-button";
 
 function Status({ active }: { active: boolean }) {
-  return active ? null : <span className="ml-2 rounded bg-zinc-200 px-1.5 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">inactive</span>;
+  return active ? null : <span className="badge">inactive</span>;
 }
 
 /** Product catalog: categories, their products and each product's plans (price list). Everything comes from SQL via the API. */
@@ -61,9 +61,9 @@ export function ProductsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold">Products</h1>
-        <div className="flex-1" />
-        <label className="flex items-center gap-2 text-sm">
+        <h1 className="page-title">Products</h1>
+        <div className="toolbar-spacer" />
+        <label className="checkbox-label">
           <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
           Show inactive
         </label>
@@ -75,20 +75,20 @@ export function ProductsPage() {
       </div>
 
       {error && <Alert kind="error">{error}</Alert>}
-      {!catalog && !error && <p className="text-sm text-zinc-500">Loading...</p>}
-      {catalog?.length === 0 && <p className="text-sm text-zinc-500">No categories yet.</p>}
+      {!catalog && !error && <p className="text-sm text-muted">Loading...</p>}
+      {catalog?.length === 0 && <p className="text-sm text-muted">No categories yet.</p>}
 
       {catalog?.map((c) => (
-        <section key={c.id} className="rounded border border-zinc-200 dark:border-zinc-800">
-          <header className="flex flex-wrap items-center gap-3 border-b border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+        <section key={c.id} className="card">
+          <header className="card-header">
             <div>
-              <h2 className="font-semibold">
+              <h2 className="section-title">
                 {c.name}
                 <Status active={c.isActive} />
               </h2>
-              {c.description && <p className="text-xs text-zinc-500">{c.description}</p>}
+              {c.description && <p className="hint">{c.description}</p>}
             </div>
-            <div className="flex-1" />
+            <div className="toolbar-spacer" />
             <Can permission={Perm.ProductEdit}>
               <button type="button" className={`${link} text-sm`} onClick={() => setDialog({ kind: "category", category: c })}>
                 Edit category
@@ -104,24 +104,24 @@ export function ProductsPage() {
           </header>
 
           {c.products.length === 0 ? (
-            <p className="px-4 py-4 text-sm text-zinc-500">No products in this category.</p>
+            <p className="card-body text-sm text-muted">No products in this category.</p>
           ) : (
-            <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+            <ul className="card-list">
               {c.products.map((p) => {
                 const open = expanded.has(p.id);
                 return (
-                  <li key={p.id} className="px-4 py-2 text-sm">
+                  <li key={p.id}>
                     <div className="flex flex-wrap items-center gap-3">
                       <button type="button" aria-expanded={open} onClick={() => toggle(p.id)} className="flex items-center gap-2 text-left">
-                        <span className="w-3 text-zinc-500">{open ? "▾" : "▸"}</span>
+                        <span className="w-3 text-muted">{open ? "▾" : "▸"}</span>
                         <span className="font-medium">{p.name}</span>
-                        <span className="font-mono text-xs text-zinc-500">{p.code}</span>
+                        <span className="code hint">{p.code}</span>
                         <Status active={p.isActive} />
                       </button>
-                      <span className="text-xs text-zinc-500">
+                      <span className="hint">
                         {p.plans.length} plan{p.plans.length === 1 ? "" : "s"}
                       </span>
-                      <div className="flex-1" />
+                      <div className="toolbar-spacer" />
                       <Can permission={Perm.ProductEdit}>
                         <button type="button" className={link} onClick={() => setDialog({ kind: "product", categoryId: c.id, product: p })}>
                           Edit
@@ -137,33 +137,33 @@ export function ProductsPage() {
                     </div>
 
                     {open && (
-                      <div className="mt-2 ml-5 overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
-                        <table className="w-full text-left text-sm">
-                          <thead className="bg-zinc-50 dark:bg-zinc-900">
+                      <div className="table-wrap mt-2 ml-5">
+                        <table className="data-table">
+                          <thead>
                             <tr>
-                              <th className="px-3 py-2">Plan</th>
-                              <th className="px-3 py-2">Duration</th>
-                              <th className="px-3 py-2 text-right">Price</th>
-                              <th className="px-3 py-2 text-right">Cost</th>
-                              <th className="px-3 py-2 text-right">Margin</th>
-                              <th className="px-3 py-2" />
+                              <th>Plan</th>
+                              <th>Duration</th>
+                              <th className="amount">Price</th>
+                              <th className="amount">Cost</th>
+                              <th className="amount">Margin</th>
+                              <th />
                             </tr>
                           </thead>
                           <tbody>
                             {p.plans.map((plan) => (
-                              <tr key={plan.id} className="border-t border-zinc-200 dark:border-zinc-800">
-                                <td className="px-3 py-2">
+                              <tr key={plan.id}>
+                                <td>
                                   {plan.name}
                                   <Status active={plan.isActive} />
-                                  {plan.description && <div className="text-xs text-zinc-500">{plan.description}</div>}
+                                  {plan.description && <div className="hint">{plan.description}</div>}
                                 </td>
-                                <td className="px-3 py-2">{formatDuration(plan.durationCount, plan.durationUnit)}</td>
-                                <td className="px-3 py-2 text-right tabular-nums">{formatInr(plan.price)}</td>
-                                <td className="px-3 py-2 text-right tabular-nums">{formatInr(plan.cost)}</td>
-                                <td className={`px-3 py-2 text-right tabular-nums ${plan.price - plan.cost < 0 ? "text-red-600" : ""}`}>
+                                <td>{formatDuration(plan.durationCount, plan.durationUnit)}</td>
+                                <td className="amount">{formatInr(plan.price)}</td>
+                                <td className="amount">{formatInr(plan.cost)}</td>
+                                <td className={`amount ${plan.price - plan.cost < 0 ? "text-danger" : ""}`}>
                                   {formatInr(plan.price - plan.cost)}
                                 </td>
-                                <td className="px-3 py-2 text-right">
+                                <td className="actions">
                                   <Can permission={Perm.ProductEdit}>
                                     <button type="button" className={link} onClick={() => setDialog({ kind: "plan", product: p, plan })}>
                                       Edit
@@ -174,7 +174,7 @@ export function ProductsPage() {
                             ))}
                             {p.plans.length === 0 && (
                               <tr>
-                                <td colSpan={6} className="px-3 py-4 text-center text-zinc-500">
+                                <td colSpan={6} className="table-empty">
                                   No plans yet. A product needs at least one active plan before it can be sold.
                                 </td>
                               </tr>

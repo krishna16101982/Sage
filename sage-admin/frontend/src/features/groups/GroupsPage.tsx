@@ -60,10 +60,10 @@ export function GroupsPage() {
   const sortHeader = (key: SortKey, label: string) => {
     const active = sortBy === key;
     return (
-      <th className="px-3 py-2" aria-sort={active ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
+      <th aria-sort={active ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
         <button
           type="button"
-          className="font-semibold"
+          className="sort-button"
           onClick={() => {
             if (active) setSortDirection(sortDirection === "asc" ? "desc" : "asc");
             else {
@@ -80,13 +80,13 @@ export function GroupsPage() {
     );
   };
 
-  const field = "rounded border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700";
+  const field = "field field-inline";
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Permission Groups</h1>
+      <h1 className="page-title">Permission Groups</h1>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="toolbar">
         <input
           aria-label="Search groups"
           placeholder="Search name, code or description"
@@ -107,15 +107,15 @@ export function GroupsPage() {
           }}
         >
           <option value="">Any status</option>
-          <option value="Active" className="text-black">Active</option>
-          <option value="Inactive" className="text-black">Inactive</option>
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
         </select>
-        <div className="flex-1" />
+        <div className="toolbar-spacer" />
         <Can permission={Perm.GroupAdd}>
           <button
             type="button"
             onClick={() => setDialog({ kind: "form" })}
-            className="rounded bg-zinc-900 px-3 py-2 text-sm text-white dark:bg-zinc-100 dark:text-zinc-900"
+            className="btn btn-primary"
           >
             Add group
           </button>
@@ -124,44 +124,44 @@ export function GroupsPage() {
 
       {error && <Alert kind="error">{error}</Alert>}
 
-      <div className="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-50 dark:bg-zinc-900">
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
             <tr>
               {sortHeader("name", "Name")}
               {sortHeader("code", "Code")}
               {sortHeader("userCount", "Users")}
-              <th className="px-3 py-2">Permissions</th>
+              <th>Permissions</th>
               {sortHeader("status", "Status")}
-              <th className="px-3 py-2" />
+              <th />
             </tr>
           </thead>
           <tbody>
             {data?.items.map((g) => (
-              <tr key={g.id} className="border-t border-zinc-200 dark:border-zinc-800">
-                <td className="px-3 py-2">
+              <tr key={g.id}>
+                <td>
                   {g.name}
-                  {g.description && <div className="text-xs text-zinc-500">{g.description}</div>}
+                  {g.description && <div className="hint">{g.description}</div>}
                 </td>
-                <td className="px-3 py-2 font-mono">{g.code}</td>
-                <td className="px-3 py-2">{g.userCount}</td>
-                <td className="px-3 py-2">{g.permissionCount}</td>
-                <td className="px-3 py-2">
+                <td className="code">{g.code}</td>
+                <td>{g.userCount}</td>
+                <td>{g.permissionCount}</td>
+                <td>
                   {g.status}
-                  {g.isSystem && <span className="ml-2 text-xs text-zinc-500">system</span>}
+                  {g.isSystem && <span className="badge">system</span>}
                 </td>
-                <td className="space-x-3 whitespace-nowrap px-3 py-2 text-right">
-                  <button type="button" className="underline" onClick={() => setDialog({ kind: "permissions", group: g })}>
+                <td className="actions">
+                  <button type="button" className="link-button" onClick={() => setDialog({ kind: "permissions", group: g })}>
                     Permissions
                   </button>
                   <Can permission={Perm.GroupEdit}>
-                    <button type="button" className="underline" onClick={() => setDialog({ kind: "form", group: g })}>
+                    <button type="button" className="link-button" onClick={() => setDialog({ kind: "form", group: g })}>
                       Edit
                     </button>
                   </Can>
                   {!g.isSystem && (
                     <Can permission={Perm.GroupDelete}>
-                      <button type="button" className="text-red-600 underline" onClick={() => setDialog({ kind: "delete", group: g })}>
+                      <button type="button" className="link-button danger" onClick={() => setDialog({ kind: "delete", group: g })}>
                         Delete
                       </button>
                     </Can>
@@ -171,14 +171,14 @@ export function GroupsPage() {
             ))}
             {!loading && data?.items.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-zinc-500">
+                <td colSpan={6} className="table-empty">
                   No groups match.
                 </td>
               </tr>
             )}
             {loading && !data && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-zinc-500">
+                <td colSpan={6} className="table-empty">
                   Loading...
                 </td>
               </tr>
