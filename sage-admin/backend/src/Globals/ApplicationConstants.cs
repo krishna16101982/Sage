@@ -58,7 +58,12 @@ namespace SageAdminApi.Globals
             public const string MobileInvalid = "Mobile number is invalid";
             public const string PasswordMismatch = "Password and confirm password do not match";
             public const string GroupCodeInvalid = "Group code must start with a letter and contain only letters, digits, '_' or '-'";
-            public const string GroupNameRequired = "Group name is required";
+            public const string GroupNameRequired = "Group name is required (max 100 characters)";
+            public const string GroupStatusInvalid = "Status must be Active or Inactive";
+            public const string GroupNotFound = "Group not found";
+            public const string GroupSystemDelete = "System groups cannot be deleted";
+            public const string GroupSystemDeactivate = "System groups cannot be deactivated";
+            public const string PermissionIdsRequired = "Permission list is required (send an empty list to remove all)";
             public const string RecordAlreadyExists = "Record already exists";
             public const string ModuleCodeInvalid = "Module code must start with a letter and contain only letters, digits, '_' or '-' (2-50 characters)";
             public const string ModuleNameRequired = "Module name is required (max 100 characters)";

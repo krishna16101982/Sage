@@ -8,7 +8,7 @@ Three application folders (do not add more without approval):
 | `backend/` | Admin API (`src/`), SQL scripts (`database/`), tests (`Tests/`) | ASP.NET Core, .NET 10, SQL Server |
 | `frontend/` | Admin Panel UI | Next.js (App Router), React, TypeScript, Tailwind |
 
-Design and plan: [SAGE_ANALYSIS.md](SAGE_ANALYSIS.md). Current status: **Sprint 3 (Permissions) implemented; stored procedures added for transactional and rule-bearing queries.**
+Design and plan: [SAGE_ANALYSIS.md](SAGE_ANALYSIS.md). Current status: **Sprint 4 (Permission Groups) implemented. Next: Sprint 5 (Admin Users).**
 
 ## First-time local setup
 
@@ -75,10 +75,25 @@ Integration tests create and drop their own database `SageAdmin_Test_<guid>` on 
 - Every endpoint declares its permission with `[RequirePermission(PermissionConstants.X)]`. The backend checks it against SQL on every request: 401 without a valid session, 403 without the permission.
 - A permission's code is `Module.Action`; module code, permission module and action never change after creation. System modules/permissions cannot be deactivated. Deactivating a module or permission bumps `PermissionVersion` of every affected user, so it takes effect on their next request.
 
+## Permission groups (Sprint 4)
+| Endpoint | Permission | Notes |
+|----------|------------|-------|
+| `GET /api/admin/groups` | `Group.View` | paged: `page`, `pageSize`, `search`, `status` (Active/Inactive), `sortBy` (name, code, status, userCount, createdAtUtc), `sortDirection` |
+| `GET /api/admin/groups/{id}` | `Group.View` | group + permission matrix (every active permission, plus inactive ones the group still holds) |
+| `POST /api/admin/groups` | `Group.Add` | `{code, name, description}`; 409 on duplicate code or name |
+| `PUT /api/admin/groups/{id}` | `Group.Edit` | `{name, description, status}`; code never changes |
+| `DELETE /api/admin/groups/{id}` | `Group.Delete` | 409 while any user is assigned |
+| `PUT /api/admin/groups/{id}/permissions` | `Group.AssignPermissions` | `{permissionIds: [...]}` replaces the whole set; 400 for unknown ids or newly granted inactive permissions |
+
+- `{id}` is the group's public GUID. System groups cannot be deactivated or deleted.
+- Changing a group's permissions or status bumps `PermissionVersion` for its members, so their current access token stops working and the next session gets the new access. Unchanged saves do nothing (no bump, no audit row).
+- Create, update, status change, delete and permission changes are audited; permission changes record the added and removed codes.
+- UI: `/groups` lists groups; **Permissions** opens the matrix (modules by category × actions, row/column select-all). It is read-only without `Group.AssignPermissions`.
+
 ## Writing SQL (ixcheck pattern)
 Build the statement with `StringBuilder _sqlQuery`, then call the shared wrappers: `ExecuteInsertAsync` (returns the new id), `ExecuteUpdateAsync` / `ExecuteDeleteAsync` (rows affected), `ExecuteCheckExistsAndInsertAsync` (409 if it exists). They return `(IFunctionReturn, long)` and never throw for duplicates, foreign-key conflicts or SQL errors. Unlike ixcheck, values are always `@parameters`, never concatenated into the SQL text.
 
-Stored procedures: `ExecuteProcedureWriteAsync` (same `(IFunctionReturn, long)` shape; `long` = the procedure's `SELECT`ed value, by convention the new id or rows affected), `ExecuteProcedureScalarAsync`, `QueryProcedureAsync` (OUTPUT parameters are filled when it returns), `ExecuteProcedureAsync`. A procedure reports expected errors with `THROW 50404` (-> 404) or `THROW 50409` (-> 409); other `THROW` numbers reach C# as `DatabaseException.SqlErrorNumber` (e.g. `50001` for an already-used refresh token).
+Stored procedures: `ExecuteProcedureWriteAsync` (same `(IFunctionReturn, long)` shape; `long` = the procedure's `SELECT`ed value, by convention the new id or rows affected), `ExecuteProcedureScalarAsync`, `QueryProcedureAsync` (OUTPUT parameters are filled when it returns), `ExecuteProcedureAsync`. A procedure reports expected errors with `THROW 50400` (-> 400), `THROW 50404` (-> 404) or `THROW 50409` (-> 409), and the THROW message is returned to the client, so write it for the user. Other `THROW` numbers reach C# as `DatabaseException.SqlErrorNumber` (e.g. `50001` for an already-used refresh token).
 
 ## Frontend layout
 `frontend/src/app/(admin)/<module>/page.tsx` is one folder per module (dashboard, users, groups, permissions, audit-logs, profile, settings, change-password); pages are thin and import their screens from `frontend/src/features/<module>/`. Shared UI is in `components/`, API calls in `services/`, types in `types/`.

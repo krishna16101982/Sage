@@ -2,7 +2,9 @@
 
 import { useEffect, type ReactNode } from "react";
 
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+const WIDTH = { md: "max-w-md", xl: "max-w-5xl" } as const;
+
+export function Modal({ title, onClose, children, size = "md" }: { title: string; onClose: () => void; children: ReactNode; size?: keyof typeof WIDTH }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -15,7 +17,7 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="w-full max-w-md space-y-4 rounded-lg border border-zinc-200 bg-white p-6 text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100"
+        className={`w-full ${WIDTH[size]} max-h-[90vh] space-y-4 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-6 text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100`}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">

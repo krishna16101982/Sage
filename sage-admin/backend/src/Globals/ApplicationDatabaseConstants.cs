@@ -36,6 +36,11 @@ namespace SageAdminApi.Globals
             public const string PermissionCreate = "dbo.usp_Permission_Create";
             public const string PermissionUpdate = "dbo.usp_Permission_Update";
             public const string PermissionGetPaged = "dbo.usp_Permission_GetPaged";
+            public const string GroupGetPaged = "dbo.usp_Group_GetPaged";
+            public const string GroupCreate = "dbo.usp_Group_Create";
+            public const string GroupUpdate = "dbo.usp_Group_Update";
+            public const string GroupDelete = "dbo.usp_Group_Delete";
+            public const string GroupSetPermissions = "dbo.usp_Group_SetPermissions";
         }
 
         public static class ColumnNames

@@ -11,6 +11,7 @@ export const Perm = {
   GroupAdd: "Group.Add",
   GroupEdit: "Group.Edit",
   GroupDelete: "Group.Delete",
+  GroupAssignPermissions: "Group.AssignPermissions",
   PermissionView: "Permission.View",
   PermissionAdd: "Permission.Add",
   PermissionEdit: "Permission.Edit",

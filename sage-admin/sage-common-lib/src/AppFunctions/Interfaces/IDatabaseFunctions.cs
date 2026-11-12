@@ -31,8 +31,8 @@ public interface IDatabaseFunctions
     Task<(IFunctionReturn functionReturn, long retValue)> ExecuteCheckExistsAndInsertAsync(string checkSql, string insertSql, IEnumerable<SqlParameter>? parameters, string methodName, string existsMessage, string? successMessage = null, CancellationToken ct = default);
 
     // ---- Stored procedures (procedureName is a fixed name such as "dbo.usp_Module_Create", never user input) ----
-    // A procedure signals expected business errors with THROW: 50404 maps to 404 and 50409 to 409; any other user error number
-    // comes back as a DatabaseException carrying SqlErrorNumber.
+    // A procedure signals expected business errors with THROW: 50400 maps to 400, 50404 to 404 and 50409 to 409, carrying the
+    // THROW message (so write it for the user). Any other user error number comes back as a DatabaseException with SqlErrorNumber.
 
     /// <summary>Runs a procedure. Returns rows affected as reported by SQL Server (-1 when the procedure uses SET NOCOUNT ON).</summary>
     Task<int> ExecuteProcedureAsync(string procedureName, IEnumerable<SqlParameter>? parameters = null, CancellationToken ct = default);

@@ -38,6 +38,7 @@ public class DatabaseFunctions : IDatabaseFunctions
             try { result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false); }
             finally { cmd.Parameters.Clear(); }
             if (result is null || result is DBNull) return default;
+            if (result is T typed) return typed;
             return (T)Convert.ChangeType(result, Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T));
         });
 
@@ -229,10 +230,13 @@ public class DatabaseFunctions : IDatabaseFunctions
     /// <summary>Maps SQL errors to app exceptions without leaking server details to clients.</summary>
     public static AppException Map(SqlException ex) => ex.Number switch
     {
-        DatabaseConstants.SqlErrorNumbers.UniqueConstraintViolation or DatabaseConstants.SqlErrorNumbers.UniqueIndexViolation or DatabaseConstants.SqlErrorNumbers.ProcedureAlreadyExists
+        DatabaseConstants.SqlErrorNumbers.UniqueConstraintViolation or DatabaseConstants.SqlErrorNumbers.UniqueIndexViolation
             => new ConflictException("A record with the same unique value already exists."),
         DatabaseConstants.SqlErrorNumbers.ForeignKeyViolation => new ConflictException("The operation conflicts with related data."),
-        DatabaseConstants.SqlErrorNumbers.ProcedureNotFound => new NotFoundException("The record was not found."),
+        // Our own procedures THROW these with a message written for the user (never SQL Server text), so it is passed on.
+        DatabaseConstants.SqlErrorNumbers.ProcedureAlreadyExists => new ConflictException(ex.Message),
+        DatabaseConstants.SqlErrorNumbers.ProcedureNotFound => new NotFoundException(ex.Message),
+        DatabaseConstants.SqlErrorNumbers.ProcedureInvalidInput => new AppException(ex.Message, Constants.HttpStatusCodes.BadRequest, Constants.ReturnMessageTypes.ValidationError),
         _ => new DatabaseException("A database error occurred.", ex.Number, ex)
     };
 }

@@ -100,13 +100,27 @@ namespace SageAdminApi.AppValidations
         }
 
         /// <summary>
-        /// Validate a permission group's name and code.
+        /// Validate a new permission group (code is immutable afterwards).
         /// </summary>
-        public static IFunctionReturn ValidateGroup(string _name, string _code, string _methodName)
+        public static IFunctionReturn ValidateGroup(string _name, string _code, string _description, string _methodName)
         {
             var _errors = new List<string>();
-            if (string.IsNullOrWhiteSpace(_name)) _errors.Add(ApplicationConstants.ValidationMessages.GroupNameRequired);
             if (!ValidationFunctions.IsValidCode(_code)) _errors.Add(ApplicationConstants.ValidationMessages.GroupCodeInvalid);
+            CheckText(_errors, _name, 100, true, ApplicationConstants.ValidationMessages.GroupNameRequired);
+            CheckText(_errors, _description, 500, false, ApplicationConstants.ValidationMessages.DescriptionTooLong);
+            return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
+        }
+
+        /// <summary>
+        /// Validate group edits (name, description, status).
+        /// </summary>
+        public static IFunctionReturn ValidateGroupUpdate(string _name, string _description, string _status, string _methodName)
+        {
+            var _errors = new List<string>();
+            CheckText(_errors, _name, 100, true, ApplicationConstants.ValidationMessages.GroupNameRequired);
+            CheckText(_errors, _description, 500, false, ApplicationConstants.ValidationMessages.DescriptionTooLong);
+            if (_status != ApplicationDatabaseConstants.Status.Active && _status != ApplicationDatabaseConstants.Status.Inactive)
+                _errors.Add(ApplicationConstants.ValidationMessages.GroupStatusInvalid);
             return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
         }
     }
