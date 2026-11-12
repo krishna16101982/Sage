@@ -7,6 +7,7 @@ Three application folders (do not add more without approval):
 | `sage-common-lib/` | Shared library (responses, exceptions, DB access, security, validation, logging) reusable by the future User Panel | .NET 10 class library |
 | `backend/` | Admin API (`src/`), SQL scripts (`database/`), tests (`Tests/`) | ASP.NET Core, .NET 10, SQL Server |
 | `frontend/` | Admin Panel UI | Next.js (App Router), React, TypeScript, Tailwind |
+| `frontend-angular/` | Admin Panel UI, Angular version (same API and screens; both kept) — see its README | Angular 21, TypeScript |
 
 Design and plan: [SAGE_ANALYSIS.md](SAGE_ANALYSIS.md). Current status: **Sprint 7 (Admin users) implemented. Next: Sprint 8 (User Panel foundation in `../sage-user`).** Sales plan: [../SALES_DESIGN.md](../SALES_DESIGN.md).
 

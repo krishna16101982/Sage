@@ -12,6 +12,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "sage-admin-angular",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "frontend-angular", "start"],
+      "port": 4200
     }
   ]
 }

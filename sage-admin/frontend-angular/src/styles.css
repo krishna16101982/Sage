@@ -1,0 +1,18 @@
+/* =====================================================================================================
+   Styles entry point (angular.json -> "styles").
+     styles/theme.css       colours, radius, fonts (light and dark)   -> change the look here
+     styles/components.css  named classes: btn-primary, field, ...     -> change shapes and spacing here
+     styles/layout.css      reset + small layout helpers (stack, row)
+   theme.css and components.css are the same files as in ../frontend (Next.js); keep them in step.
+   ===================================================================================================== */
+/* Layer order: later layers win. base = reset, components = named classes, utilities = layout helpers. */
+@layer base, components, utilities;
+@import "./styles/layout.css";
+@import "./styles/theme.css";
+@import "./styles/components.css";
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
