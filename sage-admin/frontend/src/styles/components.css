@@ -19,6 +19,7 @@
   .sidebar-title { margin-bottom: 1.5rem; font-size: 1.125rem; font-weight: 600; }
   .sidebar-link {
     display: block;
+    text-decoration: none;
     padding: 0.5rem 0.75rem;
     border-radius: var(--radius);
     font-size: 0.875rem;
