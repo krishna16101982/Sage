@@ -111,6 +111,34 @@ namespace SageAdminApi.AppValidations
             return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
         }
 
+        /// <summary>
+        /// Validate a sales user's details and role/manager combination. Username only on create (pass checkUsername=false to skip).
+        /// </summary>
+        public static IFunctionReturn ValidateSalesUser(string _firstName, string _lastName, string _username, bool _checkUsername, string _email, string _mobile,
+            string _role, System.Guid? _managerId, string _methodName)
+        {
+            var _errors = new List<string>();
+            CheckText(_errors, _firstName, 100, true, ApplicationConstants.ValidationMessages.FirstNameRequired);
+            CheckText(_errors, _lastName, 100, true, ApplicationConstants.ValidationMessages.LastNameRequired);
+            if (_checkUsername)
+            {
+                if (string.IsNullOrWhiteSpace(_username)) _errors.Add(ApplicationConstants.ValidationMessages.UsernameRequired);
+                else if (!ValidationFunctions.IsValidUsername(_username)) _errors.Add(ApplicationConstants.ValidationMessages.UsernameInvalid);
+            }
+            if (!ValidationFunctions.IsValidEmail(_email) || _email.Length > 256) _errors.Add(ApplicationConstants.ValidationMessages.EmailInvalid);
+            if (!string.IsNullOrWhiteSpace(_mobile) && !ValidationFunctions.IsValidPhone(_mobile)) _errors.Add(ApplicationConstants.ValidationMessages.MobileInvalid);
+            if (_role == ApplicationDatabaseConstants.SalesRoles.SalesPerson)
+            {
+                if (!_managerId.HasValue) _errors.Add(ApplicationConstants.ValidationMessages.SalesManagerRequired);
+            }
+            else if (_role == ApplicationDatabaseConstants.SalesRoles.SalesManager)
+            {
+                if (_managerId.HasValue) _errors.Add(ApplicationConstants.ValidationMessages.SalesManagerNotAllowed);
+            }
+            else _errors.Add(ApplicationConstants.ValidationMessages.SalesRoleInvalid);
+            return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
+        }
+
         /// <summary>Plan durations allowed by dbo.ProductPlans (CK_ProductPlans_DurationUnit).</summary>
         public static readonly string[] DurationUnits = { "Month", "Quarter", "Year" };
 

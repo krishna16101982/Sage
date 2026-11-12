@@ -76,6 +76,14 @@ namespace SageAdminApi.Globals
             public const string DurationCountInvalid = "Duration must be between 1 and 120";
             public const string PriceInvalid = "Price is required: 0 or more, at most 2 decimal places";
             public const string CostInvalid = "Cost is required: 0 or more, at most 2 decimal places";
+            public const string FirstNameRequired = "First name is required (max 100 characters)";
+            public const string LastNameRequired = "Last name is required (max 100 characters)";
+            public const string SalesRoleInvalid = "Role must be SalesPerson or SalesManager";
+            public const string SalesManagerRequired = "A sales person needs a sales manager";
+            public const string SalesManagerNotAllowed = "A sales manager cannot have a manager";
+            public const string SalesStatusInvalid = "Status must be Active or Inactive";
+            public const string SalesUserNotFound = "Sales user not found";
+            public const string PasswordResetBySalesAdmin = "Temporary password set. The user must change it at next sign-in.";
             public const string PermissionIdsRequired = "Permission list is required (send an empty list to remove all)";
             public const string RecordAlreadyExists = "Record already exists";
             public const string ModuleCodeInvalid = "Module code must start with a letter and contain only letters, digits, '_' or '-' (2-50 characters)";

@@ -8,7 +8,7 @@ Three application folders (do not add more without approval):
 | `backend/` | Admin API (`src/`), SQL scripts (`database/`), tests (`Tests/`) | ASP.NET Core, .NET 10, SQL Server |
 | `frontend/` | Admin Panel UI | Next.js (App Router), React, TypeScript, Tailwind |
 
-Design and plan: [SAGE_ANALYSIS.md](SAGE_ANALYSIS.md). Current status: **Sprint 5 (Product catalog) implemented. Next: Sprint 6 (Sales users).** Sales plan: [../SALES_DESIGN.md](../SALES_DESIGN.md).
+Design and plan: [SAGE_ANALYSIS.md](SAGE_ANALYSIS.md). Current status: **Sprint 6 (Sales users) implemented. Next: Sprint 7 (User Panel foundation in `../sage-user`).** Sales plan: [../SALES_DESIGN.md](../SALES_DESIGN.md).
 
 ## First-time local setup
 
@@ -104,6 +104,24 @@ Categories → products → plans. A plan is a price-list entry: name, duration 
 - Price and cost changes are audited (old and new values) and affect future sales only.
 - Seed (`SeedData/002`): categories **SaaS** (SHTMS, GreytHR, LinkedIn, Freshdesk) and **Cyber Security**; plans and prices are entered in the UI.
 - UI: `/products` (sidebar **Products**).
+
+## Sales users (Sprint 6)
+User Panel accounts, kept in `dbo.SalesUsers` (separate from admin users). Roles: **SalesPerson** (must report to an active SalesManager) and **SalesManager** (can also sell; has no manager). Created and managed here; they sign in only to the User Panel.
+
+| Endpoint | Permission | Notes |
+|----------|------------|-------|
+| `GET /api/admin/sales-users` | `SalesUser.View` | paged: `search`, `role`, `status`, `managerId` (a manager's team), `sortBy`, `sortDirection` |
+| `GET /api/admin/sales-users/managers` · `GET .../{id}` | `SalesUser.View` | active managers for the drop-down; one user |
+| `POST /api/admin/sales-users` | `SalesUser.Add` | details + role + manager + temporary password; the user must change it at first sign-in |
+| `PUT /api/admin/sales-users/{id}` | `SalesUser.Edit` | details, role, manager; username fixed; a manager with a team cannot become a sales person (409) |
+| `PUT /api/admin/sales-users/{id}/status` | `SalesUser.ChangeStatus` | `Active` (also clears a lockout) or `Inactive` |
+| `POST /api/admin/sales-users/{id}/reset-password` | `SalesUser.ResetPassword` | temporary password, must change at next sign-in |
+
+- Username and email are unique among non-deleted sales users. Role, manager, status and password changes bump `PermissionVersion`, so User Panel sessions pick them up on the next request (enforced once the User Panel exists).
+- Create, edit, status and password resets are audited; password data never appears in responses or audit rows.
+- UI: `/sales-users` (sidebar **Sales Users**).
+
+If a running API locks `backend/src/bin`, build or test side by side with `dotnet test backend\SageAdmin.sln --artifacts-path backend\.artifacts` (ignored by git).
 
 ## Writing SQL (ixcheck pattern)
 Build the statement with `StringBuilder _sqlQuery`, then call the shared wrappers: `ExecuteInsertAsync` (returns the new id), `ExecuteUpdateAsync` / `ExecuteDeleteAsync` (rows affected), `ExecuteCheckExistsAndInsertAsync` (409 if it exists). They return `(IFunctionReturn, long)` and never throw for duplicates, foreign-key conflicts or SQL errors. Unlike ixcheck, values are always `@parameters`, never concatenated into the SQL text.

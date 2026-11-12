@@ -27,3 +27,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.suo
+
+# Side-by-side build output (used when a running API locks bin/)
+.artifacts/

@@ -33,6 +33,13 @@ namespace SageAdminApi.Globals
         internal const string ProductAdd = "Product.Add";
         internal const string ProductEdit = "Product.Edit";
 
+        //Sales users (User Panel accounts)
+        internal const string SalesUserView = "SalesUser.View";
+        internal const string SalesUserAdd = "SalesUser.Add";
+        internal const string SalesUserEdit = "SalesUser.Edit";
+        internal const string SalesUserChangeStatus = "SalesUser.ChangeStatus";
+        internal const string SalesUserResetPassword = "SalesUser.ResetPassword";
+
         //Audit logs
         internal const string AuditLogView = "AuditLog.View";
 

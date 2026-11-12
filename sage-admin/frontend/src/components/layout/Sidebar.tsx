@@ -12,6 +12,7 @@ const ITEMS = [
   { href: "/groups", label: "Groups", permission: "Group.View" },
   { href: "/permissions", label: "Permissions", permission: "Permission.View" },
   { href: "/products", label: "Products", permission: "Product.View" },
+  { href: "/sales-users", label: "Sales Users", permission: "SalesUser.View" },
   { href: "/audit-logs", label: "Audit Logs", permission: "AuditLog.View" },
   { href: "/settings", label: "Settings", permission: "Setting.View" },
 ];
