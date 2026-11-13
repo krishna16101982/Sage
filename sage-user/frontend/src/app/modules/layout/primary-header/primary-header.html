@@ -1,7 +1,46 @@
 <header class="app-header">
-  <span>
-    {{ auth.user()?.firstName }} {{ auth.user()?.lastName }}
-    <span class="badge">{{ auth.isManager() ? 'Sales manager' : 'Sales person' }}</span>
-  </span>
-  <button type="button" class="link-button" (click)="logout()">Sign out</button>
+  <button type="button" class="icon-button" aria-label="Show or hide the menu" (click)="toggleNav.emit()">
+    <app-icon name="menu" />
+  </button>
+  <span class="header-crumb">Home</span>
+  @if (pageTitle() && pageTitle() !== 'Home') {
+    <app-icon name="chevron-right" class="header-crumb" />
+    <span class="header-title">{{ pageTitle() }}</span>
+  }
+
+  <div class="header-spacer"></div>
+
+  <div class="header-search" role="search">
+    <app-icon name="search" />
+    <input #search class="field" type="search" placeholder="Search pages" aria-label="Search pages"
+           (input)="onSearch(search.value)" (keydown)="onSearchKey($event)" (blur)="query.set('')" />
+    @if (results().length > 0) {
+      <div class="search-results" role="listbox" aria-label="Matching pages">
+        @for (r of results(); track r.href; let i = $index) {
+          <button type="button" class="search-result" role="option" [class.is-active]="i === activeIndex()"
+                  [attr.aria-selected]="i === activeIndex()" (mousedown)="$event.preventDefault()" (click)="go(r.href, search)">
+            <app-icon [name]="r.icon" />
+            <span>{{ r.label }}</span>
+            <span class="hint">{{ r.section }}</span>
+          </button>
+        }
+      </div>
+    }
+  </div>
+
+  <button type="button" class="icon-button" [attr.aria-label]="theme.mode() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+          [title]="theme.mode() === 'dark' ? 'Light mode' : 'Dark mode'" (click)="theme.toggle()">
+    <app-icon [name]="theme.mode() === 'dark' ? 'sun' : 'moon'" />
+  </button>
+
+  @if (auth.user(); as u) {
+    <div class="header-user">
+      <span class="avatar avatar-sm" aria-hidden="true">{{ initials() }}</span>
+      <span class="header-user-name">{{ u.firstName }} {{ u.lastName }}</span>
+      <span class="badge">{{ u.isManager ? 'Sales manager' : 'Sales person' }}</span>
+    </div>
+  }
+  <button type="button" class="icon-button" aria-label="Sign out" title="Sign out" (click)="logout()">
+    <app-icon name="log-out" />
+  </button>
 </header>

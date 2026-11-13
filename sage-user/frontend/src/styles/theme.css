@@ -1,77 +1,152 @@
 /* =====================================================================================================
-   THEME: every colour, radius and font used by the Admin Panel.
-   To restyle the app, change the values here. Components (components.css) only use these variables.
-   The first block is the light theme; the second overrides it when the device is in dark mode.
+   THEME: every colour, radius, shadow and font the app uses. To restyle, change the values here;
+   components.css only uses these variables. Same file in the Admin Panel and the User Panel (Angular).
+
+   Look: dark navy sidebar, white top bar, light grey page, white cards, teal as the main colour.
+   Light values first. Dark values apply when the device is in dark mode (unless the user picked light in the
+   top bar), or when the user picked dark (the theme button sets <html data-theme="light|dark">).
    ===================================================================================================== */
 
 :root {
   /* Page and surfaces */
-  --color-bg: #ffffff;              /* page background */
-  --color-surface: #ffffff;         /* cards, dialogs */
-  --color-surface-muted: #f4f4f5;   /* table headers, card headers, hover */
-  --color-backdrop: rgb(0 0 0 / 0.5); /* behind dialogs */
+  --color-bg: #eceff4;              /* page background (grey behind the cards) */
+  --color-surface: #ffffff;         /* cards, top bar, dialogs, tables */
+  --color-surface-muted: #f4f6f9;   /* table headers, hover rows */
+  --color-backdrop: rgb(15 23 42 / 0.5); /* behind dialogs and the phone menu */
 
   /* Text */
-  --color-text: #171717;            /* normal text */
-  --color-text-muted: #71717a;      /* hints, secondary text */
+  --color-text: #1e293b;            /* normal text */
+  --color-text-muted: #64748b;      /* hints, secondary text, table headings */
 
   /* Lines */
-  --color-border: #e4e4e7;          /* card, table and divider lines */
-  --color-border-input: #d4d4d8;    /* form field borders */
-  --color-focus: #3b82f6;           /* focus ring on fields and buttons */
+  --color-border: #e1e5eb;          /* card, table and divider lines */
+  --color-border-input: #d5dae2;    /* form field borders */
+  --color-focus: #14a085;           /* focus ring */
 
-  /* Brand / main button */
-  --color-primary: #18181b;
-  --color-primary-hover: #3f3f46;
-  --color-on-primary: #ffffff;      /* text on the main button */
+  /* Brand / main buttons (teal) */
+  --color-primary: #14a085;
+  --color-primary-hover: #0f8a72;
+  --color-primary-soft: #e3f5f0;    /* light teal: icon tiles, selected rows, focus glow */
+  --color-on-primary: #ffffff;      /* text on teal */
+
+  /* Sidebar (dark navy) */
+  --color-sidebar-bg: #1b2433;
+  --color-sidebar-border: #273246;
+  --color-sidebar-text: #b4bfcd;
+  --color-sidebar-heading: #6e7c91;
+  --color-sidebar-hover: rgb(255 255 255 / 0.05);
+  --color-sidebar-active: #273246;
+  --color-sidebar-active-text: #ffffff;
+
+  /* Accent colours for stat cards, charts and avatars (colour + its light tint) */
+  --accent-teal: #14a085;    --accent-teal-soft: #e3f5f0;
+  --accent-blue: #3b82f6;    --accent-blue-soft: #e8f0fe;
+  --accent-orange: #f59e0b;  --accent-orange-soft: #fef3e2;
+  --accent-green: #22a35a;   --accent-green-soft: #e6f6ec;
+  --accent-red: #e5484d;     --accent-red-soft: #fdecec;
+  --accent-purple: #9b5de5;  --accent-purple-soft: #f3ebfd;
 
   /* Status colours */
   --color-danger: #dc2626;          /* delete, deactivate, negative amounts */
   --color-danger-hover: #b91c1c;
   --color-error-bg: #fef2f2;
-  --color-error-border: #fca5a5;
+  --color-error-border: #fecaca;
   --color-error-text: #991b1b;
-  --color-success-bg: #f0fdf4;
-  --color-success-border: #86efac;
-  --color-success-text: #166534;
+  --color-success-bg: #ecfdf5;
+  --color-success-border: #a7f3d0;
+  --color-success-text: #065f46;
   --color-warning-bg: #fef3c7;
   --color-warning-text: #78350f;
+  --color-up: #16a34a;              /* "+12%" on stat cards */
+  --color-down: #dc2626;            /* "-3%" on stat cards */
 
-  /* Shape and type */
-  --radius: 0.25rem;                /* buttons, fields, tables */
-  --radius-lg: 0.5rem;              /* dialogs, sign-in card */
-  --font-body: Arial, Helvetica, sans-serif;
+  /* Shape, depth and type */
+  --radius: 0.5rem;                 /* buttons, fields */
+  --radius-lg: 0.75rem;             /* cards, tables, dialogs */
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+  --shadow-pop: 0 12px 32px rgb(16 24 40 / 0.18);
+  --font-body: Inter, "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
   --font-code: ui-monospace, Consolas, "Courier New", monospace;
-  --sidebar-width: 14rem;
+  --sidebar-width: 15rem;
+  --sidebar-width-collapsed: 4.25rem;
+  --header-height: 3.75rem;
 }
 
+/* Dark values. Kept in two places on purpose: device dark mode (unless the user chose light), and an explicit choice. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #0a0a0a;
-    --color-surface: #18181b;
-    --color-surface-muted: #27272a;
-    --color-backdrop: rgb(0 0 0 / 0.7);
-
-    --color-text: #ededed;
-    --color-text-muted: #a1a1aa;
-
-    --color-border: #27272a;
-    --color-border-input: #3f3f46;
-    --color-focus: #60a5fa;
-
-    --color-primary: #f4f4f5;
-    --color-primary-hover: #d4d4d8;
-    --color-on-primary: #18181b;
-
+  :root:not([data-theme="light"]) {
+    --color-bg: #0f141c;
+    --color-surface: #161d28;
+    --color-surface-muted: #1c2533;
+    --color-backdrop: rgb(0 0 0 / 0.65);
+    --color-text: #e5e9f0;
+    --color-text-muted: #94a3b8;
+    --color-border: #263142;
+    --color-border-input: #334155;
+    --color-focus: #2cc5a2;
+    --color-primary: #17a88b;
+    --color-primary-hover: #1fbf9e;
+    --color-primary-soft: #133a33;
+    --color-sidebar-bg: #111823;
+    --color-sidebar-border: #1f2937;
+    --color-sidebar-active: #1f2a3a;
+    --accent-teal-soft: #133a33;
+    --accent-blue-soft: #172a4a;
+    --accent-orange-soft: #3a2a10;
+    --accent-green-soft: #143222;
+    --accent-red-soft: #3d1a1c;
+    --accent-purple-soft: #2b1d42;
     --color-danger: #f87171;
     --color-danger-hover: #fca5a5;
-    --color-error-bg: #450a0a;
+    --color-error-bg: #3b1214;
     --color-error-border: #7f1d1d;
     --color-error-text: #fecaca;
-    --color-success-bg: #052e16;
+    --color-success-bg: #0f2e22;
     --color-success-border: #14532d;
     --color-success-text: #bbf7d0;
-    --color-warning-bg: #78350f;
-    --color-warning-text: #fef3c7;
+    --color-warning-bg: #3a2a10;
+    --color-warning-text: #fde68a;
+    --color-up: #4ade80;
+    --color-down: #f87171;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.5);
   }
+}
+
+:root[data-theme="dark"] {
+  --color-bg: #0f141c;
+  --color-surface: #161d28;
+  --color-surface-muted: #1c2533;
+  --color-backdrop: rgb(0 0 0 / 0.65);
+  --color-text: #e5e9f0;
+  --color-text-muted: #94a3b8;
+  --color-border: #263142;
+  --color-border-input: #334155;
+  --color-focus: #2cc5a2;
+  --color-primary: #17a88b;
+  --color-primary-hover: #1fbf9e;
+  --color-primary-soft: #133a33;
+  --color-sidebar-bg: #111823;
+  --color-sidebar-border: #1f2937;
+  --color-sidebar-active: #1f2a3a;
+  --accent-teal-soft: #133a33;
+  --accent-blue-soft: #172a4a;
+  --accent-orange-soft: #3a2a10;
+  --accent-green-soft: #143222;
+  --accent-red-soft: #3d1a1c;
+  --accent-purple-soft: #2b1d42;
+  --color-danger: #f87171;
+  --color-danger-hover: #fca5a5;
+  --color-error-bg: #3b1214;
+  --color-error-border: #7f1d1d;
+  --color-error-text: #fecaca;
+  --color-success-bg: #0f2e22;
+  --color-success-border: #14532d;
+  --color-success-text: #bbf7d0;
+  --color-warning-bg: #3a2a10;
+  --color-warning-text: #fde68a;
+  --color-up: #4ade80;
+  --color-down: #f87171;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.5);
 }

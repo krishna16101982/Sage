@@ -3,7 +3,7 @@
      styles/theme.css       colours, radius, fonts (light and dark)   -> change the look here
      styles/components.css  named classes: btn-primary, field, ...     -> change shapes and spacing here
      styles/layout.css      reset + small layout helpers (stack, row)
-   theme.css and components.css are the same files as in the Admin Panel (sage-admin/frontend-angular); keep them in step.
+   The three files are the same in sage-admin/frontend-angular and sage-user/frontend; keep them in step.
    ===================================================================================================== */
 /* Layer order: later layers win. base = reset, components = named classes, utilities = layout helpers. */
 @layer base, components, utilities;

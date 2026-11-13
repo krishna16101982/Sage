@@ -67,6 +67,17 @@ src/
 
 Every component is a `.ts` file (logic) with a matching `.html` file (markup) beside it. Pages use the class names from `src/styles/` in their `.html`; there are no per-component CSS files.
 
+## Look and feel
+Dark navy sidebar (logo, sections from the module categories, an icon per module, the signed-in user at the bottom), white top bar (menu button, page title, page search, light/dark switch, user, sign out), light grey page with white cards, teal as the main colour.
+
+- **Colours:** all in `src/styles/theme.css` (light values, then dark values). Change `--color-primary` for the main colour, `--color-sidebar-bg` for the sidebar, `--color-bg` for the page grey, `--accent-*` for the stat-card colours.
+- **Shapes and spacing:** `src/styles/components.css` (sidebar, top bar, cards, `stat-card`, tables, buttons, fields, dialogs, `bar-chart`).
+- **Same files in both apps:** `theme.css`, `components.css` and `layout.css` are identical in `sage-admin/frontend-angular` and `sage-user/frontend`; copy a change to both.
+- **Icons:** `component/icon/icon.ts` (`<app-icon name="users" />`, line icons adapted from Feather, MIT). The sidebar icon for each module code is in `modules/layout/primary-navigation/primary-navigation.ts` (`MODULE_ICONS`).
+- **Dark mode:** follows the device until the user clicks the moon / sun button; the choice is kept in this browser (`services/theme/theme.service.ts`).
+- **Menu button:** collapses the sidebar to icons on wide screens and slides it in on phones.
+- **Dashboard** (`modules/dashboard`): this month's sales, revenue, margin and customers, sales per day (`component/bar-chart`), top sales persons and recent sales. Each block shows only with `Sales.View` / `Customer.View`.
+
 ## URLs
 Each feature has `/<feature>/list`, `/<feature>/add` and `/<feature>/:id/edit` (e.g. `/users/list`, `/users/add`, `/users/{id}/edit`, `/users/{id}/reset-password`). Products: `/products/list`, `/products/categories/add`, `/products/categories/:id/edit`, `/products/add?categoryId=`, `/products/:id/edit`, `/products/:productId/plans/add`, `/products/plans/:id/edit`. Permissions: `/permissions/list`, `/permissions/modules`, and their add/edit pages.
 

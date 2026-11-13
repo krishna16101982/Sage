@@ -1,12 +1,13 @@
 /* =====================================================================================================
-   BASE + LAYOUT HELPERS: a minimal reset and a few small layout classes used in the page templates.
-   (The Next.js app gets these from Tailwind; Angular keeps them here as plain CSS.)
+   BASE + LAYOUT HELPERS: a minimal reset and small layout classes used in the page templates.
+   Same file in both Angular apps.
    ===================================================================================================== */
 
 @layer base {
 /* ---------- Reset ---------- */
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; }
+html { -webkit-font-smoothing: antialiased; }
 h1, h2, h3, p, ul, fieldset { margin: 0; padding: 0; }
 ul { list-style: none; }
 fieldset { border: 0; }
@@ -18,7 +19,7 @@ table { border-collapse: collapse; }
 @layer utilities {
 
 /* ---------- Stacks: children one under another with a gap ---------- */
-.stack { display: flex; flex-direction: column; gap: 1rem; }
+.stack { display: flex; flex-direction: column; gap: 1.25rem; }
 .stack-sm { display: flex; flex-direction: column; gap: 0.5rem; }
 .stack-xs { display: flex; flex-direction: column; gap: 0.25rem; }
 
@@ -27,26 +28,20 @@ table { border-collapse: collapse; }
 .row-tight { display: flex; align-items: center; gap: 0.5rem; }
 .spacer { flex: 1; }
 
+/* ---------- Grids ---------- */
+/* Tiles side by side that wrap on small screens (totals above the sales lists) */
+.tile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem; }
+/* Dashboard: a wide column and a narrow one; one column on small screens */
+.grid-main-side { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+@media (max-width: 1100px) { .grid-main-side { grid-template-columns: minmax(0, 1fr); } }
+
 /* ---------- Sizes and spacing ---------- */
 .w-56 { width: 14rem; }
 .w-64 { width: 16rem; }
 .w-72 { width: 18rem; }
 .max-w-sm { max-width: 24rem; }
 .max-w-lg { max-width: 36rem; }   /* Add/Edit pages */
-.max-w-3xl { max-width: 48rem; }  /* sale details */
-/* Tiles side by side that wrap on small screens (totals above the sales list) */
-.tile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.75rem; }
-
-/* ---------- Sidebar sections (one per module category) ---------- */
-.sidebar-section + .sidebar-section { margin-top: 1rem; }
-.sidebar-heading {
-  padding: 0 0.75rem 0.25rem;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
+.max-w-3xl { max-width: 48rem; }  /* sale page, sale details */
 .mt-1 { margin-top: 0.25rem; }
 .mt-2 { margin-top: 0.5rem; }
 .ml-5 { margin-left: 1.25rem; }
@@ -60,4 +55,5 @@ table { border-collapse: collapse; }
 .font-semibold { font-weight: 600; }
 .block { display: block; }
 .dim { opacity: 0.5; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }

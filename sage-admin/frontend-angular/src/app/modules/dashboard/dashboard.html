@@ -1,1 +1,172 @@
-<h1 class="page-title">Dashboard</h1>
+<div class="stack">
+  <div class="page-header">
+    <div class="stack-xs">
+      <span class="page-eyebrow">Overview</span>
+      <h1 class="page-title">Dashboard</h1>
+    </div>
+    <div class="spacer"></div>
+    @if (canSales) {
+      <a class="btn btn-secondary" routerLink="/sales/summary"><app-icon name="bar-chart" /> Sales summary</a>
+    }
+    @if (canAddCustomer) {
+      <a class="btn btn-primary" routerLink="/customers/add"><app-icon name="plus" /> Add customer</a>
+    }
+  </div>
+
+  @if (error()) { <p class="hint text-danger">{{ error() }}</p> }
+
+  @if (!canSales && !canCustomers) {
+    <section class="card">
+      <div class="card-body stack-sm">
+        <h2 class="section-title">Welcome, {{ auth.user()?.firstName }}</h2>
+        <p class="text-sm text-muted">Use the menu on the left to open the screens you have access to.</p>
+      </div>
+    </section>
+  }
+
+  <!-- Figures for this month -->
+  @if (canSales || canCustomers) {
+    <div class="stat-grid">
+      @if (canSales) {
+        <div class="card stat-card accent-teal">
+          <div class="stat-top">
+            <span class="stat-icon"><app-icon name="cart" /></span>
+            <div class="stack-xs">
+              <span class="stat-label">Sales this month</span>
+              <span>
+                <span class="stat-value">{{ thisMonth()?.totalCount ?? '…' }}</span>
+                @if (countChange(); as c) { <span class="stat-change" [class.up]="c >= 0" [class.down]="c < 0">{{ c >= 0 ? '▲' : '▼' }} {{ c >= 0 ? c : -c }}%</span> }
+              </span>
+              <span class="stat-sub">{{ lastMonth()?.totalCount ?? 0 }} last month</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card stat-card accent-blue">
+          <div class="stat-top">
+            <span class="stat-icon"><app-icon name="rupee" /></span>
+            <div class="stack-xs">
+              <span class="stat-label">Revenue this month</span>
+              <span>
+                <span class="stat-value">{{ thisMonth() ? inr(thisMonth()!.totalSaleAmount) : '…' }}</span>
+                @if (revenueChange(); as c) { <span class="stat-change" [class.up]="c >= 0" [class.down]="c < 0">{{ c >= 0 ? '▲' : '▼' }} {{ c >= 0 ? c : -c }}%</span> }
+              </span>
+              <span class="stat-sub">{{ inr(lastMonth()?.totalSaleAmount ?? 0) }} last month</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card stat-card accent-orange">
+          <div class="stat-top">
+            <span class="stat-icon"><app-icon name="percent" /></span>
+            <div class="stack-xs">
+              <span class="stat-label">Margin this month</span>
+              <span class="stat-value" [class.text-danger]="(thisMonth()?.totalMargin ?? 0) < 0">{{ thisMonth() ? inr(thisMonth()!.totalMargin) : '…' }}</span>
+              <span class="stat-sub">{{ marginPercent() }}% of revenue</span>
+            </div>
+          </div>
+          <div class="progress" aria-hidden="true"><span [style.width.%]="marginPercent() > 0 ? marginPercent() : 0"></span></div>
+        </div>
+      }
+      @if (canCustomers) {
+        <a class="card stat-card accent-purple" routerLink="/customers/list">
+          <div class="stat-top">
+            <span class="stat-icon"><app-icon name="briefcase" /></span>
+            <div class="stack-xs">
+              <span class="stat-label">Customers</span>
+              <span class="stat-value">{{ customerCount() ?? '…' }}</span>
+              <span class="stat-sub">Shared with the User Panel</span>
+            </div>
+          </div>
+        </a>
+      }
+    </div>
+  }
+
+  @if (canSales) {
+    <div class="grid-main-side">
+      <!-- Sales per day -->
+      <section class="card">
+        <header class="card-header">
+          <div class="stack-xs">
+            <h2 class="section-title">Sales per day</h2>
+            <span class="hint">{{ month }} · active sales, by the day they were recorded</span>
+          </div>
+          <div class="spacer"></div>
+          <span class="stat-value" style="font-size: 1.125rem">{{ thisMonth() ? inr(thisMonth()!.totalSaleAmount) : '' }}</span>
+        </header>
+        <div class="card-body accent-teal">
+          <app-bar-chart [points]="daily()" [summary]="'Sale amount per day in ' + month" />
+          @if ((thisMonth()?.totalCount ?? 0) > 200) { <p class="hint mt-2">The chart shows the first 200 sales of the month.</p> }
+        </div>
+      </section>
+
+      <!-- Top sales persons -->
+      <section class="card">
+        <header class="card-header">
+          <h2 class="section-title">Top sales persons</h2>
+          <div class="spacer"></div>
+          <a class="link-button text-sm" routerLink="/sales/summary">View all</a>
+        </header>
+        @if (topSellers().length === 0) {
+          <p class="card-body text-sm text-muted">No sales yet this month.</p>
+        } @else {
+          <ul class="activity-list">
+            @for (r of topSellers(); track r.id; let i = $index) {
+              <li>
+                <span class="avatar avatar-sm" [class]="accents[i]">{{ initialsOf(r.name) }}</span>
+                <div class="activity-text stack-xs">
+                  <div class="row-tight">
+                    <span class="font-medium truncate">{{ r.name }}</span>
+                    <span class="spacer"></span>
+                    <span class="font-semibold">{{ inr(r.saleAmount) }}</span>
+                  </div>
+                  <div class="progress" [class]="accents[i]">
+                    <span [style.width.%]="(r.saleAmount / topMax()) * 100"></span>
+                  </div>
+                  <span class="hint">{{ r.saleCount }} sale{{ r.saleCount === 1 ? '' : 's' }}{{ r.role === 'SalesManager' ? ' · manager' : (r.managerName ? ' · team of ' + r.managerName : '') }}</span>
+                </div>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+    </div>
+
+    <!-- Latest sales -->
+    <section class="card">
+      <header class="card-header">
+        <div class="stack-xs">
+          <h2 class="section-title">Recent sales</h2>
+          <span class="hint">The latest sales recorded in the User Panel</span>
+        </div>
+        <div class="spacer"></div>
+        <a class="btn btn-secondary" routerLink="/sales/list">View all <app-icon name="chevron-right" /></a>
+      </header>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Sale</th><th>Customer</th><th>Product</th><th>Sales person</th><th class="amount">Amount</th><th>Status</th><th>Sold on</th></tr>
+          </thead>
+          <tbody>
+            @for (s of recent(); track s.id) {
+              <tr>
+                <td><a class="link-button code" style="white-space: nowrap" [routerLink]="['/sales', s.id]">{{ s.saleNumber }}</a></td>
+                <td>{{ s.customerName }}</td>
+                <td>{{ s.productName }} <div class="hint">{{ s.planName }}</div></td>
+                <td>{{ s.sellerName }}</td>
+                <td class="amount font-medium">{{ inr(s.saleAmount) }}</td>
+                <td>
+                  @if (s.status === 'Cancelled') { <span class="badge badge-danger">Cancelled</span> } @else { <span class="badge badge-success">Active</span> }
+                </td>
+                <td class="date">{{ dateTime(s.createdAtUtc) }}</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="7" class="table-empty">No sales recorded yet.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+</div>

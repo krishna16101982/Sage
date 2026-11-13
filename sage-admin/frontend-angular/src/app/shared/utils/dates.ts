@@ -39,3 +39,23 @@ export function formatDate(date: string | null): string {
   const [y, m, d] = date.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
+/** First and last day of a month, 'yyyy-MM-dd'. offset 0 = this month, -1 = last month. */
+export function monthBounds(offset = 0): { from: string; to: string } {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  const last = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
+  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return { from: fmt(first), to: fmt(last) };
+}
+
+/** "November 2026" */
+export function monthName(offset = 0): string {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() + offset, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+}
+
+/** % change from previous to current, rounded; null when there is nothing to compare with. */
+export function percentChange(current: number, previous: number): number | null {
+  return previous > 0 ? Math.round(((current - previous) / previous) * 100) : null;
+}

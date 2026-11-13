@@ -1,17 +1,37 @@
 <nav aria-label="Main" class="sidebar">
-  <div class="sidebar-title">Sage Admin</div>
-  @for (section of sections(); track $index) {
-    <div class="sidebar-section">
-      @if (section.category) { <div class="sidebar-heading">{{ section.category }}</div> }
-      <ul class="stack-xs">
-        @for (item of section.items; track item.code) {
-          <li>
-            <a class="sidebar-link" [routerLink]="item.path" routerLinkActive #rla="routerLinkActive" [attr.aria-current]="rla.isActive ? 'page' : null">{{ item.name }}</a>
-          </li>
-        }
-      </ul>
+  <a class="sidebar-brand" routerLink="/dashboard" title="Sage Admin">
+    <span class="brand-mark">S</span>
+    <span class="brand-name">Sage <span class="brand-sub">Admin</span></span>
+  </a>
+
+  <div class="sidebar-nav">
+    @for (section of sections(); track $index) {
+      <div class="sidebar-section">
+        @if (section.category) { <div class="sidebar-heading">{{ section.category }}</div> }
+        <ul class="stack-xs">
+          @for (item of section.items; track item.code) {
+            <li>
+              <a class="sidebar-link" [routerLink]="item.path" routerLinkActive #rla="routerLinkActive"
+                 [attr.aria-current]="rla.isActive ? 'page' : null" [title]="item.name">
+                <app-icon [name]="icons[item.code] ?? 'circle'" />
+                <span class="sidebar-label">{{ item.name }}</span>
+              </a>
+            </li>
+          }
+        </ul>
+      </div>
+    } @empty {
+      <p class="sidebar-empty">No screens are assigned to you yet. Ask an administrator for access.</p>
+    }
+  </div>
+
+  @if (auth.user(); as u) {
+    <div class="sidebar-user">
+      <span class="avatar">{{ initials() }}</span>
+      <div class="sidebar-user-text">
+        <span class="sidebar-user-name">{{ u.firstName }} {{ u.lastName }}</span>
+        <span class="sidebar-user-role">{{ u.isSuperAdmin ? 'Super Admin' : 'Administrator' }}</span>
+      </div>
     </div>
-  } @empty {
-    <p class="hint">No screens are assigned to you yet. Ask an administrator for access.</p>
   }
 </nav>

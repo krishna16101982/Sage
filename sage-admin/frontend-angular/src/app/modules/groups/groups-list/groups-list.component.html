@@ -33,7 +33,7 @@
             <td>{{ g.userCount }}</td>
             <td>{{ g.permissionCount }}</td>
             <td>
-              {{ g.status }}
+              <span class="badge" [class.badge-success]="g.status === 'Active'">{{ g.status }}</span>
               @if (g.isSystem) { <span class="badge">system</span> }
             </td>
             <td class="actions">

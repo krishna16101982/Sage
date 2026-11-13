@@ -4,7 +4,7 @@
     <div class="row">
       <h1 class="page-title">Sale {{ sale()?.saleNumber ?? '' }}</h1>
       @if (sale(); as s) {
-        @if (s.status === 'Cancelled') { <span class="badge badge-danger">Cancelled</span> } @else { <span class="badge">Active</span> }
+        @if (s.status === 'Cancelled') { <span class="badge badge-danger">Cancelled</span> } @else { <span class="badge badge-success">Active</span> }
         <div class="spacer"></div>
         @if (s.status === 'Active') {
           <button type="button" class="btn btn-danger" (click)="cancelling.set(true)">Cancel sale</button>

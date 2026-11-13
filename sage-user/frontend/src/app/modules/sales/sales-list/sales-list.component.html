@@ -57,7 +57,7 @@
             <td class="amount">{{ inr(s.discountAmount) }} <div class="hint">{{ s.discountPercent }}%</div></td>
             <td class="date">{{ date(s.renewalDate) }}</td>
             <td>
-              @if (s.status === 'Cancelled') { <span class="badge badge-danger">Cancelled</span> } @else { <span class="badge">Active</span> }
+              @if (s.status === 'Cancelled') { <span class="badge badge-danger">Cancelled</span> } @else { <span class="badge badge-success">Active</span> }
             </td>
           </tr>
         } @empty {

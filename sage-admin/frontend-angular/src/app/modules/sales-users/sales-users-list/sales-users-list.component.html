@@ -46,7 +46,7 @@
               }
             </td>
             <td>
-              {{ u.status }}
+              <span class="badge" [class.badge-success]="u.status === 'Active'">{{ u.status }}</span>
               @if (u.isLockedOut) { <span class="badge badge-danger">locked out</span> }
               @if (u.mustChangePassword) { <div class="hint">must change password</div> }
             </td>

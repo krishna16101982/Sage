@@ -22,7 +22,7 @@
             <td>{{ m.sortOrder }}</td>
             <td class="code">{{ m.menuPath ?? '-' }}</td>
             <td>{{ m.permissionCount }}</td>
-            <td>{{ m.isActive ? 'Active' : 'Inactive' }} @if (m.isSystem) { <span class="badge">system</span> }</td>
+            <td><span class="badge" [class.badge-success]="m.isActive">{{ m.isActive ? 'Active' : 'Inactive' }}</span> @if (m.isSystem) { <span class="badge">system</span> }</td>
             <td class="actions">
               <a *appCan="perm.PermissionEdit" class="link-button" [routerLink]="['/permissions/modules', m.id, 'edit']">Edit</a>
             </td>

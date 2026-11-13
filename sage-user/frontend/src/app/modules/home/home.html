@@ -1,37 +1,156 @@
 @if (auth.user(); as u) {
-  <div class="stack max-w-3xl">
-    <div class="row">
-      <h1 class="page-title">Welcome, {{ u.firstName }}</h1>
+  <div class="stack">
+    <div class="page-header">
+      <div class="stack-xs">
+        <span class="page-eyebrow">Overview</span>
+        <h1 class="page-title">Welcome, {{ u.firstName }}</h1>
+      </div>
       <div class="spacer"></div>
-      <a class="btn btn-primary" routerLink="/sales/add">New sale</a>
+      <a class="btn btn-secondary" routerLink="/sales/list"><app-icon name="list" /> My sales</a>
+      <a class="btn btn-primary" routerLink="/sales/add"><app-icon name="plus" /> New sale</a>
     </div>
 
-    <section class="stack-sm">
-      <h2 class="section-title">This month</h2>
-      <div class="tile-grid">
-        <a class="card" routerLink="/sales/list" style="text-decoration: none"><div class="card-body stack-xs">
-          <span class="text-xs text-muted">My sales</span>
-          <span class="font-semibold">{{ mine()?.totalCount ?? '…' }}</span>
-          <span class="text-sm">{{ mine() ? inr(mine()!.totalSaleAmount) : '' }}</span>
-        </div></a>
-        @if (u.isManager) {
-          <a class="card" routerLink="/sales/team" style="text-decoration: none"><div class="card-body stack-xs">
-            <span class="text-xs text-muted">Team sales</span>
-            <span class="font-semibold">{{ team()?.totalCount ?? '…' }}</span>
-            <span class="text-sm">{{ team() ? inr(team()!.totalSaleAmount) : '' }}</span>
-          </div></a>
-        }
+    @if (error()) { <p class="hint text-danger">{{ error() }}</p> }
+
+    <!-- Figures for this month -->
+    <div class="stat-grid">
+      <a class="card stat-card accent-teal" routerLink="/sales/list">
+        <div class="stat-top">
+          <span class="stat-icon"><app-icon name="cart" /></span>
+          <div class="stack-xs">
+            <span class="stat-label">My sales this month</span>
+            <span>
+              <span class="stat-value">{{ mine()?.totalCount ?? '…' }}</span>
+              @if (countChange(); as c) { <span class="stat-change" [class.up]="c >= 0" [class.down]="c < 0">{{ c >= 0 ? '▲' : '▼' }} {{ c >= 0 ? c : -c }}%</span> }
+            </span>
+            <span class="stat-sub">{{ mineLast()?.totalCount ?? 0 }} last month</span>
+          </div>
+        </div>
+      </a>
+
+      <div class="card stat-card accent-blue">
+        <div class="stat-top">
+          <span class="stat-icon"><app-icon name="rupee" /></span>
+          <div class="stack-xs">
+            <span class="stat-label">My revenue this month</span>
+            <span>
+              <span class="stat-value">{{ mine() ? inr(mine()!.totalSaleAmount) : '…' }}</span>
+              @if (revenueChange(); as c) { <span class="stat-change" [class.up]="c >= 0" [class.down]="c < 0">{{ c >= 0 ? '▲' : '▼' }} {{ c >= 0 ? c : -c }}%</span> }
+            </span>
+            <span class="stat-sub">{{ inr(mineLast()?.totalSaleAmount ?? 0) }} last month</span>
+          </div>
+        </div>
       </div>
-      <p class="hint">Active sales recorded since the 1st of this month.</p>
+
+      <div class="card stat-card accent-orange">
+        <div class="stat-top">
+          <span class="stat-icon"><app-icon name="percent" /></span>
+          <div class="stack-xs">
+            <span class="stat-label">My margin this month</span>
+            <span class="stat-value" [class.text-danger]="(mine()?.totalMargin ?? 0) < 0">{{ mine() ? inr(mine()!.totalMargin) : '…' }}</span>
+            <span class="stat-sub">{{ marginPercent() }}% of revenue</span>
+          </div>
+        </div>
+        <div class="progress" aria-hidden="true"><span [style.width.%]="marginPercent() > 0 ? marginPercent() : 0"></span></div>
+      </div>
+
+      @if (u.isManager) {
+        <a class="card stat-card accent-purple" routerLink="/sales/team">
+          <div class="stat-top">
+            <span class="stat-icon"><app-icon name="users" /></span>
+            <div class="stack-xs">
+              <span class="stat-label">Team revenue this month</span>
+              <span class="stat-value">{{ team() ? inr(team()!.totalSaleAmount) : '…' }}</span>
+              <span class="stat-sub">{{ team()?.totalCount ?? 0 }} sale{{ team()?.totalCount === 1 ? '' : 's' }} by your team</span>
+            </div>
+          </div>
+        </a>
+      } @else {
+        <a class="card stat-card accent-purple" routerLink="/customers/list">
+          <div class="stat-top">
+            <span class="stat-icon"><app-icon name="briefcase" /></span>
+            <div class="stack-xs">
+              <span class="stat-label">Customers</span>
+              <span class="stat-value">{{ customerCount() ?? '…' }}</span>
+              <span class="stat-sub">Shared by the whole sales team</span>
+            </div>
+          </div>
+        </a>
+      }
+    </div>
+
+    <div class="grid-main-side">
+      <!-- My sales per day -->
+      <section class="card">
+        <header class="card-header">
+          <div class="stack-xs">
+            <h2 class="section-title">My sales per day</h2>
+            <span class="hint">{{ month }} · active sales</span>
+          </div>
+          <div class="spacer"></div>
+          <span class="stat-value" style="font-size: 1.125rem">{{ mine() ? inr(mine()!.totalSaleAmount) : '' }}</span>
+        </header>
+        <div class="card-body accent-teal">
+          <app-bar-chart [points]="daily()" [summary]="'My sale amount per day in ' + month" />
+        </div>
+      </section>
+
+      <!-- Quick actions and profile -->
+      <section class="card">
+        <header class="card-header"><h2 class="section-title">Quick actions</h2></header>
+        <ul class="activity-list">
+          <li>
+            <span class="stat-icon accent-teal" style="width: 2rem; height: 2rem"><app-icon name="plus-circle" /></span>
+            <div class="activity-text"><a class="link-button" routerLink="/sales/add">Record a new sale</a><div class="hint">Product, customer, price and term</div></div>
+          </li>
+          <li>
+            <span class="stat-icon accent-purple" style="width: 2rem; height: 2rem"><app-icon name="briefcase" /></span>
+            <div class="activity-text"><a class="link-button" routerLink="/customers/add">Add a customer</a><div class="hint">Search first: customers are shared</div></div>
+          </li>
+          <li>
+            <span class="stat-icon accent-blue" style="width: 2rem; height: 2rem"><app-icon name="user-check" /></span>
+            <div class="activity-text">
+              <span class="font-medium">{{ u.isManager ? 'Sales manager' : 'Sales person' }}</span>
+              <div class="hint">{{ u.managerName ? 'Your manager: ' + u.managerName : 'You lead a team' }} · <span class="code">{{ u.username }}</span></div>
+            </div>
+          </li>
+        </ul>
+      </section>
+    </div>
+
+    <!-- My latest sales -->
+    <section class="card">
+      <header class="card-header">
+        <div class="stack-xs">
+          <h2 class="section-title">My recent sales</h2>
+          <span class="hint">Your latest sales</span>
+        </div>
+        <div class="spacer"></div>
+        <a class="btn btn-secondary" routerLink="/sales/list">View all <app-icon name="chevron-right" /></a>
+      </header>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Sale</th><th>Customer</th><th>Product</th><th class="amount">Amount</th><th>Renewal</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            @for (s of recent(); track s.id) {
+              <tr>
+                <td><a class="link-button code" style="white-space: nowrap" [routerLink]="['/sales', s.id]">{{ s.saleNumber }}</a></td>
+                <td>{{ s.customerName }}</td>
+                <td>{{ s.productName }} <div class="hint">{{ s.planName }}</div></td>
+                <td class="amount font-medium">{{ inr(s.saleAmount) }}</td>
+                <td class="date">{{ date(s.renewalDate) }}</td>
+                <td>
+                  @if (s.status === 'Cancelled') { <span class="badge badge-danger">Cancelled</span> } @else { <span class="badge badge-success">Active</span> }
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="6" class="table-empty">No sales yet. <a class="link-button" routerLink="/sales/add">Record your first sale</a>.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </section>
-
-    <div class="card">
-      <div class="card-body stack-sm text-sm">
-        <div><span class="text-muted">Role:</span> {{ u.isManager ? 'Sales manager' : 'Sales person' }}</div>
-        @if (u.managerName) { <div><span class="text-muted">Your manager:</span> {{ u.managerName }}</div> }
-        <div><span class="text-muted">Username:</span> <span class="code">{{ u.username }}</span></div>
-        <div><span class="text-muted">Email:</span> {{ u.email }}</div>
-      </div>
-    </div>
   </div>
 }

@@ -20,7 +20,7 @@
             <td class="code">{{ p.code }}</td>
             <td>{{ p.name }} @if (p.description) { <div class="hint">{{ p.description }}</div> }</td>
             <td>{{ p.moduleName }}</td>
-            <td>{{ p.isActive ? 'Active' : 'Inactive' }} @if (p.isSystem) { <span class="badge">system</span> }</td>
+            <td><span class="badge" [class.badge-success]="p.isActive">{{ p.isActive ? 'Active' : 'Inactive' }}</span> @if (p.isSystem) { <span class="badge">system</span> }</td>
             <td class="actions">
               <a *appCan="perm.PermissionEdit" class="link-button" [routerLink]="['/permissions', p.id, 'edit']">Edit</a>
             </td>
