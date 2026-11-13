@@ -12,8 +12,8 @@ export class PermissionsService {
   list = (q: PermissionQuery) => this.rest.get<PagedResult<PermissionItem>>(`${this.base}${toQuery(q)}`);
   /** Modules with their permissions (includeInactive for management screens). */
   modules = (includeInactive = false) => this.rest.get<ModuleItemDto[]>(`${this.base}/modules?includeInactive=${includeInactive}`);
-  createModule = (data: { code: string; name: string; category?: string; sortOrder: number }) => this.rest.post<ModuleItemDto>(`${this.base}/modules`, data);
-  updateModule = (id: number, data: { name: string; category?: string; sortOrder: number; isActive: boolean }) =>
+  createModule = (data: { code: string; name: string; category?: string; sortOrder: number; menuPath?: string }) => this.rest.post<ModuleItemDto>(`${this.base}/modules`, data);
+  updateModule = (id: number, data: { name: string; category?: string; sortOrder: number; isActive: boolean; menuPath: string }) =>
     this.rest.put<ModuleItemDto>(`${this.base}/modules/${id}`, data);
   createPermission = (data: { moduleId: number; action: string; name: string; description?: string }) => this.rest.post<PermissionItem>(this.base, data);
   updatePermission = (id: number, data: { name: string; description?: string; isActive: boolean }) => this.rest.put<PermissionItem>(`${this.base}/${id}`, data);

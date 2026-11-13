@@ -1,22 +1,12 @@
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../../services/auth/auth.service';
-import { PermissionService } from '../../../services/permission/permission.service';
-import { Perm } from '../../../shared/enumarations/permission-codes';
+import type { MenuItem } from '../../../shared/interfaces/auth.interface';
 
-/** Menu items. Each is shown only when the user holds its permission (the API decides the permissions). */
-const ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', permission: Perm.DashboardView },
-  { href: '/users', label: 'Admin Users', permission: Perm.AdminUserView },
-  { href: '/groups', label: 'Groups', permission: Perm.GroupView },
-  { href: '/permissions', label: 'Permissions', permission: Perm.PermissionView },
-  { href: '/products', label: 'Products', permission: Perm.ProductView },
-  { href: '/sales-users', label: 'Sales Users', permission: Perm.SalesUserView },
-  { href: '/audit-logs', label: 'Audit Logs', permission: Perm.AuditLogView },
-  { href: '/settings', label: 'Settings', permission: Perm.SettingView },
-];
-
-/** Left-hand navigation. */
+/**
+ * Left-hand navigation, built from the Modules table (Permissions > Modules): every active module with a menu link that
+ * the user can view, in sort order, under its category. Nothing here is hard-coded.
+ */
 @Component({
   selector: 'app-primary-navigation',
   imports: [RouterLink, RouterLinkActive],
@@ -24,6 +14,15 @@ const ITEMS = [
 })
 export class PrimaryNavigation {
   private readonly auth = inject(AuthService);
-  private readonly permissions = inject(PermissionService);
-  protected readonly items = computed(() => (this.auth.user() ? ITEMS.filter((i) => this.permissions.has(i.permission)) : []));
+
+  /** Consecutive items with the same category form one section. */
+  protected readonly sections = computed(() => {
+    const sections: { category: string | null; items: MenuItem[] }[] = [];
+    for (const item of this.auth.user()?.menu ?? []) {
+      const last = sections[sections.length - 1];
+      if (last && last.category === item.category) last.items.push(item);
+      else sections.push({ category: item.category, items: [item] });
+    }
+    return sections;
+  });
 }

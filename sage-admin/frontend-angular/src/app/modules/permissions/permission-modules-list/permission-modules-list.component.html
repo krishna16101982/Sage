@@ -12,7 +12,7 @@
 
   <div class="table-wrap">
     <table class="data-table">
-      <thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Order</th><th>Permissions</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Order</th><th>Menu link</th><th>Permissions</th><th>Status</th><th></th></tr></thead>
       <tbody>
         @for (m of modules() ?? []; track m.id) {
           <tr>
@@ -20,6 +20,7 @@
             <td>{{ m.name }}</td>
             <td>{{ m.category ?? '-' }}</td>
             <td>{{ m.sortOrder }}</td>
+            <td class="code">{{ m.menuPath ?? '-' }}</td>
             <td>{{ m.permissionCount }}</td>
             <td>{{ m.isActive ? 'Active' : 'Inactive' }} @if (m.isSystem) { <span class="badge">system</span> }</td>
             <td class="actions">
@@ -27,7 +28,7 @@
             </td>
           </tr>
         } @empty {
-          <tr><td colspan="7" class="table-empty">{{ modules() ? 'No modules.' : 'Loading...' }}</td></tr>
+          <tr><td colspan="8" class="table-empty">{{ modules() ? 'No modules.' : 'Loading...' }}</td></tr>
         }
       </tbody>
     </table>

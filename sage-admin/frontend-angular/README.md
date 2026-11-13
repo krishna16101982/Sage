@@ -46,7 +46,7 @@ src/
       enumarations/             permission-codes.ts (Perm)
       utils/                    format.ts (INR, duration, date), password.ts
     modules/
-      layout/                   primary-layout, primary-header, primary-navigation
+      layout/                   primary-layout, primary-header, primary-navigation (sidebar built from the API's menu)
       login/                    login-layout, login-prompt, forgot-password, reset-password
       changepassword/
       dashboard/
@@ -72,4 +72,5 @@ Route parameters and query parameters arrive as component inputs (`withComponent
 ## Adding a screen
 1. Add the API calls to a service in `services/<area>/`.
 2. Create `modules/<feature>/<feature>-list|add|edit/` components (`.ts` + `.html`) and `<feature>.routes.ts`.
-3. Load the routes from `app.routes.ts` (`loadChildren`) and add the menu item in `modules/layout/primary-navigation/`.
+3. Load the routes from `app.routes.ts` (`loadChildren`).
+4. Show it in the sidebar: on Permissions > Modules, give its module a **menu link** (the route, e.g. `/inventory`), a category and a sort order. Users see it when they have the module's `View` permission. No code change is needed for the menu.

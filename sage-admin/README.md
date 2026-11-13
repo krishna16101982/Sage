@@ -74,6 +74,8 @@ Integration tests create and drop their own database `SageAdmin_Test_<guid>` on 
 ## Permissions (Sprint 3)
 - `GET /api/admin/permissions` (paged: `page`, `pageSize`, `search`, `moduleId`, `isActive`, `sortBy`, `sortDirection`), `GET /api/admin/permissions/modules?includeInactive=`, `POST /api/admin/permissions`, `PUT /api/admin/permissions/{id}`, `POST /api/admin/permissions/modules`, `PUT /api/admin/permissions/modules/{id}`.
 - Every endpoint declares its permission with `[RequirePermission(PermissionConstants.X)]`. The backend checks it against SQL on every request: 401 without a valid session, 403 without the permission.
+- **Sidebar = modules.** Each module can have a **menu link** (`MenuPath`, e.g. `/products`; edited on Permissions > Modules). The sidebar lists every active module with a link whose `<Code>.View` the user holds (Super Admin: all), in sort order under its category. The API sends it with the signed-in user (`menu` in login / refresh / `GET /api/admin/auth/me`). Modules without a link only carry permissions. A link must be a screen the Admin Panel has. Editing a module without sending `menuPath` keeps its link (the Next.js app, whose sidebar is still a fixed list, does not send it); an empty `menuPath` removes it.
+- The HR modules (Employee, Attendance, Payroll) were removed (`SeedData/005_Remove_HR_Modules.sql`).
 - A permission's code is `Module.Action`; module code, permission module and action never change after creation. System modules/permissions cannot be deactivated. Deactivating a module or permission bumps `PermissionVersion` of every affected user, so it takes effect on their next request.
 
 ## Permission groups (Sprint 4)

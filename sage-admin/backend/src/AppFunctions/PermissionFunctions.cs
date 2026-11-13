@@ -26,7 +26,7 @@ namespace SageAdminApi.AppFunctions
     {
         private const string PermissionColumns = "p.Id, p.ModuleId, m.Code, m.Name, p.Action, p.Code, p.Name, p.Description, p.IsActive, p.IsSystem";
         private const string PermissionFrom = "FROM dbo.Permissions p JOIN dbo.Modules m ON m.Id = p.ModuleId";
-        private const string ModuleSelect = "SELECT m.Id, m.Code, m.Name, m.Category, m.SortOrder, m.IsActive, m.IsSystem, (SELECT COUNT(*) FROM dbo.Permissions px WHERE px.ModuleId = m.Id) FROM dbo.Modules m";
+        private const string ModuleSelect = "SELECT m.Id, m.Code, m.Name, m.Category, m.SortOrder, m.IsActive, m.IsSystem, (SELECT COUNT(*) FROM dbo.Permissions px WHERE px.ModuleId = m.Id), m.MenuPath FROM dbo.Modules m";
 
         /// <summary>
         /// Sort keys the client may request. dbo.usp_Permission_GetPaged maps each key to a fixed ORDER BY; anything else falls back to "module".
@@ -57,7 +57,8 @@ namespace SageAdminApi.AppFunctions
             SortOrder = r.GetInt32(4),
             IsActive = r.GetBoolean(5),
             IsSystem = r.GetBoolean(6),
-            PermissionCount = r.GetInt32(7)
+            PermissionCount = r.GetInt32(7),
+            MenuPath = r.IsDBNull(8) ? null : r.GetString(8)
         };
 
         private static PermissionDto MapPermission(SqlDataReader r) => new PermissionDto
@@ -90,7 +91,7 @@ namespace SageAdminApi.AppFunctions
             => _databaseFunctions.QuerySingleOrDefaultAsync($"SELECT {PermissionColumns} {PermissionFrom} WHERE p.Id = @id", MapPermission, new[] { P("@id", _id) }, _ct);
 
         /// <summary>Audit snapshot: only business fields, never secrets.</summary>
-        private static object Snapshot(ModuleDto m) => m == null ? null : new { m.Code, m.Name, m.Category, m.SortOrder, m.IsActive };
+        private static object Snapshot(ModuleDto m) => m == null ? null : new { m.Code, m.Name, m.Category, m.SortOrder, m.IsActive, m.MenuPath };
         private static object Snapshot(PermissionDto p) => p == null ? null : new { p.Code, p.Name, p.Description, p.IsActive };
 
         #endregion
@@ -158,13 +159,14 @@ namespace SageAdminApi.AppFunctions
             #endregion
             try
             {
-                _functionReturn = ApplicationValidationFunctions.ValidateModule(_params?.Code, _params?.Name, _params?.Category, _methodName);
+                _functionReturn = ApplicationValidationFunctions.ValidateModule(_params?.Code, _params?.Name, _params?.Category, _params?.MenuPath, _methodName);
                 if (!_functionReturn.Status) return (null, _functionReturn);
 
                 // The procedure checks and inserts under one lock; a duplicate code comes back as a 409.
                 (_functionReturn, _id) = await _databaseFunctions.ExecuteProcedureWriteAsync(SP.ModuleCreate, new[]
                 {
-                    P("@Code", _params.Code.Trim()), P("@Name", Clean(_params.Name)), P("@Category", Clean(_params.Category)), P("@SortOrder", _params.SortOrder)
+                    P("@Code", _params.Code.Trim()), P("@Name", Clean(_params.Name)), P("@Category", Clean(_params.Category)), P("@SortOrder", _params.SortOrder),
+                    P("@MenuPath", string.IsNullOrWhiteSpace(_params.MenuPath) ? null : _params.MenuPath.Trim())
                 }, _methodName, "Module created.", _ct);
                 if (!_functionReturn.Status) return (null, WithConflictMessage(_functionReturn, ApplicationConstants.ValidationMessages.ModuleCodeExists));
 
@@ -189,7 +191,7 @@ namespace SageAdminApi.AppFunctions
             #endregion
             try
             {
-                _functionReturn = ApplicationValidationFunctions.ValidateModuleUpdate(_params?.Name, _params?.Category, _methodName);
+                _functionReturn = ApplicationValidationFunctions.ValidateModuleUpdate(_params?.Name, _params?.Category, _params?.MenuPath, _methodName);
                 if (!_functionReturn.Status) return (null, _functionReturn);
 
                 ModuleDto _existing = await GetModuleByIdAsync(_id, _ct);
@@ -202,7 +204,9 @@ namespace SageAdminApi.AppFunctions
                 // module's permissions, so their tokens are re-evaluated on the next request.
                 (_functionReturn, _retValue) = await _databaseFunctions.ExecuteProcedureWriteAsync(SP.ModuleUpdate, new[]
                 {
-                    P("@Id", _id), P("@Name", Clean(_params.Name)), P("@Category", Clean(_params.Category)), P("@SortOrder", _params.SortOrder), P("@IsActive", _params.IsActive)
+                    P("@Id", _id), P("@Name", Clean(_params.Name)), P("@Category", Clean(_params.Category)), P("@SortOrder", _params.SortOrder), P("@IsActive", _params.IsActive),
+                    // Not sent = keep the current link (older clients do not know the field); empty = remove it.
+                    P("@MenuPath", _params.MenuPath == null ? _existing.MenuPath : (string.IsNullOrWhiteSpace(_params.MenuPath) ? null : _params.MenuPath.Trim()))
                 }, _methodName, "Module updated.", _ct);
                 if (!_functionReturn.Status) return (null, _functionReturn);
                 if (_retValue == 0) return (null, ApplicationCommonFunctions.NotFound(ApplicationConstants.ValidationMessages.ModuleNotFound, _methodName));

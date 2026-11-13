@@ -14,15 +14,29 @@ public class PermissionValidationUnitTests
     [InlineData("Employee", "", null, false)]
     [InlineData("Employee", "   ", null, false)]
     public void ValidateModule(string code, string name, string? category, bool ok)
-        => ApplicationValidationFunctions.ValidateModule(code, name, category, "t").Status.ShouldBe(ok);
+        => ApplicationValidationFunctions.ValidateModule(code, name, category, null, "t").Status.ShouldBe(ok);
 
     [Fact]
     public void ValidateModule_LengthLimits()
     {
-        ApplicationValidationFunctions.ValidateModule("Code", new string('n', 100), new string('c', 100), "t").Status.ShouldBeTrue();
-        ApplicationValidationFunctions.ValidateModule("Code", new string('n', 101), null, "t").Status.ShouldBeFalse();
-        ApplicationValidationFunctions.ValidateModule("Code", "n", new string('c', 101), "t").Status.ShouldBeFalse();
+        ApplicationValidationFunctions.ValidateModule("Code", new string('n', 100), new string('c', 100), null, "t").Status.ShouldBeTrue();
+        ApplicationValidationFunctions.ValidateModule("Code", new string('n', 101), null, null, "t").Status.ShouldBeFalse();
+        ApplicationValidationFunctions.ValidateModule("Code", "n", new string('c', 101), null, "t").Status.ShouldBeFalse();
     }
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("", true)]
+    [InlineData("/products", true)]
+    [InlineData("/reports/sales-summary", true)]
+    [InlineData("products", false)]
+    [InlineData("/Products", false)]
+    [InlineData("/products/", false)]
+    [InlineData("//x", false)]
+    [InlineData("/a b", false)]
+    [InlineData("https://evil.example.com", false)]
+    public void ValidateModule_MenuLink(string? menuPath, bool ok)
+        => ApplicationValidationFunctions.ValidateModule("Code", "Name", null, menuPath, "t").Status.ShouldBe(ok);
 
     [Theory]
     [InlineData("View", "Employee - View", null, true)]

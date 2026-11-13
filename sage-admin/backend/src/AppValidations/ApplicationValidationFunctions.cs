@@ -56,23 +56,32 @@ namespace SageAdminApi.AppValidations
         /// <summary>
         /// Validate a new module (code is immutable afterwards).
         /// </summary>
-        public static IFunctionReturn ValidateModule(string _code, string _name, string _category, string _methodName)
+        /// <summary>A sidebar link such as /products or /reports/sales; empty means "not in the sidebar".</summary>
+        public static bool IsValidMenuPath(string _menuPath)
+        {
+            string _value = (_menuPath ?? string.Empty).Trim();
+            return _value.Length == 0 || (_value.Length <= 200 && System.Text.RegularExpressions.Regex.IsMatch(_value, "^/[a-z0-9-]+(/[a-z0-9-]+)*$"));
+        }
+
+        public static IFunctionReturn ValidateModule(string _code, string _name, string _category, string _menuPath, string _methodName)
         {
             var _errors = new List<string>();
             if (!ValidationFunctions.IsValidCode(_code)) _errors.Add(ApplicationConstants.ValidationMessages.ModuleCodeInvalid);
             CheckText(_errors, _name, 100, true, ApplicationConstants.ValidationMessages.ModuleNameRequired);
             CheckText(_errors, _category, 100, false, ApplicationConstants.ValidationMessages.CategoryTooLong);
+            if (!IsValidMenuPath(_menuPath)) _errors.Add(ApplicationConstants.ValidationMessages.MenuPathInvalid);
             return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
         }
 
         /// <summary>
-        /// Validate module edits (name, category).
+        /// Validate module edits (name, category, menu link).
         /// </summary>
-        public static IFunctionReturn ValidateModuleUpdate(string _name, string _category, string _methodName)
+        public static IFunctionReturn ValidateModuleUpdate(string _name, string _category, string _menuPath, string _methodName)
         {
             var _errors = new List<string>();
             CheckText(_errors, _name, 100, true, ApplicationConstants.ValidationMessages.ModuleNameRequired);
             CheckText(_errors, _category, 100, false, ApplicationConstants.ValidationMessages.CategoryTooLong);
+            if (!IsValidMenuPath(_menuPath)) _errors.Add(ApplicationConstants.ValidationMessages.MenuPathInvalid);
             return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
         }
 

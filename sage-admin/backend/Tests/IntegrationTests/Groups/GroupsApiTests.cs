@@ -74,7 +74,7 @@ public class GroupsApiTests
     {
         var perms = profile switch
         {
-            "hr" => new[] { "Employee.View", "Employee.Add", "Employee.Edit" },
+            "hr" => new[] { "Customer.View", "Customer.Add", "Customer.Edit" },
             "permissionAdmin" => new[] { "Permission.View", "Permission.Add", "Permission.Edit" },
             _ => Array.Empty<string>()
         };
@@ -180,9 +180,9 @@ public class GroupsApiTests
         var res = await Call(HttpMethod.Get, $"{Base}/{g}", token);
         res.Status.ShouldBe(200);
         var modules = res.Data.GetProperty("modules").EnumerateArray().Select(m => m.GetProperty("code").GetString()).ToList();
-        modules.ShouldContain("Employee");
+        modules.ShouldContain("Customer");
         modules.ShouldContain("Group");
-        MatrixPermissions(res.Data).Select(p => p.GetProperty("code").GetString()).ShouldContain("Employee.View");
+        MatrixPermissions(res.Data).Select(p => p.GetProperty("code").GetString()).ShouldContain("Customer.View");
         AssignedCodes(res.Data).ShouldBeEmpty();
     }
 
@@ -269,25 +269,25 @@ public class GroupsApiTests
     {
         var token = await AdminTokenAsync();
         var (g, _, _) = await CreateGroupAsync(token);
-        var view = await PermissionIdAsync("Employee.View");
-        var add = await PermissionIdAsync("Employee.Add");
-        var edit = await PermissionIdAsync("Employee.Edit");
+        var view = await PermissionIdAsync("Customer.View");
+        var add = await PermissionIdAsync("Customer.Add");
+        var edit = await PermissionIdAsync("Customer.Edit");
 
         var first = await Call(HttpMethod.Put, $"{Base}/{g}/permissions", token, new { permissionIds = new[] { view, add, add } });
         first.Status.ShouldBe(200);
-        AssignedCodes(first.Data).ShouldBe(new[] { "Employee.Add", "Employee.View" });
+        AssignedCodes(first.Data).ShouldBe(new[] { "Customer.Add", "Customer.View" });
         first.Data.GetProperty("permissionCount").GetInt32().ShouldBe(2);
 
         var second = await Call(HttpMethod.Put, $"{Base}/{g}/permissions", token, new { permissionIds = new[] { view, edit } });
-        AssignedCodes(second.Data).ShouldBe(new[] { "Employee.Edit", "Employee.View" });
+        AssignedCodes(second.Data).ShouldBe(new[] { "Customer.Edit", "Customer.View" });
 
         var audit = await _fx.Db.QueryAsync(
             "SELECT NewValues FROM dbo.AuditLogs WHERE EntityType = 'PermissionGroup' AND Action = 'AssignPermissions' AND EntityId = @id ORDER BY Id",
             r => r.GetString(0), new[] { TestDb.P("@id", g.ToString()) });
         audit.Count.ShouldBe(2);
         using var last = JsonDocument.Parse(audit[1]);
-        last.RootElement.GetProperty("Added").EnumerateArray().Select(x => x.GetString()).ShouldBe(new[] { "Employee.Edit" });
-        last.RootElement.GetProperty("Removed").EnumerateArray().Select(x => x.GetString()).ShouldBe(new[] { "Employee.Add" });
+        last.RootElement.GetProperty("Added").EnumerateArray().Select(x => x.GetString()).ShouldBe(new[] { "Customer.Edit" });
+        last.RootElement.GetProperty("Removed").EnumerateArray().Select(x => x.GetString()).ShouldBe(new[] { "Customer.Add" });
 
         var cleared = await Call(HttpMethod.Put, $"{Base}/{g}/permissions", token, new { permissionIds = Array.Empty<long>() });
         AssignedCodes(cleared.Data).ShouldBeEmpty();
@@ -316,7 +316,7 @@ public class GroupsApiTests
     {
         var token = await AdminTokenAsync();
         var (g, _, _) = await CreateGroupAsync(token);
-        var view = await PermissionIdAsync("Employee.View");
+        var view = await PermissionIdAsync("Customer.View");
 
         var res = await Call(HttpMethod.Put, $"{Base}/{g}/permissions", token, new { permissionIds = new[] { view, 999999999L } });
         res.Status.ShouldBe(400);
@@ -393,7 +393,7 @@ public class GroupsApiTests
     {
         var token = await AdminTokenAsync();
         var (g, _, _) = await CreateGroupAsync(token);
-        (await Call(HttpMethod.Put, $"{Base}/{g}/permissions", token, new { permissionIds = new[] { await PermissionIdAsync("Employee.View") } })).Status.ShouldBe(200);
+        (await Call(HttpMethod.Put, $"{Base}/{g}/permissions", token, new { permissionIds = new[] { await PermissionIdAsync("Customer.View") } })).Status.ShouldBe(200);
         var member = await TestData.CreateUserAsync(_fx.Db);
         await AddMemberAsync(g, member);
 

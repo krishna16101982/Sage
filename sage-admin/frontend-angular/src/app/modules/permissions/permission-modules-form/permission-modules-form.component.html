@@ -2,8 +2,15 @@
   @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
   <label class="field-label">Code <input class="field" name="code" required placeholder="e.g. Inventory" [disabled]="!!module()" [(ngModel)]="code" /></label>
   <label class="field-label">Name <input class="field" name="name" required maxlength="100" [(ngModel)]="name" /></label>
-  <label class="field-label">Category <input class="field" name="category" maxlength="100" placeholder="e.g. HR, Sales" [(ngModel)]="category" /></label>
+  <label class="field-label">Category <input class="field" name="category" maxlength="100" placeholder="e.g. Administration, Sales" [(ngModel)]="category" /></label>
   <label class="field-label">Sort order <input class="field" name="sortOrder" type="number" [(ngModel)]="sortOrder" /></label>
+  <label class="field-label">Menu link
+    <input class="field" name="menuPath" maxlength="200" placeholder="e.g. /products (leave empty: not in the sidebar)" [(ngModel)]="menuPath" />
+  </label>
+  <p class="hint">
+    The sidebar lists every active module that has a menu link, in sort order under its category, to users with its
+    <span class="code">{{ (module()?.code ?? code) || 'Module' }}.View</span> permission. The link must be a screen of the Admin Panel.
+  </p>
   @if (module(); as m) {
     <label class="checkbox-label">
       <input type="checkbox" name="active" [disabled]="m.isSystem" [(ngModel)]="active" /> Active

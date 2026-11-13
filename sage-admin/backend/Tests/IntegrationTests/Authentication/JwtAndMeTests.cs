@@ -85,7 +85,7 @@ public class JwtAndMeTests
         var perms = me.Data.GetProperty("permissions").EnumerateArray().Select(x => x.GetString()).ToList();
         var total = await _fx.Db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM dbo.Permissions p JOIN dbo.Modules m ON m.Id=p.ModuleId WHERE p.IsActive=1 AND m.IsActive=1");
         perms.Count.ShouldBe(total);
-        perms.ShouldContain("Employee.Delete");
+        perms.ShouldContain("Customer.Delete");
         perms.ShouldContain("AdminUser.Add");
     }
 
@@ -94,15 +94,15 @@ public class JwtAndMeTests
     {
         var c = _fx.CreateClient();
         var user = await TestData.CreateUserAsync(_fx.Db);
-        await TestData.AssignGroupAsync(_fx.Db, user, "Employee.View", "Employee.Add", "Employee.Edit", "Attendance.View");
+        await TestData.AssignGroupAsync(_fx.Db, user, "Customer.View", "Customer.Add", "Customer.Edit", "Invoice.View");
         var login = await AuthHttp.LoginAsync(c, user.Username, user.Password);
         var me = await AuthHttp.MeAsync(c, login.AccessToken);
 
         var perms = me.Data.GetProperty("permissions").EnumerateArray().Select(x => x.GetString()!).OrderBy(x => x).ToList();
-        perms.ShouldBe(new[] { "Attendance.View", "Employee.Add", "Employee.Edit", "Employee.View" });
-        perms.ShouldNotContain("Employee.Delete");
+        perms.ShouldBe(new[] { "Customer.Add", "Customer.Edit", "Customer.View", "Invoice.View" });
+        perms.ShouldNotContain("Customer.Delete");
         me.Data.GetProperty("modules").EnumerateArray().Select(m => m.GetProperty("code").GetString()).OrderBy(x => x)
-            .ShouldBe(new[] { "Attendance", "Employee" });
+            .ShouldBe(new[] { "Customer", "Invoice" });
     }
 
     [Fact]
@@ -118,4 +118,33 @@ public class JwtAndMeTests
     [Fact]
     public async Task Status_RemainsAnonymous()
         => (await AuthHttp.SendAsync(_fx.CreateClient(), HttpMethod.Get, "/api/admin/status")).Status.ShouldBe(200);
+
+    // ---------------- sidebar menu (dbo.Modules.MenuPath) ----------------
+
+    [Fact]
+    public async Task Me_Menu_SuperAdmin_SeesEveryLinkedScreenInSortOrder()
+    {
+        var c = _fx.CreateClient();
+        var user = await TestData.CreateUserAsync(_fx.Db, isSuperAdmin: true);
+        var me = await AuthHttp.MeAsync(c, (await AuthHttp.LoginAsync(c, user.Username, user.Password)).AccessToken);
+
+        var menu = me.Data.GetProperty("menu").EnumerateArray().ToList();
+        var seeded = new[] { "/dashboard", "/users", "/groups", "/permissions", "/audit-logs", "/settings", "/products", "/sales-users" };
+        menu.Select(m => m.GetProperty("path").GetString()).Where(seeded.Contains).ShouldBe(seeded);
+        menu.First().GetProperty("category").GetString().ShouldBe("Administration");
+        menu.Single(m => m.GetProperty("code").GetString() == "Product").GetProperty("name").GetString().ShouldBe("Product Catalog");
+        menu.ShouldNotContain(m => m.GetProperty("code").GetString() == "Customer"); // no screen (no link): not in the menu
+    }
+
+    [Fact]
+    public async Task Me_Menu_GroupUser_SeesOnlyLinkedModulesTheyCanView()
+    {
+        var c = _fx.CreateClient();
+        var user = await TestData.CreateUserAsync(_fx.Db);
+        await TestData.AssignGroupAsync(_fx.Db, user, "Product.View", "Product.Add", "Customer.View", "SalesUser.Add");
+        var me = await AuthHttp.MeAsync(c, (await AuthHttp.LoginAsync(c, user.Username, user.Password)).AccessToken);
+
+        // Product.View -> Products. Customer has no link; SalesUser.Add without SalesUser.View does not show the menu item.
+        me.Data.GetProperty("menu").EnumerateArray().Select(m => m.GetProperty("path").GetString()).ShouldBe(new[] { "/products" });
+    }
 }

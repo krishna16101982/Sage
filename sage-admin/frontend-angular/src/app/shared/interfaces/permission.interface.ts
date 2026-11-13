@@ -21,6 +21,8 @@ export interface ModuleItemDto {
   isActive: boolean;
   isSystem: boolean;
   permissionCount: number;
+  /** Sidebar link, e.g. /products; null = not in the sidebar. */
+  menuPath: string | null;
   permissions: PermissionItem[];
 }
 

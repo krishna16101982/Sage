@@ -2,6 +2,7 @@ import { Component, OnInit, inject, input, output, signal } from '@angular/core'
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Alert } from '../../../component/alert/alert';
+import { AuthService } from '../../../services/auth/auth.service';
 import { PermissionsService } from '../../../services/permissions/permissions.service';
 import { errorText } from '../../../services/rest/global-rest-service';
 import type { ModuleItemDto } from '../../../shared/interfaces/permission.interface';
@@ -17,11 +18,13 @@ export class PermissionModulesForm implements OnInit {
   /** Emits the module name after saving. */
   readonly saved = output<string>();
   private readonly service = inject(PermissionsService);
+  private readonly auth = inject(AuthService);
 
   code = '';
   name = '';
   category = '';
   sortOrder = 0;
+  menuPath = '';
   active = true;
   readonly error = signal<string | null>(null);
   readonly busy = signal(false);
@@ -33,6 +36,7 @@ export class PermissionModulesForm implements OnInit {
       this.name = m.name;
       this.category = m.category ?? '';
       this.sortOrder = m.sortOrder;
+      this.menuPath = m.menuPath ?? '';
       this.active = m.isActive;
     }
   }
@@ -43,8 +47,12 @@ export class PermissionModulesForm implements OnInit {
     try {
       const m = this.module();
       const order = Number(this.sortOrder) || 0;
-      if (m) await this.service.updateModule(m.id, { name: this.name, category: this.category || undefined, sortOrder: order, isActive: this.active });
-      else await this.service.createModule({ code: this.code, name: this.name, category: this.category || undefined, sortOrder: order });
+      const menuPath = this.menuPath.trim();
+      // An empty link takes the module out of the sidebar.
+      if (m) await this.service.updateModule(m.id, { name: this.name, category: this.category || undefined, sortOrder: order, isActive: this.active, menuPath });
+      else await this.service.createModule({ code: this.code, name: this.name, category: this.category || undefined, sortOrder: order, menuPath: menuPath || undefined });
+      // The sidebar comes with the signed-in user: reload it so a new or changed link shows at once.
+      await this.auth.reloadUser();
       this.saved.emit(this.name);
     } catch (err) {
       this.error.set(errorText(err));

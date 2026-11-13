@@ -33,6 +33,17 @@ table { border-collapse: collapse; }
 .w-72 { width: 18rem; }
 .max-w-sm { max-width: 24rem; }
 .max-w-lg { max-width: 36rem; }   /* Add/Edit pages */
+
+/* ---------- Sidebar sections (one per module category) ---------- */
+.sidebar-section + .sidebar-section { margin-top: 1rem; }
+.sidebar-heading {
+  padding: 0 0.75rem 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
 .mt-1 { margin-top: 0.25rem; }
 .mt-2 { margin-top: 0.5rem; }
 .ml-5 { margin-left: 1.25rem; }

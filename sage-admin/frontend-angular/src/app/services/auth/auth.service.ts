@@ -29,6 +29,15 @@ export class AuthService {
     }
   }
 
+  /** Reloads the signed-in user (permissions and sidebar), e.g. after a module's menu link changed. */
+  async reloadUser(): Promise<void> {
+    try {
+      this.user.set(await this.api.get<CurrentUser>('/api/admin/auth/me'));
+    } catch {
+      // Keep the current user; the next request will sort out an expired session.
+    }
+  }
+
   async login(username: string, password: string): Promise<CurrentUser> {
     const data = await this.api.post<LoginResponse>('/api/admin/auth/login', { username, password });
     this.api.setAccessToken(data.accessToken);

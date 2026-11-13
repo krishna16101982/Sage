@@ -93,6 +93,7 @@ namespace SageAdminApi.Globals
             public const string ModuleCodeInvalid = "Module code must start with a letter and contain only letters, digits, '_' or '-' (2-50 characters)";
             public const string ModuleNameRequired = "Module name is required (max 100 characters)";
             public const string CategoryTooLong = "Category must be at most 100 characters";
+            public const string MenuPathInvalid = "Menu link must start with '/' and use only lower-case letters, digits, '-' and '/' (e.g. /products), at most 200 characters";
             public const string ActionInvalid = "Action must start with a letter and contain only letters, digits, '_' or '-' (2-50 characters)";
             public const string PermissionNameRequired = "Permission name is required (max 150 characters)";
             public const string DescriptionTooLong = "Description must be at most 500 characters";

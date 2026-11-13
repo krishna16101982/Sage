@@ -9,6 +9,15 @@ namespace SageAdminApi.Models
         public string Name { get; set; } = string.Empty;
     }
 
+    /// <summary>One sidebar entry: a module with a menu link that the user may view.</summary>
+    public class MenuItem
+    {
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Category { get; set; }
+        public string Path { get; set; } = string.Empty;
+    }
+
     /// <summary>User info returned to the frontend. Permissions come from SQL (never hardcoded in the UI).</summary>
     public class CurrentUserResponse
     {
@@ -21,6 +30,8 @@ namespace SageAdminApi.Models
         public bool MustChangePassword { get; set; }
         public List<string> Permissions { get; set; } = new List<string>();
         public List<ModuleItem> Modules { get; set; } = new List<ModuleItem>();
+        /// <summary>The sidebar, from dbo.Modules: active modules with a MenuPath whose Code.View the user holds, by SortOrder.</summary>
+        public List<MenuItem> Menu { get; set; } = new List<MenuItem>();
     }
 
     /// <summary>Body of login and refresh responses. The refresh token is NOT in the body; it is an HttpOnly cookie.</summary>

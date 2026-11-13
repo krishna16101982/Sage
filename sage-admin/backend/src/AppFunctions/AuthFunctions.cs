@@ -24,6 +24,7 @@ namespace SageAdminApi.AppFunctions
 {
     public class AuthFunctions : IAuthFunctions
     {
+        private const string MenuSelect = "SELECT Code, Name, Category, MenuPath FROM dbo.Modules WHERE IsActive = 1 AND MenuPath IS NOT NULL ORDER BY SortOrder, Name";
         private const string UserColumns = "Id, PublicId, FirstName, LastName, Username, Email, PasswordHash, MustChangePassword, IsSuperAdmin, Status, FailedLoginCount, LockoutEndUtc, PermissionVersion";
         private const int SqlErrorTokenAlreadyUsed = 50001;
         private static string _dummyHash;
@@ -162,6 +163,11 @@ namespace SageAdminApi.AppFunctions
                 r => (Permission: r.GetString(0), ModuleCode: r.GetString(1), ModuleName: r.GetString(2)),
                 new[] { P("@UserId", _user.Id) }, _ct);
 
+            var _permissions = _rows.Select(x => x.Permission).Distinct().ToList();
+            var _granted = new HashSet<string>(_permissions, StringComparer.OrdinalIgnoreCase);
+            var _menuModules = await _databaseFunctions.QueryAsync(MenuSelect,
+                r => new MenuItem { Code = r.GetString(0), Name = r.GetString(1), Category = r.IsDBNull(2) ? null : r.GetString(2), Path = r.GetString(3) }, null, _ct);
+
             return new CurrentUserResponse
             {
                 Id = _user.PublicId,
@@ -171,7 +177,10 @@ namespace SageAdminApi.AppFunctions
                 LastName = _user.LastName,
                 IsSuperAdmin = _user.IsSuperAdmin,
                 MustChangePassword = _user.MustChangePassword,
-                Permissions = _rows.Select(x => x.Permission).Distinct().ToList(),
+                Permissions = _permissions,
+                // A module is in the sidebar when it has a link and the user may view it (the effective permissions already
+                // hold every active permission for a Super Admin and leave out inactive modules).
+                Menu = _menuModules.Where(m => _granted.Contains(m.Code + ".View")).ToList(),
                 Modules = _rows.GroupBy(x => x.ModuleCode).Select(g => new ModuleItem { Code = g.Key, Name = g.First().ModuleName }).ToList()
             };
         }

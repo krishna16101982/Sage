@@ -150,14 +150,14 @@ public class DatabaseCrudAndConstraintTests
         var code = "G" + Guid.NewGuid().ToString("N")[..10];
         await TestDb.InsertUserAsync(db, name, name + "@t.io");
         await db.ExecuteNonQueryAsync("INSERT dbo.PermissionGroups (Name, Code) VALUES (@c, @c)", new[] { TestDb.P("@c", code) });
-        await db.ExecuteNonQueryAsync("INSERT dbo.GroupPermissions (GroupId, PermissionId) SELECT g.Id, p.Id FROM dbo.PermissionGroups g, dbo.Permissions p WHERE g.Code=@c AND p.Code IN ('Employee.View','Employee.Add')", new[] { TestDb.P("@c", code) });
+        await db.ExecuteNonQueryAsync("INSERT dbo.GroupPermissions (GroupId, PermissionId) SELECT g.Id, p.Id FROM dbo.PermissionGroups g, dbo.Permissions p WHERE g.Code=@c AND p.Code IN ('Customer.View','Customer.Add')", new[] { TestDb.P("@c", code) });
         await db.ExecuteNonQueryAsync("INSERT dbo.AdminUserGroups (UserId, GroupId) SELECT u.Id, g.Id FROM dbo.AdminUsers u, dbo.PermissionGroups g WHERE u.Username=@u AND g.Code=@c", new[] { TestDb.P("@u", name), TestDb.P("@c", code) });
 
         var perms = await db.QueryAsync("SELECT PermissionCode FROM dbo.vw_AdminUserEffectivePermissions v JOIN dbo.AdminUsers u ON u.Id=v.UserId WHERE u.Username=@u",
             r => r.GetString(0), new[] { TestDb.P("@u", name) });
-        perms.OrderBy(x => x).ShouldBe(new[] { "Employee.Add", "Employee.View" });
+        perms.OrderBy(x => x).ShouldBe(new[] { "Customer.Add", "Customer.View" });
 
-        var has = await db.ExecuteScalarAsync<bool>("SELECT dbo.fn_UserHasPermission((SELECT Id FROM dbo.AdminUsers WHERE Username=@u), 'Employee.Delete')", new[] { TestDb.P("@u", name) });
+        var has = await db.ExecuteScalarAsync<bool>("SELECT dbo.fn_UserHasPermission((SELECT Id FROM dbo.AdminUsers WHERE Username=@u), 'Customer.Delete')", new[] { TestDb.P("@u", name) });
         has.ShouldBeFalse();
 
         // deactivating the group removes access

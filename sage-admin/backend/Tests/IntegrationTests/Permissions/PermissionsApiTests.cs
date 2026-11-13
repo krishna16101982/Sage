@@ -65,7 +65,7 @@ public class PermissionsApiTests
     {
         var perms = profile switch
         {
-            "hr" => new[] { "Employee.View", "Employee.Add", "Employee.Edit", "Attendance.View" },
+            "hr" => new[] { "Customer.View", "Customer.Add", "Customer.Edit", "Invoice.View" },
             "sales" => new[] { "Customer.View", "Sales.View", "Sales.Add" },
             "accounts" => new[] { "Invoice.View", "Payment.View", "FinancialReports.View" },
             _ => Array.Empty<string>()
@@ -144,21 +144,21 @@ public class PermissionsApiTests
     public async Task List_FiltersByModule()
     {
         var token = await AdminTokenAsync();
-        var moduleId = await _fx.Db.ExecuteScalarAsync<long>("SELECT Id FROM dbo.Modules WHERE Code='Employee'");
+        var moduleId = await _fx.Db.ExecuteScalarAsync<long>("SELECT Id FROM dbo.Modules WHERE Code='Customer'");
         var res = await Call(HttpMethod.Get, $"/api/admin/permissions?moduleId={moduleId}&pageSize=50", token);
         var codes = res.Data.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("code").GetString()!).ToList();
-        codes.Count.ShouldBe(5);
-        codes.ShouldAllBe(c => c.StartsWith("Employee."));
+        codes.Count.ShouldBe(4);
+        codes.ShouldAllBe(c => c.StartsWith("Customer."));
     }
 
     [Fact]
     public async Task List_SearchMatchesCodeNameOrModule_CaseInsensitive()
     {
         var token = await AdminTokenAsync();
-        var res = await Call(HttpMethod.Get, "/api/admin/permissions?search=payroll&pageSize=50", token);
+        var res = await Call(HttpMethod.Get, "/api/admin/permissions?search=payment&pageSize=50", token);
         var codes = res.Data.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("code").GetString()!).ToList();
-        codes.Count.ShouldBe(4);
-        codes.ShouldAllBe(c => c.StartsWith("Payroll."));
+        codes.Count.ShouldBe(3);
+        codes.ShouldAllBe(c => c.StartsWith("Payment."));
     }
 
     [Fact]
@@ -209,9 +209,9 @@ public class PermissionsApiTests
     {
         var res = await Call(HttpMethod.Get, "/api/admin/permissions/modules", await AdminTokenAsync());
         res.Status.ShouldBe(200);
-        var employee = res.Data.EnumerateArray().First(m => m.GetProperty("code").GetString() == "Employee");
-        employee.GetProperty("permissions").GetArrayLength().ShouldBe(5);
-        employee.GetProperty("permissionCount").GetInt32().ShouldBe(5);
+        var employee = res.Data.EnumerateArray().First(m => m.GetProperty("code").GetString() == "Customer");
+        employee.GetProperty("permissions").GetArrayLength().ShouldBe(4);
+        employee.GetProperty("permissionCount").GetInt32().ShouldBe(4);
     }
 
     [Fact]
@@ -380,7 +380,7 @@ public class PermissionsApiTests
     [Fact]
     public async Task CreatePermission_ExistingSeededCode_Returns409()
     {
-        var moduleId = await _fx.Db.ExecuteScalarAsync<long>("SELECT Id FROM dbo.Modules WHERE Code='Employee'");
+        var moduleId = await _fx.Db.ExecuteScalarAsync<long>("SELECT Id FROM dbo.Modules WHERE Code='Customer'");
         var res = await Call(HttpMethod.Post, "/api/admin/permissions", await AdminTokenAsync(), new { moduleId, action = "View", name = "dup" });
         res.Status.ShouldBe(409);
     }
@@ -500,5 +500,42 @@ public class PermissionsApiTests
         constants.ShouldNotBeEmpty();
         foreach (var code in constants)
             (await _fx.Db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM dbo.Permissions WHERE Code=@c", new[] { TestDb.P("@c", code) })).ShouldBe(1, code);
+    }
+
+    // ---------------- menu link & HR removal ----------------
+
+    [Fact]
+    public async Task Module_MenuLink_Validated_KeptWhenNotSent_ClearedWhenEmpty_AndDrivesTheMenu()
+    {
+        var token = await AdminTokenAsync();
+        var code = Uniq("Inv");
+        (await Call(HttpMethod.Post, "/api/admin/permissions/modules", token, new { code = Uniq("B"), name = "Bad", sortOrder = 1, menuPath = "inventory" })).Status.ShouldBe(400);
+        (await Call(HttpMethod.Post, "/api/admin/permissions/modules", token, new { code = Uniq("B"), name = "Bad", sortOrder = 1, menuPath = "/In ventory" })).Status.ShouldBe(400);
+
+        var created = await Call(HttpMethod.Post, "/api/admin/permissions/modules", token, new { code, name = "Inventory", category = "Stock", sortOrder = 950, menuPath = "/inventory" });
+        created.Status.ShouldBe(201);
+        created.Data.GetProperty("menuPath").GetString().ShouldBe("/inventory");
+        var id = created.Data.GetProperty("id").GetInt64();
+
+        // In the menu only once the module has a View permission.
+        async Task<List<string?>> MenuAsync() => (await Call(HttpMethod.Get, "/api/admin/auth/me", await AdminTokenAsync()))
+            .Data.GetProperty("menu").EnumerateArray().Select(m => m.GetProperty("path").GetString()).ToList();
+        (await MenuAsync()).ShouldNotContain("/inventory");
+        await CreatePermissionAsync(token, id, "View");
+        (await MenuAsync()).ShouldContain("/inventory");
+
+        // An edit that does not send menuPath (e.g. an older client) keeps the link; an empty one removes it.
+        var kept = await Call(HttpMethod.Put, $"/api/admin/permissions/modules/{id}", token, new { name = "Inventory", category = "Stock", sortOrder = 950, isActive = true });
+        kept.Data.GetProperty("menuPath").GetString().ShouldBe("/inventory");
+        var cleared = await Call(HttpMethod.Put, $"/api/admin/permissions/modules/{id}", token, new { name = "Inventory", category = "Stock", sortOrder = 950, isActive = true, menuPath = "" });
+        cleared.Data.GetProperty("menuPath").ValueKind.ShouldBe(System.Text.Json.JsonValueKind.Null);
+        (await MenuAsync()).ShouldNotContain("/inventory");
+    }
+
+    [Fact]
+    public async Task HrModules_AreRemoved()
+    {
+        (await _fx.Db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM dbo.Modules WHERE Category = N'HR' OR Code IN ('Employee','Attendance','Payroll')")).ShouldBe(0);
+        (await _fx.Db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM dbo.Permissions WHERE Code LIKE 'Employee.%' OR Code LIKE 'Attendance.%' OR Code LIKE 'Payroll.%'")).ShouldBe(0);
     }
 }

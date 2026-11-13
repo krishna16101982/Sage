@@ -1,11 +1,13 @@
 -- Updates a module. When IsActive changes, every user holding one of its permissions gets PermissionVersion + 1
 -- so their access is re-evaluated on the next request. Returns rows affected (0 = not found).
+-- @MenuPath: the sidebar link, or NULL for no link (the API passes the current value when the caller did not send one).
 CREATE OR ALTER PROCEDURE dbo.usp_Module_Update
     @Id        BIGINT,
     @Name      NVARCHAR(100),
     @Category  NVARCHAR(100) = NULL,
     @SortOrder INT,
-    @IsActive  BIT
+    @IsActive  BIT,
+    @MenuPath  NVARCHAR(200) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -17,7 +19,7 @@ BEGIN
     SELECT @wasActive = IsActive FROM dbo.Modules WITH (UPDLOCK) WHERE Id = @Id;
 
     UPDATE dbo.Modules
-    SET Name = @Name, Category = @Category, SortOrder = @SortOrder, IsActive = @IsActive, UpdatedAtUtc = SYSUTCDATETIME()
+    SET Name = @Name, Category = @Category, SortOrder = @SortOrder, IsActive = @IsActive, MenuPath = @MenuPath, UpdatedAtUtc = SYSUTCDATETIME()
     WHERE Id = @Id;
 
     DECLARE @rows BIGINT = @@ROWCOUNT;

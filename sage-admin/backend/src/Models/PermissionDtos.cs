@@ -27,6 +27,8 @@ namespace SageAdminApi.Models
         public bool IsActive { get; set; }
         public bool IsSystem { get; set; }
         public int PermissionCount { get; set; }
+        /// <summary>Sidebar link (e.g. /products); null = not in the sidebar.</summary>
+        public string MenuPath { get; set; }
         /// <summary>Filled by GET permissions/modules (used by the group permission matrix).</summary>
         public List<PermissionDto> Permissions { get; set; } = new List<PermissionDto>();
     }
