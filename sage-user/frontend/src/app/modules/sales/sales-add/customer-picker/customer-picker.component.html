@@ -1,0 +1,46 @@
+@if (customer(); as c) {
+  <div class="card">
+    <div class="card-body row">
+      <div class="stack-xs">
+        <span class="font-medium">{{ c.name }}</span>
+        <span class="hint">
+          {{ c.contactPerson ?? '' }}{{ c.contactPerson && c.city ? ' · ' : '' }}{{ c.city ?? '' }}{{ c.gstin ? ' · GSTIN ' + c.gstin : '' }}
+        </span>
+      </div>
+      <div class="spacer"></div>
+      <button type="button" class="link-button text-sm" (click)="customer.set(null)">Change</button>
+    </div>
+  </div>
+} @else {
+  <div class="stack-sm">
+    <div class="row">
+      <input class="field field-inline w-72" aria-label="Search customers" placeholder="Type at least 2 letters of the name, phone or GSTIN"
+             [(ngModel)]="search" (ngModelChange)="changed()" />
+      <button type="button" class="btn btn-secondary" (click)="adding.set(true)">Add new customer</button>
+    </div>
+    @if (error()) { <p class="text-sm text-danger">{{ error() }}</p> }
+    @if (searching()) { <p class="hint">Searching...</p> }
+    @if (results(); as list) {
+      @if (list.length === 0) {
+        <p class="hint">No customer matches "{{ search }}". Use <strong>Add new customer</strong>.</p>
+      } @else {
+        <ul class="card card-list" aria-label="Matching customers">
+          @for (c of list; track c.id) {
+            <li>
+              <button type="button" class="link-button text-left" style="text-decoration: none" (click)="choose(c)">
+                <span class="font-medium">{{ c.name }}</span>
+                <span class="hint"> {{ c.city ?? '' }}{{ c.gstin ? ' · ' + c.gstin : '' }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    }
+  </div>
+}
+
+@if (adding()) {
+  <app-modal title="Add new customer" (closed)="adding.set(false)">
+    <app-customers-form (saved)="added($event)" (cancelled)="adding.set(false)" />
+  </app-modal>
+}

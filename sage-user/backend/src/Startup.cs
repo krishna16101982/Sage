@@ -114,6 +114,10 @@ namespace SageUserApi
             services.AddScoped<IApiResponse, ApiResponse>();
             services.AddScoped<ITokenFunctions, TokenFunctions>();
             services.AddScoped<IAuthFunctions, AuthFunctions>();
+            services.AddScoped<ISalesUserContextFunctions, SalesUserContextFunctions>();
+            services.AddScoped<ICatalogFunctions, CatalogFunctions>();
+            services.AddScoped<ICustomerFunctions, CustomerFunctions>();
+            services.AddScoped<ISaleFunctions, SaleFunctions>();
         }
 
         public void Configure(IApplicationBuilder app, IHostEnvironment env)

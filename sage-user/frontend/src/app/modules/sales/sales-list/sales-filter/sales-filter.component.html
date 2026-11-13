@@ -1,0 +1,19 @@
+<input class="field field-inline w-64" aria-label="Search sales" placeholder="Sale number, customer or product"
+       [(ngModel)]="search" (ngModelChange)="changed(true)" />
+@if (members().length > 0) {
+  <select class="field field-inline" aria-label="Filter by sales person" [(ngModel)]="sellerId" (ngModelChange)="changed(false)">
+    <option value="">Whole team</option>
+    @for (m of members(); track m.id) { <option [value]="m.id">{{ m.name }}{{ m.status === 'Active' ? '' : ' (' + m.status + ')' }}</option> }
+  </select>
+}
+<select class="field field-inline" aria-label="Filter by status" [(ngModel)]="status" (ngModelChange)="changed(false)">
+  <option value="">Any status</option>
+  <option value="Active">Active</option>
+  <option value="Cancelled">Cancelled</option>
+</select>
+<span class="row-tight text-sm">
+  Sold
+  <input class="field field-inline" type="date" aria-label="Sold from" [(ngModel)]="soldFrom" (ngModelChange)="changed(false)" />
+  to
+  <input class="field field-inline" type="date" aria-label="Sold to" [(ngModel)]="soldTo" (ngModelChange)="changed(false)" />
+</span>

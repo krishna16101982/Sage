@@ -1,12 +1,12 @@
 # Sage Sales — Design (draft for approval)
 
 Adds a product catalog, sales users (sales person / sales manager) and sale recording.
-Status: **draft, awaiting approval.** Nothing below is built yet.
+Status: **built** — Sprints 5–9 are done (catalog, sales users, admin users, User Panel foundation, customers and sales).
 
 ## 1. Decisions (from you)
 | # | Decision |
 |---|----------|
-| D1 | Sales users sign in to a separate **User Panel**: `sage-user/frontend` (Next.js) + `sage-user/backend` (ASP.NET Core). The User API is a **separate project with its own controllers and functions** (nothing shared with the admin backend except the folder layout); **only `sage-common-lib` is shared**. It uses the **same SQL database**; schema scripts stay in one place (`sage-admin/backend/database`). |
+| D1 | Sales users sign in to a separate **User Panel**: `sage-user/frontend` (Angular) + `sage-user/backend` (ASP.NET Core). The User API is a **separate project with its own controllers and functions** (nothing shared with the admin backend except the folder layout); **only `sage-common-lib` is shared**. It uses the **same SQL database**; schema scripts stay in one place (`sage-admin/backend/database`). |
 | D2 | Admins / Super Admins create and manage sales users in the **Admin Panel**. Sales users never see the Admin Panel. |
 | D3 | A sales manager is also a sales person (can sell). Many sales persons report to one manager. |
 | D4 | Categories and products are dynamic (admin adds more). Seed: **SaaS** (SHTMS, GreytHR, LinkedIn, Freshdesk) and **Cyber Security** (no products yet). |
@@ -57,7 +57,7 @@ Writes with rules (sale creation and totals, manager assignment, plan price chan
 | 6 | Admin | Sales users: create/edit, role, manager, activate/deactivate, reset password; permissions `SalesUser.*` |
 | 7 | Admin | Admin Users (create, group, activate/deactivate, reset password) — pulled forward, done |
 | 8 | User | `sage-user` foundation: backend (shared common lib, same DB), sales-user login/refresh/logout/change password, Angular frontend shell — done |
-| 9 | User | Customers + sale page + My sales / Team sales |
+| 9 | User | Customers + sale page + My sales / Team sales — done |
 | later | Admin | Dashboard & Audit log screens, Settings, sales reports |
 
 `sage-user/bakend` was renamed to `sage-user/backend` (Sprint 8). The User Panel frontend is Angular.

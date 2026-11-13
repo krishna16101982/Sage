@@ -12,6 +12,12 @@ export const authGuard: CanActivateFn = (_route, state) => {
   return true;
 };
 
+/** Sales-manager screens (Team sales). Anyone else goes to their own sales. The API checks this again. */
+export const managerGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  return auth.isManager() ? true : inject(Router).parseUrl('/sales/list');
+};
+
 /** Sign-in pages: an already signed-in user goes straight to the home page. */
 export const guestGuard: CanActivateFn = () => {
   const auth = inject(AuthService);

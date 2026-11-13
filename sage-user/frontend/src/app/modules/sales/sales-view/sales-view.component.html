@@ -1,0 +1,69 @@
+<div class="stack max-w-3xl">
+  <div class="stack-xs">
+    <a class="link-button text-sm" [routerLink]="backLink()">← Back to sales</a>
+    <div class="row">
+      <h1 class="page-title">Sale {{ sale()?.saleNumber ?? '' }}</h1>
+      @if (sale(); as s) {
+        @if (s.status === 'Cancelled') { <span class="badge badge-danger">Cancelled</span> } @else { <span class="badge">Active</span> }
+        <div class="spacer"></div>
+        @if (s.status === 'Active') {
+          <button type="button" class="btn btn-danger" (click)="cancelling.set(true)">Cancel sale</button>
+        }
+      }
+    </div>
+  </div>
+
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (notice()) { <app-alert kind="success">{{ notice() }}</app-alert> }
+  @if (!sale() && !error()) { <p class="text-sm text-muted">Loading...</p> }
+
+  @if (sale(); as s) {
+    @if (s.status === 'Cancelled') {
+      <app-alert kind="error">
+        Cancelled {{ dateTime(s.cancelledAtUtc) }}{{ s.cancelledByName ? ' by ' + s.cancelledByName : '' }}: {{ s.cancelReason }}
+      </app-alert>
+    }
+
+    <section class="card">
+      <header class="card-header"><h2 class="section-title">What was sold</h2></header>
+      <div class="card-body form-grid-2 text-sm">
+        <div><span class="text-muted">Customer</span><div class="font-medium">{{ s.customerName }}</div></div>
+        <div><span class="text-muted">Sales person</span><div>{{ s.sellerName }}</div></div>
+        <div><span class="text-muted">Product</span><div>{{ s.categoryName }} › {{ s.productName }}</div></div>
+        <div><span class="text-muted">Plan</span><div>{{ s.planName }}</div></div>
+        <div><span class="text-muted">Recorded</span><div>{{ dateTime(s.createdAtUtc) }}</div></div>
+        <div><span class="text-muted">Quantity</span><div>{{ s.quantity }}</div></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <header class="card-header"><h2 class="section-title">Amounts</h2></header>
+      <div class="card-body">
+        <table class="data-table">
+          <tbody>
+            <tr><td>Price per unit (price list at the time of sale)</td><td class="amount">{{ inr(s.unitPrice) }}</td></tr>
+            <tr><td>List amount ({{ s.quantity }} × {{ inr(s.unitPrice) }})</td><td class="amount">{{ inr(s.listAmount) }}</td></tr>
+            <tr><td>Discount ({{ s.discountPercent }}%)</td><td class="amount">− {{ inr(s.discountAmount) }}</td></tr>
+            <tr><td class="font-semibold">Sale amount</td><td class="amount font-semibold">{{ inr(s.saleAmount) }}</td></tr>
+            <tr><td>Cost ({{ s.quantity }} × {{ inr(s.unitCost) }})</td><td class="amount">{{ inr(s.costAmount) }}</td></tr>
+            <tr><td>Margin</td><td class="amount" [class.text-danger]="s.margin < 0">{{ inr(s.margin) }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <header class="card-header"><h2 class="section-title">Term</h2></header>
+      <div class="card-body form-grid-2 text-sm">
+        <div><span class="text-muted">Duration</span><div>{{ durationText(s.durationCount, s.durationUnit) }}</div></div>
+        <div><span class="text-muted">Start date</span><div>{{ date(s.startDate) }}</div></div>
+        <div><span class="text-muted">Renewal date</span><div class="font-medium">{{ date(s.renewalDate) }}</div></div>
+        @if (s.notes) { <div><span class="text-muted">Notes</span><div>{{ s.notes }}</div></div> }
+      </div>
+    </section>
+
+    @if (cancelling()) {
+      <app-sales-cancel-modal [sale]="s" (closed)="cancelling.set(false)" (cancelled)="onCancelled($event)" />
+    }
+  }
+</div>

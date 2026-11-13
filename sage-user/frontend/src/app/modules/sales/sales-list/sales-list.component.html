@@ -1,0 +1,75 @@
+<div class="stack">
+  <div class="row">
+    <h1 class="page-title">{{ isTeam() ? 'Team sales' : 'My sales' }}</h1>
+    <div class="spacer"></div>
+    <a class="btn btn-primary" routerLink="/sales/add">New sale</a>
+  </div>
+  @if (isTeam()) { <p class="hint">Sales made by the people who reported to you when the sale was recorded.</p> }
+
+  <div class="toolbar">
+    <app-sales-filter [members]="members()" (filterChange)="onFilter($event)" />
+  </div>
+
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (notice()) { <app-alert kind="success">{{ notice() }}</app-alert> }
+
+  @if (data(); as d) {
+    <div class="tile-grid" aria-label="Totals">
+      <div class="card"><div class="card-body stack-xs">
+        <span class="text-xs text-muted">Sales</span><span class="font-semibold">{{ d.totalCount }}</span>
+      </div></div>
+      <div class="card"><div class="card-body stack-xs">
+        <span class="text-xs text-muted">Sale amount (active)</span><span class="font-semibold">{{ inr(d.totalSaleAmount) }}</span>
+      </div></div>
+      <div class="card"><div class="card-body stack-xs">
+        <span class="text-xs text-muted">Margin (active)</span>
+        <span class="font-semibold" [class.text-danger]="d.totalMargin < 0">{{ inr(d.totalMargin) }}</span>
+      </div></div>
+    </div>
+  }
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th appSort [active]="sortBy() === 'saleNumber'" [direction]="sortDirection()" (sort)="sort('saleNumber', $event)">Sale</th>
+          <th appSort [active]="sortBy() === 'soldAt'" [direction]="sortDirection()" (sort)="sort('soldAt', $event)">Sold on</th>
+          <th appSort [active]="sortBy() === 'customer'" [direction]="sortDirection()" (sort)="sort('customer', $event)">Customer</th>
+          <th appSort [active]="sortBy() === 'product'" [direction]="sortDirection()" (sort)="sort('product', $event)">Product / plan</th>
+          @if (isTeam()) { <th>Sales person</th> }
+          <th class="amount">Qty</th>
+          <th class="amount" appSort [active]="sortBy() === 'saleAmount'" [direction]="sortDirection()" (sort)="sort('saleAmount', $event)">Sale amount</th>
+          <th class="amount">Discount</th>
+          <th appSort [active]="sortBy() === 'renewalDate'" [direction]="sortDirection()" (sort)="sort('renewalDate', $event)">Renewal</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (s of data()?.items ?? []; track s.id) {
+          <tr [class.dim]="s.status === 'Cancelled'">
+            <td><a class="link-button code" style="white-space: nowrap" [routerLink]="['/sales', s.id]">{{ s.saleNumber }}</a></td>
+            <td class="date">{{ dateTime(s.createdAtUtc) }}</td>
+            <td>{{ s.customerName }}</td>
+            <td>{{ s.productName }} <div class="hint">{{ s.planName }}</div></td>
+            @if (isTeam()) { <td>{{ s.sellerName }}</td> }
+            <td class="amount">{{ s.quantity }}</td>
+            <td class="amount">{{ inr(s.saleAmount) }}</td>
+            <td class="amount">{{ inr(s.discountAmount) }} <div class="hint">{{ s.discountPercent }}%</div></td>
+            <td class="date">{{ date(s.renewalDate) }}</td>
+            <td>
+              @if (s.status === 'Cancelled') { <span class="badge badge-danger">Cancelled</span> } @else { <span class="badge">Active</span> }
+            </td>
+          </tr>
+        } @empty {
+          <tr><td [attr.colspan]="isTeam() ? 10 : 9" class="table-empty">
+            {{ loading() ? 'Loading...' : isTeam() ? 'No team sales match.' : 'No sales match. Record one with New sale.' }}
+          </td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (data(); as d) {
+    <app-pagination [page]="d.page" [totalPages]="d.totalPages" [totalCount]="d.totalCount" (pageChange)="goTo($event)" />
+  }
+</div>

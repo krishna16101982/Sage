@@ -32,6 +32,10 @@ table { border-collapse: collapse; }
 .w-64 { width: 16rem; }
 .w-72 { width: 18rem; }
 .max-w-sm { max-width: 24rem; }
+.max-w-lg { max-width: 36rem; }    /* Add customer page */
+.max-w-3xl { max-width: 48rem; }   /* sale page, sale details */
+/* Tiles side by side that wrap on small screens (totals above the sales lists, home page) */
+.tile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.75rem; }
 .mt-1 { margin-top: 0.25rem; }
 .mt-2 { margin-top: 0.5rem; }
 .ml-5 { margin-left: 1.25rem; }

@@ -9,7 +9,7 @@ Three application folders (do not add more without approval):
 | `frontend/` | Admin Panel UI | Next.js (App Router), React, TypeScript, Tailwind |
 | `frontend-angular/` | Admin Panel UI, Angular version (same API and screens; both kept) — see its README | Angular 21, TypeScript |
 
-Design and plan: [SAGE_ANALYSIS.md](SAGE_ANALYSIS.md). Current status: **Sprint 8 (User Panel foundation, see `../sage-user/README.md`) done. Next: Sprint 9 (customers and sales).** Sales plan: [../SALES_DESIGN.md](../SALES_DESIGN.md).
+Design and plan: [SAGE_ANALYSIS.md](SAGE_ANALYSIS.md). Current status: **Sprint 9 (User Panel customers and sales, see `../sage-user/README.md`) done.** Sales are recorded in the User Panel; new tables `Customers` and `Sales` (DDL 020, 021). An Admin Panel sales report is a later sprint. Sales plan: [../SALES_DESIGN.md](../SALES_DESIGN.md).
 
 ## First-time local setup
 
@@ -92,7 +92,7 @@ Integration tests create and drop their own database `SageAdmin_Test_<guid>` on 
 - UI: `/groups` lists groups; **Permissions** opens the matrix (modules by category × actions, row/column select-all). It is read-only without `Group.AssignPermissions`.
 
 ## Product catalog (Sprint 5)
-Categories → products → plans. A plan is a price-list entry: name, duration (count × Month/Quarter/Year), **price** and **cost** per unit in INR. The User Panel will sell from this catalog.
+Categories → products → plans. A plan is a price-list entry: name, duration (count × Month/Quarter/Year), **price** and **cost** per unit in INR. The User Panel sells from this catalog; a sale copies the price and cost, so later changes here never alter past sales.
 
 | Endpoint | Permission | Notes |
 |----------|------------|-------|

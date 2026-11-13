@@ -25,6 +25,32 @@ namespace SageUserApi.Globals
             public const string PasswordMismatch = "Password and confirm password do not match";
         }
 
+        public static class Messages
+        {
+            public const string CustomerNameRequired = "Customer name is required.";
+            public const string CustomerNameTooLong = "Customer name must be 200 characters or fewer.";
+            public const string ContactPersonTooLong = "Contact person must be 150 characters or fewer.";
+            public const string InvalidEmail = "Enter a valid email address.";
+            public const string InvalidPhone = "Enter a valid phone number.";
+            public const string InvalidGstin = "Enter a valid 15-character GSTIN (e.g. 27AAPFU0939F1ZV).";
+            public const string AddressTooLong = "Address must be 500 characters or fewer.";
+            public const string PlaceTooLong = "City, state and country must be 100 characters or fewer.";
+            public const string CustomerCreated = "Customer added.";
+            public const string CustomerNotFound = "Customer not found.";
+
+            public const string CustomerRequired = "Choose a customer.";
+            public const string PlanRequired = "Choose a plan.";
+            public const string StartDateRequired = "Start date is required.";
+            public const string StartDateOutOfRange = "Start date must be within one year of today.";
+            public const string AmountDecimals = "Amounts can have at most 2 decimal places.";
+            public const string NotesTooLong = "Notes must be 1000 characters or fewer.";
+            public const string SaleCreated = "Sale recorded.";
+            public const string SaleNotFound = "Sale not found.";
+            public const string CancelReasonRequired = "Enter a reason for cancelling (up to 500 characters).";
+            public const string SaleCancelled = "Sale cancelled.";
+            public const string ManagersOnly = "Only sales managers can see team sales.";
+        }
+
         public static class ConfigSettingNames
         {
             public const string DatabaseSettings = "DatabaseSettings";
@@ -50,6 +76,23 @@ namespace SageUserApi.Globals
             public const string SalesUserRecordLogin = "dbo.usp_SalesUser_RecordLogin";
             public const string SalesUserChangeOwnPassword = "dbo.usp_SalesUser_ChangeOwnPassword";
             public const string SalesUserRefreshTokenRotate = "dbo.usp_SalesUserRefreshToken_Rotate";
+            public const string CustomerCreate = "dbo.usp_Customer_Create";
+            public const string CustomerGetPaged = "dbo.usp_Customer_GetPaged";
+            public const string SaleCreate = "dbo.usp_Sale_Create";
+            public const string SaleCancel = "dbo.usp_Sale_Cancel";
+            public const string SaleGetPaged = "dbo.usp_Sale_GetPaged";
+        }
+
+        public static class SaleStatus
+        {
+            public const string Active = "Active";
+            public const string Cancelled = "Cancelled";
+        }
+
+        public static class SaleScope
+        {
+            public const string Mine = "mine";
+            public const string Team = "team";
         }
 
         public static class Status

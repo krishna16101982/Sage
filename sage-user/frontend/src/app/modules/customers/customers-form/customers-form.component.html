@@ -1,0 +1,29 @@
+<form class="form" (ngSubmit)="submit()">
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  <label class="field-label">Company / customer name
+    <input class="field" name="name" required maxlength="200" [(ngModel)]="name" />
+  </label>
+  <div class="form-grid-2">
+    <label class="field-label">Contact person <input class="field" name="contactPerson" maxlength="150" [(ngModel)]="contactPerson" /></label>
+    <label class="field-label">Phone <input class="field" name="phone" type="tel" maxlength="20" [(ngModel)]="phone" /></label>
+    <label class="field-label">Email <input class="field" name="email" type="email" maxlength="256" [(ngModel)]="email" /></label>
+    <label class="field-label">GSTIN
+      <input class="field" name="gstin" maxlength="15" placeholder="e.g. 27AAPFU0939F1ZV" style="text-transform: uppercase" [(ngModel)]="gstin" />
+    </label>
+  </div>
+  <label class="field-label">Address <textarea class="field" name="address" rows="2" maxlength="500" [(ngModel)]="address"></textarea></label>
+  <div class="form-grid-2">
+    <label class="field-label">City <input class="field" name="city" maxlength="100" [(ngModel)]="city" /></label>
+    <label class="field-label">State <input class="field" name="state" maxlength="100" [(ngModel)]="state" /></label>
+    <label class="field-label">Country <input class="field" name="country" maxlength="100" [(ngModel)]="country" /></label>
+  </div>
+  <p class="hint">Search the customer list first: the same GSTIN, or the same name in the same city, cannot be added twice.</p>
+  <div class="modal-footer">
+    @if (cancelLink(); as link) {
+      <a class="btn btn-secondary" [routerLink]="link">Cancel</a>
+    } @else {
+      <button type="button" class="btn btn-secondary" (click)="cancelled.emit()">Cancel</button>
+    }
+    <button type="submit" class="btn btn-primary" [disabled]="busy()">{{ busy() ? 'Please wait...' : 'Add customer' }}</button>
+  </div>
+</form>

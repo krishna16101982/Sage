@@ -1,6 +1,30 @@
 @if (auth.user(); as u) {
-  <div class="stack max-w-sm" style="max-width: 40rem">
-    <h1 class="page-title">Welcome, {{ u.firstName }}</h1>
+  <div class="stack max-w-3xl">
+    <div class="row">
+      <h1 class="page-title">Welcome, {{ u.firstName }}</h1>
+      <div class="spacer"></div>
+      <a class="btn btn-primary" routerLink="/sales/add">New sale</a>
+    </div>
+
+    <section class="stack-sm">
+      <h2 class="section-title">This month</h2>
+      <div class="tile-grid">
+        <a class="card" routerLink="/sales/list" style="text-decoration: none"><div class="card-body stack-xs">
+          <span class="text-xs text-muted">My sales</span>
+          <span class="font-semibold">{{ mine()?.totalCount ?? '…' }}</span>
+          <span class="text-sm">{{ mine() ? inr(mine()!.totalSaleAmount) : '' }}</span>
+        </div></a>
+        @if (u.isManager) {
+          <a class="card" routerLink="/sales/team" style="text-decoration: none"><div class="card-body stack-xs">
+            <span class="text-xs text-muted">Team sales</span>
+            <span class="font-semibold">{{ team()?.totalCount ?? '…' }}</span>
+            <span class="text-sm">{{ team() ? inr(team()!.totalSaleAmount) : '' }}</span>
+          </div></a>
+        }
+      </div>
+      <p class="hint">Active sales recorded since the 1st of this month.</p>
+    </section>
+
     <div class="card">
       <div class="card-body stack-sm text-sm">
         <div><span class="text-muted">Role:</span> {{ u.isManager ? 'Sales manager' : 'Sales person' }}</div>
@@ -9,8 +33,5 @@
         <div><span class="text-muted">Email:</span> {{ u.email }}</div>
       </div>
     </div>
-    <p class="text-sm text-muted">
-      Recording sales{{ u.isManager ? ' and viewing your team\'s sales' : '' }} is coming in the next release.
-    </p>
   </div>
 }

@@ -1,0 +1,42 @@
+<div class="stack">
+  <h1 class="page-title">Customers</h1>
+  <p class="hint">Customers are shared by the whole sales team. Search before adding one.</p>
+
+  <div class="toolbar">
+    <app-customers-filter (searchChange)="onSearch($event)" />
+    <div class="toolbar-spacer"></div>
+    <a class="btn btn-primary" routerLink="/customers/add">Add customer</a>
+  </div>
+
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (notice()) { <app-alert kind="success">{{ notice() }}</app-alert> }
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr><th>Customer</th><th>Contact</th><th>GSTIN</th><th>City</th><th class="amount">Active sales</th><th>Added by</th></tr>
+      </thead>
+      <tbody>
+        @for (c of data()?.items ?? []; track c.id) {
+          <tr>
+            <td class="font-medium">{{ c.name }}</td>
+            <td>
+              {{ c.contactPerson ?? '-' }}
+              @if (c.phone || c.email) { <div class="hint">{{ c.phone }}{{ c.phone && c.email ? ' · ' : '' }}{{ c.email }}</div> }
+            </td>
+            <td class="code">{{ c.gstin ?? '-' }}</td>
+            <td>{{ c.city ?? '-' }}{{ c.state ? ', ' + c.state : '' }}</td>
+            <td class="amount">{{ c.saleCount }}</td>
+            <td>{{ c.createdByName ?? '-' }}</td>
+          </tr>
+        } @empty {
+          <tr><td colspan="6" class="table-empty">{{ loading() ? 'Loading...' : 'No customers match.' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (data(); as d) {
+    <app-pagination [page]="d.page" [totalPages]="d.totalPages" [totalCount]="d.totalCount" (pageChange)="goTo($event)" />
+  }
+</div>
