@@ -4,7 +4,7 @@ type ThemeMode = 'light' | 'dark';
 
 /**
  * Light / dark switch in the top bar. Sets <html data-theme="light|dark"> (theme.css has the colours) and remembers the
- * choice in this browser. Until the user picks one, the device's own setting is used. Same file in both Angular apps.
+ * choice in this browser. Light is the default, whatever the device setting. Same file in both Angular apps.
  */
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
@@ -42,6 +42,6 @@ export class ThemeService {
       document.documentElement.dataset['theme'] = saved;
       return saved;
     }
-    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    return 'light';
   }
 }

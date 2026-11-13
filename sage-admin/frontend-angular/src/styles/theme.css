@@ -3,8 +3,8 @@
    components.css only uses these variables. Same file in the Admin Panel and the User Panel (Angular).
 
    Look: dark navy sidebar, white top bar, light grey page, white cards, teal as the main colour.
-   Light values first. Dark values apply when the device is in dark mode (unless the user picked light in the
-   top bar), or when the user picked dark (the theme button sets <html data-theme="light|dark">).
+   Light values first (the default for everyone). Dark values apply only when the user picks dark with the moon
+   button in the top bar (it sets <html data-theme="dark">).
    ===================================================================================================== */
 
 :root {
@@ -72,47 +72,7 @@
   --header-height: 3.75rem;
 }
 
-/* Dark values. Kept in two places on purpose: device dark mode (unless the user chose light), and an explicit choice. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --color-bg: #0f141c;
-    --color-surface: #161d28;
-    --color-surface-muted: #1c2533;
-    --color-backdrop: rgb(0 0 0 / 0.65);
-    --color-text: #e5e9f0;
-    --color-text-muted: #94a3b8;
-    --color-border: #263142;
-    --color-border-input: #334155;
-    --color-focus: #2cc5a2;
-    --color-primary: #17a88b;
-    --color-primary-hover: #1fbf9e;
-    --color-primary-soft: #133a33;
-    --color-sidebar-bg: #111823;
-    --color-sidebar-border: #1f2937;
-    --color-sidebar-active: #1f2a3a;
-    --accent-teal-soft: #133a33;
-    --accent-blue-soft: #172a4a;
-    --accent-orange-soft: #3a2a10;
-    --accent-green-soft: #143222;
-    --accent-red-soft: #3d1a1c;
-    --accent-purple-soft: #2b1d42;
-    --color-danger: #f87171;
-    --color-danger-hover: #fca5a5;
-    --color-error-bg: #3b1214;
-    --color-error-border: #7f1d1d;
-    --color-error-text: #fecaca;
-    --color-success-bg: #0f2e22;
-    --color-success-border: #14532d;
-    --color-success-text: #bbf7d0;
-    --color-warning-bg: #3a2a10;
-    --color-warning-text: #fde68a;
-    --color-up: #4ade80;
-    --color-down: #f87171;
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
-    --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.5);
-  }
-}
-
+/* Dark values: used only when the user picks dark with the moon button in the top bar. */
 :root[data-theme="dark"] {
   --color-bg: #0f141c;
   --color-surface: #161d28;

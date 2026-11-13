@@ -74,7 +74,7 @@ Dark navy sidebar (logo, sections from the module categories, an icon per module
 - **Shapes and spacing:** `src/styles/components.css` (sidebar, top bar, cards, `stat-card`, tables, buttons, fields, dialogs, `bar-chart`).
 - **Same files in both apps:** `theme.css`, `components.css` and `layout.css` are identical in `sage-admin/frontend-angular` and `sage-user/frontend`; copy a change to both.
 - **Icons:** `component/icon/icon.ts` (`<app-icon name="users" />`, line icons adapted from Feather, MIT). The sidebar icon for each module code is in `modules/layout/primary-navigation/primary-navigation.ts` (`MODULE_ICONS`).
-- **Dark mode:** follows the device until the user clicks the moon / sun button; the choice is kept in this browser (`services/theme/theme.service.ts`).
+- **Dark mode:** light (grey page, white cards) is the default, whatever the device setting; dark only when the user clicks the moon button. The choice is kept in this browser (`services/theme/theme.service.ts`).
 - **Menu button:** collapses the sidebar to icons on wide screens and slides it in on phones.
 - **Dashboard** (`modules/dashboard`): this month's sales, revenue, margin and customers, sales per day (`component/bar-chart`), top sales persons and recent sales. Each block shows only with `Sales.View` / `Customer.View`.
 
