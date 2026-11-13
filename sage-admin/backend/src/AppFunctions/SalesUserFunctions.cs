@@ -21,6 +21,7 @@ using SageCommonLib.Models.Paging;
 using SageCommonLib.Security;
 using SP = SageAdminApi.Globals.ApplicationDatabaseConstants.StoredProcedures;
 using Roles = SageAdminApi.Globals.ApplicationDatabaseConstants.SalesRoles;
+using static SageCommonLib.AppFunctions.Sql;
 
 namespace SageAdminApi.AppFunctions
 {
@@ -60,12 +61,6 @@ ORDER BY u.FirstName, u.LastName";
         }
 
         #region Helpers
-
-        private static SqlParameter P(string _name, object _value) => new SqlParameter(_name, _value ?? DBNull.Value);
-
-        private static string Clean(string _value) => string.IsNullOrWhiteSpace(_value) ? null : Sanitization.Sanitize(_value.Trim());
-
-        private static DateTime? Utc(SqlDataReader r, int i) => r.IsDBNull(i) ? null : DateTime.SpecifyKind(r.GetDateTime(i), DateTimeKind.Utc);
 
         private static SalesUserDto MapSalesUser(SqlDataReader r)
         {
@@ -117,14 +112,14 @@ ORDER BY u.FirstName, u.LastName";
                 string _status = _filter.Status == ApplicationDatabaseConstants.Status.Active || _filter.Status == ApplicationDatabaseConstants.Status.Inactive
                     || _filter.Status == ApplicationDatabaseConstants.Status.Locked ? _filter.Status : null;
                 string _search = string.IsNullOrWhiteSpace(_filter.Search) ? null : "%" + _filter.Search.Trim().EscapeLike() + "%";
-                var _totalCount = new SqlParameter("@TotalCount", SqlDbType.Int) { Direction = ParameterDirection.Output };
+                var _totalCount = IntOut("@TotalCount");
                 var _parameters = new List<SqlParameter>
                 {
                     P("@Search", _search), P("@Role", _role), P("@Status", _status), P("@ManagerPublicId", _filter.ManagerId),
                     P("@SortBy", _paging.SortBy), P("@SortDirection", _paging.SortDirection), P("@Offset", _paging.Offset), P("@PageSize", _paging.PageSize), _totalCount
                 };
                 IReadOnlyList<SalesUserDto> _items = await _databaseFunctions.QueryProcedureAsync(SP.SalesUserGetPaged, MapSalesUser, _parameters, _ct);
-                int _total = _totalCount.Value is int _count ? _count : 0;
+                int _total = OutInt(_totalCount);
 
                 return (new PagedResult<SalesUserDto> { Items = _items, Page = _paging.Page, PageSize = _paging.PageSize, TotalCount = _total }, new FunctionReturn { MethodName = _methodName });
             }

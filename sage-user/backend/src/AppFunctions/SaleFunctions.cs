@@ -19,6 +19,7 @@ using SageUserApi.Models.Filter;
 using SageUserApi.Models.HttpPost;
 using Msg = SageUserApi.Globals.ApplicationConstants.Messages;
 using SP = SageUserApi.Globals.ApplicationDatabaseConstants.StoredProcedures;
+using static SageCommonLib.AppFunctions.Sql;
 
 namespace SageUserApi.AppFunctions
 {
@@ -76,14 +77,6 @@ WHERE (@status IS NULL OR r.Status = @status) AND ";
 
         #region Helpers
 
-        private static SqlParameter P(string _name, object _value) => new SqlParameter(_name, _value ?? DBNull.Value);
-        private static SqlParameter Date(string _name, DateOnly? _value)
-            => new SqlParameter(_name, SqlDbType.Date) { Value = _value.HasValue ? _value.Value.ToDateTime(TimeOnly.MinValue) : DBNull.Value };
-        private static SqlParameter Money(string _name, decimal? _value)
-            => new SqlParameter(_name, SqlDbType.Decimal) { Precision = 18, Scale = 2, Value = _value.HasValue ? _value.Value : DBNull.Value };
-
-        private static string S(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
-        private static DateTime? Utc(SqlDataReader r, int i) => r.IsDBNull(i) ? null : DateTime.SpecifyKind(r.GetDateTime(i), DateTimeKind.Utc);
         private static bool HasMoreThanTwoDecimals(decimal? _value) => _value.HasValue && decimal.Round(_value.Value, 2) != _value.Value;
 
         private static SaleDto MapSale(SqlDataReader r)
@@ -156,7 +149,7 @@ WHERE (@status IS NULL OR r.Status = @status) AND ";
                 PaginationParams _paging = new Pagination().GetPagingParams(_filter, SortKeys, "soldAt");
                 string _status = _filter.Status == ApplicationDatabaseConstants.SaleStatus.Active || _filter.Status == ApplicationDatabaseConstants.SaleStatus.Cancelled ? _filter.Status : null;
                 string _search = string.IsNullOrWhiteSpace(_filter.Search) ? null : "%" + _filter.Search.Trim().EscapeLike() + "%";
-                var _totalCount = new SqlParameter("@TotalCount", SqlDbType.Int) { Direction = ParameterDirection.Output };
+                var _totalCount = IntOut("@TotalCount");
                 var _totalSale = new SqlParameter("@TotalSaleAmount", SqlDbType.Decimal) { Precision = 18, Scale = 2, Direction = ParameterDirection.Output };
                 var _totalMargin = new SqlParameter("@TotalMargin", SqlDbType.Decimal) { Precision = 18, Scale = 2, Direction = ParameterDirection.Output };
 
@@ -174,9 +167,9 @@ WHERE (@status IS NULL OR r.Status = @status) AND ";
                     Items = _items,
                     Page = _paging.Page,
                     PageSize = _paging.PageSize,
-                    TotalCount = _totalCount.Value is int _count ? _count : 0,
-                    TotalSaleAmount = _totalSale.Value is decimal _sum ? _sum : 0m,
-                    TotalMargin = _totalMargin.Value is decimal _margin ? _margin : 0m
+                    TotalCount = OutInt(_totalCount),
+                    TotalSaleAmount = OutMoney(_totalSale),
+                    TotalMargin = OutMoney(_totalMargin)
                 }, new FunctionReturn { MethodName = _methodName });
             }
             catch (Exception ex)

@@ -17,25 +17,15 @@ namespace SageAdminApi.Controllers
     /// <summary>Sales recorded in the User Panel, read-only: by sales person, manager-wise, totals per person / manager, and CSV exports.</summary>
     [Route(ApplicationConstants.Api.RoutePrefix + "/sales")]
     [ApiController]
-    public class SalesController : ControllerBase
+    public class SalesController : AdminControllerBase
     {
         private readonly ISalesReportFunctions _salesReportFunctions;
-        private readonly IAuthorizationFunctions _authorizationFunctions;
-        private readonly ILoggerFunctions _loggerFunctions;
-        private readonly IApiResponse _apiResponse;
 
         public SalesController(ILoggerFunctions __loggerFunctions, ISalesReportFunctions __salesReportFunctions, IAuthorizationFunctions __authorizationFunctions, IApiResponse __apiResponse)
+            : base(__loggerFunctions, __apiResponse, __authorizationFunctions)
         {
-            _loggerFunctions = __loggerFunctions;
             _salesReportFunctions = __salesReportFunctions;
-            _authorizationFunctions = __authorizationFunctions;
-            _apiResponse = __apiResponse;
         }
-
-        private async Task<long?> ActorIdAsync(CancellationToken _ct)
-            => Guid.TryParse(User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value, out Guid _id)
-                ? await _authorizationFunctions.GetUserIdAsync(_id, _ct)
-                : null;
 
         /// <summary>Sends a CSV file, or the usual JSON error envelope when the export was refused.</summary>
         private async Task<IActionResult> FileAsync(string _methodName, Func<long?, Task<(ExportFile file, IFunctionReturn functionReturn)>> _action, CancellationToken _ct)
@@ -47,21 +37,6 @@ namespace SageAdminApi.Controllers
                 Response.Headers.CacheControl = "no-store";
                 Response.Headers["X-Row-Count"] = _file.RowCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 return File(_file.Content, "text/csv; charset=utf-8", _file.FileName);
-            }
-            catch (Exception ex)
-            {
-                _loggerFunctions.Error(_methodName, ex.Message, ex);
-                return ApplicationCommonFunctions.SystemErrorResult(_apiResponse);
-            }
-        }
-
-        private async Task<IActionResult> RunAsync<T>(string _methodName, Func<Task<(T data, IFunctionReturn functionReturn)>> _action)
-        {
-            try
-            {
-                (T _data, IFunctionReturn _functionReturn) = await _action();
-                if (!_functionReturn.Status) return ApplicationCommonFunctions.ErrorResult(_apiResponse, _functionReturn);
-                return Ok(_apiResponse.Success(_data));
             }
             catch (Exception ex)
             {

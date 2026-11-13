@@ -18,6 +18,7 @@ using SageUserApi.Globals;
 using SageUserApi.Models;
 using SageUserApi.Models.HttpPost;
 using SP = SageUserApi.Globals.ApplicationDatabaseConstants.StoredProcedures;
+using static SageCommonLib.AppFunctions.Sql;
 
 namespace SageUserApi.AppFunctions
 {
@@ -55,10 +56,6 @@ WHERE u.IsDeleted = 0 AND ";
         }
 
         #region Helpers
-
-        private static SqlParameter P(string _name, object _value) => new SqlParameter(_name, _value ?? DBNull.Value);
-        private static SqlParameter Dt(string _name, DateTime _value) => new SqlParameter(_name, SqlDbType.DateTime2) { Value = _value };
-        private static string Truncate(string _value, int _max) => string.IsNullOrEmpty(_value) || _value.Length <= _max ? _value : _value.Substring(0, _max);
 
         /// <summary>A failed write inside a login/refresh/password flow is a system error: the caller's catch turns it into a 500.</summary>
         private static void EnsureOk((IFunctionReturn functionReturn, long retValue) _result)

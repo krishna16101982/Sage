@@ -19,6 +19,7 @@ using SageCommonLib.Models;
 using SageCommonLib.Models.Interfaces;
 using SageCommonLib.Models.Paging;
 using SP = SageAdminApi.Globals.ApplicationDatabaseConstants.StoredProcedures;
+using static SageCommonLib.AppFunctions.Sql;
 
 namespace SageAdminApi.AppFunctions
 {
@@ -45,8 +46,6 @@ namespace SageAdminApi.AppFunctions
         }
 
         #region Helpers
-
-        private static SqlParameter P(string _name, object _value) => new SqlParameter(_name, _value ?? DBNull.Value);
 
         private static ModuleDto MapModule(SqlDataReader r) => new ModuleDto
         {
@@ -82,8 +81,6 @@ namespace SageAdminApi.AppFunctions
             return _functionReturn;
         }
 
-        private static string Clean(string _value) => string.IsNullOrWhiteSpace(_value) ? null : Sanitization.Sanitize(_value.Trim());
-
         private Task<ModuleDto> GetModuleByIdAsync(long _id, CancellationToken _ct)
             => _databaseFunctions.QuerySingleOrDefaultAsync(ModuleSelect + " WHERE m.Id = @id", MapModule, new[] { P("@id", _id) }, _ct);
 
@@ -109,7 +106,7 @@ namespace SageAdminApi.AppFunctions
                 if (string.IsNullOrWhiteSpace(_filter.SortDirection)) _paging.SortDirection = "ASC";
 
                 string _search = string.IsNullOrWhiteSpace(_filter.Search) ? null : "%" + _filter.Search.Trim().EscapeLike() + "%";
-                var _totalCount = new SqlParameter("@TotalCount", SqlDbType.Int) { Direction = ParameterDirection.Output };
+                var _totalCount = IntOut("@TotalCount");
                 var _parameters = new List<SqlParameter>
                 {
                     P("@ModuleId", _filter.ModuleId), P("@IsActive", _filter.IsActive), P("@Search", _search),
@@ -117,7 +114,7 @@ namespace SageAdminApi.AppFunctions
                     P("@Offset", _paging.Offset), P("@PageSize", _paging.PageSize), _totalCount
                 };
                 IReadOnlyList<PermissionDto> _items = await _databaseFunctions.QueryProcedureAsync(SP.PermissionGetPaged, MapPermission, _parameters, _ct);
-                int _total = _totalCount.Value is int _count ? _count : 0;
+                int _total = OutInt(_totalCount);
 
                 return (new PagedResult<PermissionDto> { Items = _items, Page = _paging.Page, PageSize = _paging.PageSize, TotalCount = _total }, new FunctionReturn { MethodName = _methodName });
             }

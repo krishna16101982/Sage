@@ -16,6 +16,7 @@ using SageCommonLib.Models;
 using SageCommonLib.Models.Interfaces;
 using SageCommonLib.Models.Paging;
 using SP = SageAdminApi.Globals.ApplicationDatabaseConstants.StoredProcedures;
+using static SageCommonLib.AppFunctions.Sql;
 
 namespace SageAdminApi.AppFunctions
 {
@@ -44,11 +45,6 @@ WHERE a.Id = @id";
         }
 
         #region Helpers
-
-        private static SqlParameter P(string _name, object _value) => new SqlParameter(_name, _value ?? DBNull.Value);
-        private static SqlParameter Date(string _name, DateOnly? _value)
-            => new SqlParameter(_name, SqlDbType.Date) { Value = _value.HasValue ? _value.Value.ToDateTime(TimeOnly.MinValue) : DBNull.Value };
-        private static string S(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
 
         private static T Fill<T>(SqlDataReader r, T _item) where T : AuditLogItem
         {
@@ -93,7 +89,7 @@ WHERE a.Id = @id";
                 if (_filter.PageSize <= 0) _paging.PageSize = 50;
                 string _actorType = _filter.ActorType == "admin" || _filter.ActorType == "sales" || _filter.ActorType == "system" ? _filter.ActorType : null;
                 string _search = string.IsNullOrWhiteSpace(_filter.Search) ? null : "%" + _filter.Search.Trim().EscapeLike() + "%";
-                var _totalCount = new SqlParameter("@TotalCount", SqlDbType.Int) { Direction = ParameterDirection.Output };
+                var _totalCount = IntOut("@TotalCount");
 
                 IReadOnlyList<AuditLogItem> _items = await _databaseFunctions.QueryProcedureAsync(SP.AuditLogGetPaged, r => Fill(r, new AuditLogItem()), new List<SqlParameter>
                 {
@@ -102,7 +98,7 @@ WHERE a.Id = @id";
                     P("@SortDirection", _paging.SortDirection), P("@Offset", _paging.Offset), P("@PageSize", _paging.PageSize), _totalCount
                 }, _ct);
 
-                int _total = _totalCount.Value is int _count ? _count : 0;
+                int _total = OutInt(_totalCount);
                 return (new PagedResult<AuditLogItem> { Items = _items, Page = _paging.Page, PageSize = _paging.PageSize, TotalCount = _total }, new FunctionReturn { MethodName = _methodName });
             }
             catch (Exception ex)

@@ -6,6 +6,7 @@ using Microsoft.Data.SqlClient;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageUserApi.AppFunctions.Interfaces;
 using SageUserApi.Models;
+using static SageCommonLib.AppFunctions.Sql;
 
 namespace SageUserApi.AppFunctions
 {
@@ -50,6 +51,5 @@ namespace SageUserApi.AppFunctions
             }
         }
 
-        private static string Truncate(string _value, int _max) => string.IsNullOrEmpty(_value) || _value.Length <= _max ? _value : _value.Substring(0, _max);
     }
 }

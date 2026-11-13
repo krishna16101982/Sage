@@ -20,26 +20,14 @@ namespace SageAdminApi.Controllers
 {
     [Route(ApplicationConstants.Api.RoutePrefix + "/permissions")]
     [ApiController]
-    public class PermissionsController : ControllerBase
+    public class PermissionsController : AdminControllerBase
     {
         private readonly IPermissionFunctions _permissionFunctions;
-        private readonly IAuthorizationFunctions _authorizationFunctions;
-        private readonly ILoggerFunctions _loggerFunctions;
-        private readonly IApiResponse _apiResponse;
 
         public PermissionsController(ILoggerFunctions __loggerFunctions, IPermissionFunctions __permissionFunctions, IAuthorizationFunctions __authorizationFunctions, IApiResponse __apiResponse)
+            : base(__loggerFunctions, __apiResponse, __authorizationFunctions)
         {
-            _loggerFunctions = __loggerFunctions;
             _permissionFunctions = __permissionFunctions;
-            _authorizationFunctions = __authorizationFunctions;
-            _apiResponse = __apiResponse;
-        }
-
-        private async Task<long?> ActorIdAsync(CancellationToken _ct)
-        {
-            return Guid.TryParse(User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value, out Guid _id)
-                ? await _authorizationFunctions.GetUserIdAsync(_id, _ct)
-                : null;
         }
 
         private IActionResult Created<T>(T _data, string _message)

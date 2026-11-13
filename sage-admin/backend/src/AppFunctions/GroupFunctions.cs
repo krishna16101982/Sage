@@ -19,6 +19,7 @@ using SageCommonLib.Models;
 using SageCommonLib.Models.Interfaces;
 using SageCommonLib.Models.Paging;
 using SP = SageAdminApi.Globals.ApplicationDatabaseConstants.StoredProcedures;
+using static SageCommonLib.AppFunctions.Sql;
 
 namespace SageAdminApi.AppFunctions
 {
@@ -65,11 +66,7 @@ WHERE g.PublicId = @id ORDER BY p.Code";
 
         #region Helpers
 
-        private static SqlParameter P(string _name, object _value) => new SqlParameter(_name, _value ?? DBNull.Value);
-
-        private static string Clean(string _value) => string.IsNullOrWhiteSpace(_value) ? null : Sanitization.Sanitize(_value.Trim());
-
-        private static DateTime Utc(SqlDataReader r, int i) => DateTime.SpecifyKind(r.GetDateTime(i), DateTimeKind.Utc);
+        private static DateTime UtcValue(SqlDataReader r, int i) => DateTime.SpecifyKind(r.GetDateTime(i), DateTimeKind.Utc);
 
         private static GroupDto MapGroup(SqlDataReader r) => new GroupDto
         {
@@ -81,8 +78,8 @@ WHERE g.PublicId = @id ORDER BY p.Code";
             IsSystem = r.GetBoolean(5),
             UserCount = r.GetInt32(6),
             PermissionCount = r.GetInt32(7),
-            CreatedAtUtc = Utc(r, 8),
-            UpdatedAtUtc = r.IsDBNull(9) ? (DateTime?)null : Utc(r, 9)
+            CreatedAtUtc = UtcValue(r, 8),
+            UpdatedAtUtc = r.IsDBNull(9) ? (DateTime?)null : UtcValue(r, 9)
         };
 
         private Task<GroupDto> GetGroupRowAsync(Guid _id, CancellationToken _ct)
@@ -141,14 +138,14 @@ WHERE g.PublicId = @id ORDER BY p.Code";
 
                 string _status = _filter.Status == ApplicationDatabaseConstants.Status.Active || _filter.Status == ApplicationDatabaseConstants.Status.Inactive ? _filter.Status : null;
                 string _search = string.IsNullOrWhiteSpace(_filter.Search) ? null : "%" + _filter.Search.Trim().EscapeLike() + "%";
-                var _totalCount = new SqlParameter("@TotalCount", SqlDbType.Int) { Direction = ParameterDirection.Output };
+                var _totalCount = IntOut("@TotalCount");
                 var _parameters = new List<SqlParameter>
                 {
                     P("@Search", _search), P("@Status", _status), P("@SortBy", _paging.SortBy), P("@SortDirection", _paging.SortDirection),
                     P("@Offset", _paging.Offset), P("@PageSize", _paging.PageSize), _totalCount
                 };
                 IReadOnlyList<GroupDto> _items = await _databaseFunctions.QueryProcedureAsync(SP.GroupGetPaged, MapGroup, _parameters, _ct);
-                int _total = _totalCount.Value is int _count ? _count : 0;
+                int _total = OutInt(_totalCount);
 
                 return (new PagedResult<GroupDto> { Items = _items, Page = _paging.Page, PageSize = _paging.PageSize, TotalCount = _total }, new FunctionReturn { MethodName = _methodName });
             }

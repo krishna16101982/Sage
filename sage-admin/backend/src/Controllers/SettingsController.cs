@@ -17,40 +17,14 @@ namespace SageAdminApi.Controllers
     /// <summary>Application settings (dbo.Settings): list and change values.</summary>
     [Route(ApplicationConstants.Api.RoutePrefix + "/settings")]
     [ApiController]
-    public class SettingsController : ControllerBase
+    public class SettingsController : AdminControllerBase
     {
         private readonly ISettingFunctions _settingFunctions;
-        private readonly IAuthorizationFunctions _authorizationFunctions;
-        private readonly ILoggerFunctions _loggerFunctions;
-        private readonly IApiResponse _apiResponse;
 
         public SettingsController(ILoggerFunctions __loggerFunctions, ISettingFunctions __settingFunctions, IAuthorizationFunctions __authorizationFunctions, IApiResponse __apiResponse)
+            : base(__loggerFunctions, __apiResponse, __authorizationFunctions)
         {
-            _loggerFunctions = __loggerFunctions;
             _settingFunctions = __settingFunctions;
-            _authorizationFunctions = __authorizationFunctions;
-            _apiResponse = __apiResponse;
-        }
-
-        private async Task<long?> ActorIdAsync(CancellationToken _ct)
-            => Guid.TryParse(User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value, out Guid _id)
-                ? await _authorizationFunctions.GetUserIdAsync(_id, _ct)
-                : null;
-
-        private async Task<IActionResult> RunAsync<T>(string _methodName, Func<Task<(T data, IFunctionReturn functionReturn)>> _action)
-        {
-            try
-            {
-                (T _data, IFunctionReturn _functionReturn) = await _action();
-                if (!_functionReturn.Status) return ApplicationCommonFunctions.ErrorResult(_apiResponse, _functionReturn);
-                string _message = _functionReturn.Message.Count > 0 ? _functionReturn.Message[0] : "OK";
-                return Ok(_apiResponse.Success(_data, _message));
-            }
-            catch (Exception ex)
-            {
-                _loggerFunctions.Error(_methodName, ex.Message, ex);
-                return ApplicationCommonFunctions.SystemErrorResult(_apiResponse);
-            }
         }
 
         [HttpGet]

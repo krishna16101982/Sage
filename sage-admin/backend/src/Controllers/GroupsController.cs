@@ -18,29 +18,15 @@ namespace SageAdminApi.Controllers
 {
     [Route(ApplicationConstants.Api.RoutePrefix + "/groups")]
     [ApiController]
-    public class GroupsController : ControllerBase
+    public class GroupsController : AdminControllerBase
     {
         private readonly IGroupFunctions _groupFunctions;
-        private readonly IAuthorizationFunctions _authorizationFunctions;
-        private readonly ILoggerFunctions _loggerFunctions;
-        private readonly IApiResponse _apiResponse;
 
         public GroupsController(ILoggerFunctions __loggerFunctions, IGroupFunctions __groupFunctions, IAuthorizationFunctions __authorizationFunctions, IApiResponse __apiResponse)
+            : base(__loggerFunctions, __apiResponse, __authorizationFunctions)
         {
-            _loggerFunctions = __loggerFunctions;
             _groupFunctions = __groupFunctions;
-            _authorizationFunctions = __authorizationFunctions;
-            _apiResponse = __apiResponse;
         }
-
-        private async Task<long?> ActorIdAsync(CancellationToken _ct)
-        {
-            return Guid.TryParse(User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value, out Guid _id)
-                ? await _authorizationFunctions.GetUserIdAsync(_id, _ct)
-                : null;
-        }
-
-        private string ClientIp => ApplicationCommonFunctions.GetClientIp(HttpContext);
 
         /// <summary>Paged, filterable list of groups (search, status, sort) with member and permission counts.</summary>
         [HttpGet]

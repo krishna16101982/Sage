@@ -17,6 +17,7 @@ using SageCommonLib.Globals;
 using SageCommonLib.Models;
 using SageCommonLib.Models.Interfaces;
 using SP = SageAdminApi.Globals.ApplicationDatabaseConstants.StoredProcedures;
+using static SageCommonLib.AppFunctions.Sql;
 
 namespace SageAdminApi.AppFunctions
 {
@@ -43,8 +44,6 @@ FROM dbo.Settings s LEFT JOIN dbo.AdminUsers u ON u.Id = s.UpdatedBy";
 
         #region Helpers
 
-        private static SqlParameter P(string _name, object _value) => new SqlParameter(_name, _value ?? DBNull.Value);
-        private static string S(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
         private static int? I(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetInt32(i);
 
         private static SettingDto Map(SqlDataReader r) => new SettingDto

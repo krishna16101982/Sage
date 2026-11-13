@@ -19,6 +19,7 @@ using SageCommonLib.Models;
 using SageCommonLib.Models.Interfaces;
 using SageCommonLib.Security;
 using SP = SageAdminApi.Globals.ApplicationDatabaseConstants.StoredProcedures;
+using static SageCommonLib.AppFunctions.Sql;
 
 namespace SageAdminApi.AppFunctions
 {
@@ -55,16 +56,11 @@ namespace SageAdminApi.AppFunctions
 
         #region Helpers
 
-        private static SqlParameter P(string _name, object _value) => new SqlParameter(_name, _value ?? DBNull.Value);
-        private static SqlParameter Dt(string _name, DateTime _value) => new SqlParameter(_name, SqlDbType.DateTime2) { Value = _value };
-
         /// <summary>A failed write inside a login/refresh/password flow is a system error: the caller's catch turns it into a 500.</summary>
         private static void EnsureOk((IFunctionReturn functionReturn, long retValue) _result)
         {
             if (!_result.functionReturn.Status) throw new InvalidOperationException(string.Join("; ", _result.functionReturn.Message));
         }
-
-        private static string Truncate(string _value, int _max) => string.IsNullOrEmpty(_value) ? _value : (_value.Length <= _max ? _value : _value.Substring(0, _max));
 
         private static IFunctionReturn Unauthorized(string _message, string _methodName)
             => FunctionReturn.Fail(Constants.ReturnMessageTypes.TokenError, _message, Constants.HttpStatusCodes.Unauthorized, _methodName);

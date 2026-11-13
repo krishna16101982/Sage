@@ -16,6 +16,7 @@ using SageCommonLib.Models;
 using SageCommonLib.Models.Interfaces;
 using SageCommonLib.Models.Paging;
 using SP = SageAdminApi.Globals.ApplicationDatabaseConstants.StoredProcedures;
+using static SageCommonLib.AppFunctions.Sql;
 
 namespace SageAdminApi.AppFunctions
 {
@@ -66,13 +67,6 @@ ORDER BY u.FirstName, u.LastName";
 
         #region Helpers
 
-        private static SqlParameter P(string _name, object _value) => new SqlParameter(_name, _value ?? DBNull.Value);
-        private static SqlParameter Date(string _name, DateOnly? _value)
-            => new SqlParameter(_name, SqlDbType.Date) { Value = _value.HasValue ? _value.Value.ToDateTime(TimeOnly.MinValue) : DBNull.Value };
-        private static SqlParameter MoneyOut(string _name) => new SqlParameter(_name, SqlDbType.Decimal) { Precision = 18, Scale = 2, Direction = ParameterDirection.Output };
-        private static string S(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
-        private static DateTime? Utc(SqlDataReader r, int i) => r.IsDBNull(i) ? null : DateTime.SpecifyKind(r.GetDateTime(i), DateTimeKind.Utc);
-
         private static AdminSaleDto MapSale(SqlDataReader r)
         {
             decimal _list = r.GetDecimal(14), _sale = r.GetDecimal(15), _discount = r.GetDecimal(16), _cost = r.GetDecimal(17);
@@ -119,7 +113,7 @@ ORDER BY u.FirstName, u.LastName";
             PaginationParams _paging = new Pagination().GetPagingParams(_filter, SortKeys, "soldAt");
             string _status = _filter.Status == "Active" || _filter.Status == "Cancelled" ? _filter.Status : null;
             string _search = string.IsNullOrWhiteSpace(_filter.Search) ? null : "%" + _filter.Search.Trim().EscapeLike() + "%";
-            var _totalCount = new SqlParameter("@TotalCount", SqlDbType.Int) { Direction = ParameterDirection.Output };
+            var _totalCount = IntOut("@TotalCount");
             var _totalSale = MoneyOut("@TotalSaleAmount");
             var _totalMargin = MoneyOut("@TotalMargin");
 
@@ -131,7 +125,7 @@ ORDER BY u.FirstName, u.LastName";
                 P("@Offset", _exportAll ? 0 : _paging.Offset), P("@PageSize", _exportAll ? MaxExportRows + 1 : _paging.PageSize),
                 _totalCount, _totalSale, _totalMargin
             }, _ct);
-            return (_items, _paging, _totalCount.Value is int _count ? _count : 0, _totalSale.Value is decimal _sum ? _sum : 0m, _totalMargin.Value is decimal _margin ? _margin : 0m);
+            return (_items, _paging, OutInt(_totalCount), OutMoney(_totalSale), OutMoney(_totalMargin));
         }
 
         private Task AuditExportAsync(long? _actorUserId, object _details, string _ipAddress, CancellationToken _ct)

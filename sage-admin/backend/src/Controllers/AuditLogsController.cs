@@ -17,31 +17,14 @@ namespace SageAdminApi.Controllers
     /// <summary>The audit log (read-only): who changed what, when, from where, with the values before and after.</summary>
     [Route(ApplicationConstants.Api.RoutePrefix + "/audit-logs")]
     [ApiController]
-    public class AuditLogsController : ControllerBase
+    public class AuditLogsController : AdminControllerBase
     {
         private readonly IAuditLogFunctions _auditLogFunctions;
-        private readonly ILoggerFunctions _loggerFunctions;
-        private readonly IApiResponse _apiResponse;
 
         public AuditLogsController(ILoggerFunctions __loggerFunctions, IAuditLogFunctions __auditLogFunctions, IApiResponse __apiResponse)
+            : base(__loggerFunctions, __apiResponse)
         {
-            _loggerFunctions = __loggerFunctions;
             _auditLogFunctions = __auditLogFunctions;
-            _apiResponse = __apiResponse;
-        }
-
-        private async Task<IActionResult> RunAsync<T>(string _methodName, Func<Task<(T data, IFunctionReturn functionReturn)>> _action)
-        {
-            try
-            {
-                (T _data, IFunctionReturn _functionReturn) = await _action();
-                return _functionReturn.Status ? Ok(_apiResponse.Success(_data)) : ApplicationCommonFunctions.ErrorResult(_apiResponse, _functionReturn);
-            }
-            catch (Exception ex)
-            {
-                _loggerFunctions.Error(_methodName, ex.Message, ex);
-                return ApplicationCommonFunctions.SystemErrorResult(_apiResponse);
-            }
         }
 
         /// <summary>Newest first. Filters: search, entityType, action, actorType (admin|sales|system), actorId, from, to; paging.</summary>

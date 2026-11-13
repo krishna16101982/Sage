@@ -19,45 +19,14 @@ namespace SageAdminApi.Controllers
     /// <summary>User Panel accounts (sales persons / sales managers), managed from the Admin Panel.</summary>
     [Route(ApplicationConstants.Api.RoutePrefix + "/sales-users")]
     [ApiController]
-    public class SalesUsersController : ControllerBase
+    public class SalesUsersController : AdminControllerBase
     {
         private readonly ISalesUserFunctions _salesUserFunctions;
-        private readonly IAuthorizationFunctions _authorizationFunctions;
-        private readonly ILoggerFunctions _loggerFunctions;
-        private readonly IApiResponse _apiResponse;
 
         public SalesUsersController(ILoggerFunctions __loggerFunctions, ISalesUserFunctions __salesUserFunctions, IAuthorizationFunctions __authorizationFunctions, IApiResponse __apiResponse)
+            : base(__loggerFunctions, __apiResponse, __authorizationFunctions)
         {
-            _loggerFunctions = __loggerFunctions;
             _salesUserFunctions = __salesUserFunctions;
-            _authorizationFunctions = __authorizationFunctions;
-            _apiResponse = __apiResponse;
-        }
-
-        private async Task<long?> ActorIdAsync(CancellationToken _ct)
-        {
-            return Guid.TryParse(User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value, out Guid _id)
-                ? await _authorizationFunctions.GetUserIdAsync(_id, _ct)
-                : null;
-        }
-
-        private string ClientIp => ApplicationCommonFunctions.GetClientIp(HttpContext);
-
-        private async Task<IActionResult> RunAsync<T>(string _methodName, Func<Task<(T data, IFunctionReturn functionReturn)>> _action)
-        {
-            try
-            {
-                (T _data, IFunctionReturn _functionReturn) = await _action();
-                if (!_functionReturn.Status) return ApplicationCommonFunctions.ErrorResult(_apiResponse, _functionReturn);
-                string _status = string.IsNullOrEmpty(_functionReturn.HttpStatusCode) ? "200" : _functionReturn.HttpStatusCode;
-                string _message = _functionReturn.Message.Count > 0 ? _functionReturn.Message[0] : "OK";
-                return new ObjectResult(_apiResponse.Success(_data, _message, _status)) { StatusCode = int.Parse(_status) };
-            }
-            catch (Exception ex)
-            {
-                _loggerFunctions.Error(_methodName, ex.Message, ex);
-                return ApplicationCommonFunctions.SystemErrorResult(_apiResponse);
-            }
         }
 
         /// <summary>Paged list: search, role, status, managerId (a manager's team), sort.</summary>

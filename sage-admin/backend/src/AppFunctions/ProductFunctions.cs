@@ -16,6 +16,7 @@ using SageCommonLib.Globals;
 using SageCommonLib.Models;
 using SageCommonLib.Models.Interfaces;
 using SP = SageAdminApi.Globals.ApplicationDatabaseConstants.StoredProcedures;
+using static SageCommonLib.AppFunctions.Sql;
 
 namespace SageAdminApi.AppFunctions
 {
@@ -42,10 +43,6 @@ namespace SageAdminApi.AppFunctions
 
         #region Helpers
 
-        private static SqlParameter P(string _name, object _value) => new SqlParameter(_name, _value ?? DBNull.Value);
-        private static SqlParameter Money(string _name, decimal _value) => new SqlParameter(_name, SqlDbType.Decimal) { Precision = 18, Scale = 2, Value = _value };
-
-        private static string Clean(string _value) => string.IsNullOrWhiteSpace(_value) ? null : Sanitization.Sanitize(_value.Trim());
 
         private static ProductCategoryDto MapCategory(SqlDataReader r) => new ProductCategoryDto
         {

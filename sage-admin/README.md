@@ -205,6 +205,28 @@ Build the statement with `StringBuilder _sqlQuery`, then call the shared wrapper
 
 Stored procedures: `ExecuteProcedureWriteAsync` (same `(IFunctionReturn, long)` shape; `long` = the procedure's `SELECT`ed value, by convention the new id or rows affected), `ExecuteProcedureScalarAsync`, `QueryProcedureAsync` (OUTPUT parameters are filled when it returns), `ExecuteProcedureAsync`. A procedure reports expected errors with `THROW 50400` (-> 400), `THROW 50404` (-> 404) or `THROW 50409` (-> 409), and the THROW message is returned to the client, so write it for the user. Other `THROW` numbers reach C# as `DatabaseException.SqlErrorNumber` (e.g. `50001` for an already-used refresh token).
 
+Shared helpers (both APIs), with `using static SageCommonLib.AppFunctions.Sql;` at the top of a functions class:
+
+| Helper | Use |
+|--------|-----|
+| `P("@Name", value)` | input parameter (null -> NULL) |
+| `Dt`, `Date`, `Money` | DATETIME2, DATE (`DateOnly?`), DECIMAL(18,2) parameters |
+| `IntOut("@TotalCount")` / `OutInt(p)`, `MoneyOut` / `OutMoney(p)` | OUTPUT parameters and their values after the call |
+| `S(r, i)`, `Utc(r, i)` | nullable text / UTC date column when reading a row |
+| `Clean(text)`, `Truncate(text, max)` | trim + strip HTML (empty -> null); cut to a column's length |
+
+A typical write:
+
+```csharp
+(IFunctionReturn _functionReturn, long _) = await _databaseFunctions.ExecuteProcedureWriteAsync(SP.CustomerUpdate, new[]
+{
+    P("@PublicId", _id), P("@Name", Clean(_params.Name)), P("@AdminUserId", _actorUserId)
+}, _methodName, "Customer saved.", _ct);
+```
+
+Admin controllers inherit `AdminControllerBase` (`RunAsync`, `ActorIdAsync`, `ClientIp`, `CurrentUserId`), so an action is one line:
+`=> RunAsync<CustomerDto>("C:Customers:GetCustomer", () => _customerFunctions.GetCustomerAsync(id, _ct));`. User API controllers do the same with `SalesControllerBase`.
+
 ## Frontend styling (how to change the look)
 All styling lives in three files under `frontend/src/styles/`:
 
