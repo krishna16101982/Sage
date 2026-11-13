@@ -34,6 +34,30 @@ export interface Sale {
   cancelledAtUtc: string | null;
   cancelledByName: string | null;
   cancelReason: string | null;
+  /** A cancellation request is waiting for the manager. */
+  hasPendingCancelRequest: boolean;
+  /** Cancellation requests for this sale, newest first (sale details only). */
+  cancelRequests?: CancelRequest[];
+}
+
+export type CancelRequestStatus = 'Pending' | 'Approved' | 'Rejected';
+
+/** A sales person's request to cancel one of their sales; the manager approves or rejects it. */
+export interface CancelRequest {
+  id: string;
+  saleId: string;
+  saleNumber: string;
+  customerName: string;
+  productName: string;
+  saleAmount: number;
+  requestedById: string;
+  requestedByName: string;
+  reason: string;
+  status: CancelRequestStatus;
+  requestedAtUtc: string;
+  decidedByName: string | null;
+  decidedAtUtc: string | null;
+  decisionNote: string | null;
 }
 
 /** A page of sales plus totals of the matching ACTIVE sales. */
@@ -74,4 +98,8 @@ export interface TeamMember {
   name: string;
   username: string;
   status: string;
+  /** May ask for their sales to be cancelled. */
+  canRequestCancellation: boolean;
+  /** Their requests waiting for the manager. */
+  pendingRequests: number;
 }

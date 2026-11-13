@@ -49,6 +49,15 @@ namespace SageUserApi.Globals
             public const string CancelReasonRequired = "Enter a reason for cancelling (up to 500 characters).";
             public const string SaleCancelled = "Sale cancelled.";
             public const string ManagersOnly = "Only sales managers can see team sales.";
+            public const string ManagersOnlyCancel = "Only your manager can cancel a sale. Use Request cancellation, or ask your manager.";
+            public const string ManagersOnlyTeam = "Only sales managers can manage a team.";
+            public const string RequestNotAllowed = "Your manager has not allowed you to request cancellations.";
+            public const string ReasonRequired = "Enter a reason (up to 500 characters).";
+            public const string NoteTooLong = "The note must be 500 characters or fewer.";
+            public const string CancelRequested = "Cancellation requested. Your manager will approve or reject it.";
+            public const string RequestApproved = "Request approved: the sale is cancelled.";
+            public const string RequestRejected = "Request rejected: the sale stays active.";
+            public const string PermissionSaved = "Saved.";
         }
 
         public static class ConfigSettingNames
@@ -81,6 +90,9 @@ namespace SageUserApi.Globals
             public const string SaleCreate = "dbo.usp_Sale_Create";
             public const string SaleCancel = "dbo.usp_Sale_Cancel";
             public const string SaleGetPaged = "dbo.usp_Sale_GetPaged";
+            public const string SaleCancelRequestCreate = "dbo.usp_SaleCancelRequest_Create";
+            public const string SaleCancelRequestDecide = "dbo.usp_SaleCancelRequest_Decide";
+            public const string SalesUserSetCancelPermission = "dbo.usp_SalesUser_SetCancelPermission";
         }
 
         public static class SaleStatus

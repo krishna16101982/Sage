@@ -1,0 +1,88 @@
+<div class="stack">
+  <div class="page-header">
+    <div class="stack-xs">
+      <span class="page-eyebrow">Sales</span>
+      <h1 class="page-title">My team</h1>
+    </div>
+    <div class="spacer"></div>
+    <a class="btn btn-secondary" routerLink="/sales/team">Team sales</a>
+  </div>
+  <p class="hint">
+    You can cancel any sale of your team. A team member can only <strong>ask</strong> for one of their sales to be cancelled,
+    and only when you switch on "Can request cancellation" for them. The sale is cancelled when you approve the request.
+  </p>
+
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (notice()) { <app-alert kind="success">{{ notice() }}</app-alert> }
+
+  <!-- Requests waiting for a decision -->
+  <section class="card">
+    <header class="card-header">
+      <h2 class="section-title">Cancellation requests</h2>
+      @if ((requests()?.length ?? 0) > 0) { <span class="badge badge-warning">{{ requests()!.length }} waiting</span> }
+    </header>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Sale</th><th>Requested by</th><th>Reason</th><th class="amount">Amount</th><th>Asked on</th><th></th></tr></thead>
+        <tbody>
+          @for (r of requests() ?? []; track r.id) {
+            <tr>
+              <td>
+                <a class="link-button code" style="white-space: nowrap" [routerLink]="['/sales', r.saleId]">{{ r.saleNumber }}</a>
+                <div class="hint">{{ r.customerName }} · {{ r.productName }}</div>
+              </td>
+              <td>{{ r.requestedByName }}</td>
+              <td>{{ r.reason }}</td>
+              <td class="amount">{{ inr(r.saleAmount) }}</td>
+              <td class="date">{{ dateTime(r.requestedAtUtc) }}</td>
+              <td class="actions">
+                <button type="button" class="link-button danger" (click)="deciding.set({ request: r, approve: true })">Approve</button>
+                <button type="button" class="link-button" (click)="deciding.set({ request: r, approve: false })">Reject</button>
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="6" class="table-empty">{{ requests() ? 'No requests waiting.' : 'Loading...' }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Team members and their permission -->
+  <section class="card">
+    <header class="card-header"><h2 class="section-title">Team members</h2></header>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Status</th><th class="amount">Requests waiting</th><th>Can request cancellation</th></tr></thead>
+        <tbody>
+          @for (m of members() ?? []; track m.id) {
+            <tr>
+              <td>
+                <div class="row-tight">
+                  <span class="avatar avatar-sm">{{ initialsOf(m.name) }}</span>
+                  <div class="stack-xs"><span class="font-medium">{{ m.name }}</span><span class="hint code">{{ m.username }}</span></div>
+                </div>
+              </td>
+              <td><span class="badge" [class.badge-success]="m.status === 'Active'">{{ m.status }}</span></td>
+              <td class="amount">{{ m.pendingRequests }}</td>
+              <td>
+                <label class="switch">
+                  <input type="checkbox" [checked]="m.canRequestCancellation" [disabled]="saving() === m.id"
+                         [attr.aria-label]="'Allow ' + m.name + ' to request cancellations'" (change)="toggle(m, $any($event.target).checked)" />
+                  <span class="switch-track" aria-hidden="true"></span>
+                  <span class="text-sm">{{ m.canRequestCancellation ? 'Allowed' : 'Not allowed' }}</span>
+                </label>
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="4" class="table-empty">{{ members() ? 'Nobody reports to you yet.' : 'Loading...' }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+@if (deciding(); as d) {
+  <app-cancel-decision-modal [request]="d.request" [approve]="d.approve" (closed)="deciding.set(null)" (decided)="decided($event)" />
+}

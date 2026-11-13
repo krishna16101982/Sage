@@ -6,7 +6,10 @@ import { errorText } from '../../../../services/rest/global-rest-service';
 import { SalesService } from '../../../../services/sales/sales.service';
 import type { Sale } from '../../../../shared/interfaces/sale.interface';
 
-/** "Cancel sale" confirmation with a required reason. A cancelled sale stays on record; it is never deleted. */
+/**
+ * Asks for a reason, then either cancels the sale (mode "cancel": sales managers) or sends a cancellation request to
+ * the manager (mode "request": sales persons their manager allowed). A cancelled sale stays on record; it is never deleted.
+ */
 @Component({
   selector: 'app-sales-cancel-modal',
   imports: [FormsModule, Alert, Modal],
@@ -14,9 +17,10 @@ import type { Sale } from '../../../../shared/interfaces/sale.interface';
 })
 export class SalesCancelModal {
   readonly sale = input.required<Sale>();
+  readonly mode = input<'cancel' | 'request'>('cancel');
   readonly closed = output<void>();
-  /** Emits the sale as it is after cancelling. */
-  readonly cancelled = output<Sale>();
+  /** Emits the message to show once the sale was cancelled or the request was sent. */
+  readonly done = output<string>();
   private readonly service = inject(SalesService);
   reason = '';
   readonly error = signal<string | null>(null);
@@ -26,7 +30,13 @@ export class SalesCancelModal {
     this.error.set(null);
     this.busy.set(true);
     try {
-      this.cancelled.emit(await this.service.cancel(this.sale().id, this.reason));
+      if (this.mode() === 'request') {
+        await this.service.requestCancel(this.sale().id, this.reason);
+        this.done.emit('Cancellation requested. Your manager will approve or reject it.');
+      } else {
+        await this.service.cancel(this.sale().id, this.reason);
+        this.done.emit(`Sale ${this.sale().saleNumber} cancelled.`);
+      }
     } catch (err) {
       this.error.set(errorText(err));
     } finally {

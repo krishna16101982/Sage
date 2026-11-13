@@ -1,13 +1,19 @@
-<app-modal [title]="'Cancel sale ' + sale().saleNumber" (closed)="closed.emit()">
+<app-modal [title]="(mode() === 'request' ? 'Request cancellation of ' : 'Cancel sale ') + sale().saleNumber" (closed)="closed.emit()">
   <form class="form" (ngSubmit)="submit()">
     @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
-    <p class="text-sm">The sale stays on record as <strong>Cancelled</strong> and no longer counts in the totals. This cannot be undone.</p>
+    @if (mode() === 'request') {
+      <p class="text-sm">Your manager will see this request and approve or reject it. The sale stays active until they approve.</p>
+    } @else {
+      <p class="text-sm">The sale stays on record as <strong>Cancelled</strong> and no longer counts in the totals. This cannot be undone.</p>
+    }
     <label class="field-label">Reason
       <textarea class="field" name="reason" rows="3" maxlength="500" required [(ngModel)]="reason"></textarea>
     </label>
     <div class="modal-footer">
       <button type="button" class="btn btn-secondary" (click)="closed.emit()">Keep the sale</button>
-      <button type="submit" class="btn btn-danger" [disabled]="busy() || !reason.trim()">{{ busy() ? 'Please wait...' : 'Cancel sale' }}</button>
+      <button type="submit" [class]="mode() === 'request' ? 'btn btn-primary' : 'btn btn-danger'" [disabled]="busy() || !reason.trim()">
+        {{ busy() ? 'Please wait...' : mode() === 'request' ? 'Send request' : 'Cancel sale' }}
+      </button>
     </div>
   </form>
 </app-modal>

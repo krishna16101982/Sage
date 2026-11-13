@@ -28,7 +28,8 @@ namespace SageUserApi.AppFunctions
     public class AuthFunctions : IAuthFunctions
     {
         private const string UserSelect = @"SELECT TOP 1 u.Id, u.PublicId, u.FirstName, u.LastName, u.Username, u.Email, u.PasswordHash, u.MustChangePassword,
-    u.Role, u.Status, u.LockoutEndUtc, u.PermissionVersion, CASE WHEN m.Id IS NULL THEN NULL ELSE CONCAT(m.FirstName, N' ', m.LastName) END
+    u.Role, u.Status, u.LockoutEndUtc, u.PermissionVersion, CASE WHEN m.Id IS NULL THEN NULL ELSE CONCAT(m.FirstName, N' ', m.LastName) END,
+    u.CanRequestCancellation
 FROM dbo.SalesUsers u LEFT JOIN dbo.SalesUsers m ON m.Id = u.ManagerId
 WHERE u.IsDeleted = 0 AND ";
         private const int SqlErrorTokenAlreadyUsed = 50001;
@@ -80,7 +81,8 @@ WHERE u.IsDeleted = 0 AND ";
             Status = r.GetString(9),
             LockoutEndUtc = r.IsDBNull(10) ? null : DateTime.SpecifyKind(r.GetDateTime(10), DateTimeKind.Utc),
             PermissionVersion = r.GetInt32(11),
-            ManagerName = r.IsDBNull(12) ? null : r.GetString(12)
+            ManagerName = r.IsDBNull(12) ? null : r.GetString(12),
+            CanRequestCancellation = r.GetBoolean(13)
         };
 
         /// <summary>Hash verified against unknown usernames so response time does not reveal whether the account exists.</summary>
@@ -164,7 +166,8 @@ WHERE u.IsDeleted = 0 AND ";
             Role = _user.Role,
             IsManager = _user.Role == ApplicationDatabaseConstants.SalesRoles.SalesManager,
             ManagerName = _user.ManagerName,
-            MustChangePassword = _user.MustChangePassword
+            MustChangePassword = _user.MustChangePassword,
+            CanRequestCancellation = _user.CanRequestCancellation && _user.Role == ApplicationDatabaseConstants.SalesRoles.SalesPerson
         };
 
         private AuthResult BuildAuthResult(SalesUser _user, string _rawRefresh, DateTime _refreshExpires)

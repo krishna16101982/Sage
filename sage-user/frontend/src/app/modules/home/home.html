@@ -12,6 +12,17 @@
 
     @if (error()) { <p class="hint text-danger">{{ error() }}</p> }
 
+    @if (pendingRequests() > 0) {
+      <a class="card accent-orange" routerLink="/team">
+        <div class="card-body row-tight">
+          <span class="badge badge-warning">{{ pendingRequests() }} waiting</span>
+          <span class="text-sm">Cancellation request{{ pendingRequests() === 1 ? '' : 's' }} from your team need{{ pendingRequests() === 1 ? 's' : '' }} your decision.</span>
+          <span class="spacer"></span>
+          <span class="link-button text-sm">Review</span>
+        </div>
+      </a>
+    }
+
     <!-- Figures for this month -->
     <div class="stat-grid">
       <a class="card stat-card accent-teal" routerLink="/sales/list">

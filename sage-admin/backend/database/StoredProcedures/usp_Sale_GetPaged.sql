@@ -4,7 +4,7 @@
 -- @Search is a ready LIKE pattern ('\' escape) matched against sale number, customer and product; @Status is Active / Cancelled / NULL.
 -- @SoldFrom / @SoldTo filter on the date the sale was recorded (UTC). @SortBy: soldAt, saleNumber, customer, product, saleAmount, renewalDate.
 -- @TotalSaleAmount and @TotalMargin cover the matching ACTIVE sales (cancelled sales are not counted).
--- Column order is the same as the API's single-sale query.
+-- Column order is the same as the API's single-sale query; the last column says whether a cancellation request is waiting.
 CREATE OR ALTER PROCEDURE dbo.usp_Sale_GetPaged
     @SalesUserId      BIGINT,
     @Scope            VARCHAR(10)      = 'mine',
@@ -50,7 +50,8 @@ BEGIN
            su.PublicId, CONCAT(su.FirstName, N' ', su.LastName),
            s.Quantity, s.UnitPrice, s.UnitCost, s.ListAmount, s.SaleAmount, s.DiscountAmount, s.CostAmount,
            s.DurationUnit, s.DurationCount, s.StartDate, s.RenewalDate, s.Status, s.Notes, s.CreatedAtUtc,
-           s.CancelledAtUtc, CASE WHEN cb.Id IS NULL THEN NULL ELSE CONCAT(cb.FirstName, N' ', cb.LastName) END, s.CancelReason
+           s.CancelledAtUtc, CASE WHEN cb.Id IS NULL THEN NULL ELSE CONCAT(cb.FirstName, N' ', cb.LastName) END, s.CancelReason,
+           CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.SaleCancelRequests r WHERE r.SaleId = s.Id AND r.Status = 'Pending') THEN 1 ELSE 0 END AS BIT)
     FROM dbo.Sales s
     JOIN dbo.Customers cu ON cu.Id = s.CustomerId
     JOIN dbo.ProductCategories c ON c.Id = s.CategoryId

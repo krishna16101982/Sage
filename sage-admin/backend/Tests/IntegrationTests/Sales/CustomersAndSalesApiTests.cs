@@ -136,7 +136,7 @@ public class CustomersAndSalesApiTests
         await SaleAsync(b, customer, plan, 1000m);
         await SaleAsync(m, customer, plan, 700m);      // the manager's own sale
         await SaleAsync(c, customer, plan, 500m);
-        await _fx.Db.ExecuteProcedureScalarAsync<int>("dbo.usp_Sale_Cancel", new[] { TestDb.P("@SalePublicId", a2), TestDb.P("@SalesUserId", a.Id), TestDb.P("@Reason", "test") });
+        await _fx.Db.ExecuteProcedureScalarAsync<int>("dbo.usp_Sale_Cancel", new[] { TestDb.P("@SalePublicId", a2), TestDb.P("@SalesUserId", m.Id), TestDb.P("@Reason", "test") });
 
         // One sales person
         var bySeller = await Call(HttpMethod.Get, $"/api/admin/sales?sellerId={a.PublicId}", token);

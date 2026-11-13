@@ -11,6 +11,7 @@ namespace SageUserApi.Models
         public Guid PublicId { get; set; }
         public string Role { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
+        public bool CanRequestCancellation { get; set; }
         public bool IsManager => Role == Globals.ApplicationDatabaseConstants.SalesRoles.SalesManager;
     }
 
@@ -98,6 +99,30 @@ namespace SageUserApi.Models
         public DateTime? CancelledAtUtc { get; set; }
         public string CancelledByName { get; set; }
         public string CancelReason { get; set; }
+        /// <summary>A cancellation request is waiting for the manager.</summary>
+        public bool HasPendingCancelRequest { get; set; }
+        /// <summary>Cancellation requests for this sale, newest first (single-sale view only).</summary>
+        public List<CancelRequestDto> CancelRequests { get; set; }
+    }
+
+    /// <summary>A sales person's request to cancel one of their sales, approved or rejected by their manager.</summary>
+    public class CancelRequestDto
+    {
+        public Guid Id { get; set; }
+        public Guid SaleId { get; set; }
+        public string SaleNumber { get; set; } = string.Empty;
+        public string CustomerName { get; set; } = string.Empty;
+        public string ProductName { get; set; } = string.Empty;
+        public decimal SaleAmount { get; set; }
+        public Guid RequestedById { get; set; }
+        public string RequestedByName { get; set; } = string.Empty;
+        public string Reason { get; set; } = string.Empty;
+        /// <summary>Pending, Approved or Rejected.</summary>
+        public string Status { get; set; } = string.Empty;
+        public DateTime RequestedAtUtc { get; set; }
+        public string DecidedByName { get; set; }
+        public DateTime? DecidedAtUtc { get; set; }
+        public string DecisionNote { get; set; }
     }
 
     /// <summary>A page of sales plus totals of the matching active sales.</summary>
@@ -114,5 +139,9 @@ namespace SageUserApi.Models
         public string Name { get; set; } = string.Empty;
         public string Username { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        /// <summary>May ask for their sales to be cancelled (the manager approves or rejects).</summary>
+        public bool CanRequestCancellation { get; set; }
+        /// <summary>Requests from this person waiting for the manager.</summary>
+        public int PendingRequests { get; set; }
     }
 }

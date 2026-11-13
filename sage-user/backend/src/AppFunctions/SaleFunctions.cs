@@ -35,7 +35,8 @@ namespace SageUserApi.AppFunctions
     su.PublicId, CONCAT(su.FirstName, N' ', su.LastName),
     s.Quantity, s.UnitPrice, s.UnitCost, s.ListAmount, s.SaleAmount, s.DiscountAmount, s.CostAmount,
     s.DurationUnit, s.DurationCount, s.StartDate, s.RenewalDate, s.Status, s.Notes, s.CreatedAtUtc,
-    s.CancelledAtUtc, CASE WHEN cb.Id IS NULL THEN NULL ELSE CONCAT(cb.FirstName, N' ', cb.LastName) END, s.CancelReason
+    s.CancelledAtUtc, CASE WHEN cb.Id IS NULL THEN NULL ELSE CONCAT(cb.FirstName, N' ', cb.LastName) END, s.CancelReason,
+    CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.SaleCancelRequests r WHERE r.SaleId = s.Id AND r.Status = 'Pending') THEN 1 ELSE 0 END AS BIT)
 FROM dbo.Sales s
 JOIN dbo.Customers cu ON cu.Id = s.CustomerId
 JOIN dbo.ProductCategories c ON c.Id = s.CategoryId
@@ -45,8 +46,22 @@ JOIN dbo.SalesUsers su ON su.Id = s.SalesUserId
 LEFT JOIN dbo.SalesUsers cb ON cb.Id = s.CancelledBySalesUserId
 WHERE s.PublicId = @id AND (s.SalesUserId = @u OR s.ManagerId = @u)";
 
-        private const string TeamSelect = @"SELECT PublicId, CONCAT(FirstName, N' ', LastName), Username, Status
-FROM dbo.SalesUsers WHERE ManagerId = @u AND IsDeleted = 0 ORDER BY FirstName, LastName";
+        private const string TeamSelect = @"SELECT u.PublicId, CONCAT(u.FirstName, N' ', u.LastName), u.Username, u.Status, u.CanRequestCancellation,
+    (SELECT COUNT(*) FROM dbo.SaleCancelRequests r JOIN dbo.Sales s ON s.Id = r.SaleId
+     WHERE r.RequestedBySalesUserId = u.Id AND r.Status = 'Pending' AND s.ManagerId = @u)
+FROM dbo.SalesUsers u WHERE u.ManagerId = @u AND u.IsDeleted = 0 ORDER BY u.FirstName, u.LastName";
+
+        /// <summary>Cancellation requests. The WHERE clause is added by the caller from fixed strings only.</summary>
+        private const string RequestSelect = @"SELECT TOP 200 r.PublicId, s.PublicId, s.SaleNumber, cu.Name, p.Name, s.SaleAmount,
+    rb.PublicId, CONCAT(rb.FirstName, N' ', rb.LastName), r.Reason, r.Status, r.RequestedAtUtc,
+    CASE WHEN db.Id IS NULL THEN NULL ELSE CONCAT(db.FirstName, N' ', db.LastName) END, r.DecidedAtUtc, r.DecisionNote
+FROM dbo.SaleCancelRequests r
+JOIN dbo.Sales s ON s.Id = r.SaleId
+JOIN dbo.Customers cu ON cu.Id = s.CustomerId
+JOIN dbo.Products p ON p.Id = s.ProductId
+JOIN dbo.SalesUsers rb ON rb.Id = r.RequestedBySalesUserId
+LEFT JOIN dbo.SalesUsers db ON db.Id = r.DecidedBySalesUserId
+WHERE (@status IS NULL OR r.Status = @status) AND ";
 
         private readonly ILoggerFunctions _loggerFunctions;
         private readonly IDatabaseFunctions _databaseFunctions;
@@ -101,7 +116,8 @@ FROM dbo.SalesUsers WHERE ManagerId = @u AND IsDeleted = 0 ORDER BY FirstName, L
                 CreatedAtUtc = Utc(r, 22).Value,
                 CancelledAtUtc = Utc(r, 23),
                 CancelledByName = S(r, 24),
-                CancelReason = S(r, 25)
+                CancelReason = S(r, 25),
+                HasPendingCancelRequest = r.GetBoolean(26)
             };
         }
 
@@ -111,8 +127,18 @@ FROM dbo.SalesUsers WHERE ManagerId = @u AND IsDeleted = 0 ORDER BY FirstName, L
         private static IFunctionReturn Invalid(List<string> _errors, string _methodName)
             => new FunctionReturn { Status = false, MessageType = Constants.ReturnMessageTypes.ValidationError, Message = _errors, HttpStatusCode = Constants.HttpStatusCodes.BadRequest, MethodName = _methodName };
 
-        private static IFunctionReturn ManagersOnly(string _methodName)
-            => FunctionReturn.Fail(Constants.ReturnMessageTypes.PermissionDenied, Msg.ManagersOnly, Constants.HttpStatusCodes.Forbidden, _methodName);
+        private static IFunctionReturn ManagersOnly(string _methodName, string _message = Msg.ManagersOnly)
+            => FunctionReturn.Fail(Constants.ReturnMessageTypes.PermissionDenied, _message, Constants.HttpStatusCodes.Forbidden, _methodName);
+
+        private static CancelRequestDto MapRequest(SqlDataReader r) => new CancelRequestDto
+        {
+            Id = r.GetGuid(0), SaleId = r.GetGuid(1), SaleNumber = r.GetString(2), CustomerName = r.GetString(3), ProductName = r.GetString(4),
+            SaleAmount = r.GetDecimal(5), RequestedById = r.GetGuid(6), RequestedByName = r.GetString(7), Reason = r.GetString(8), Status = r.GetString(9),
+            RequestedAtUtc = Utc(r, 10).Value, DecidedByName = S(r, 11), DecidedAtUtc = Utc(r, 12), DecisionNote = S(r, 13)
+        };
+
+        /// <summary>Reason / note text: trimmed, tags removed, at most 500 characters.</summary>
+        private static string CleanText(string _value) => string.IsNullOrWhiteSpace(_value) ? null : Sanitization.Sanitize(_value.Trim());
 
         #endregion
 
@@ -164,9 +190,10 @@ FROM dbo.SalesUsers WHERE ManagerId = @u AND IsDeleted = 0 ORDER BY FirstName, L
             try
             {
                 SaleDto _sale = await GetRowAsync(_id, _user.Id, _ct);
-                return _sale == null
-                    ? (null, ApplicationCommonFunctions.NotFound(Msg.SaleNotFound, _methodName))
-                    : (_sale, new FunctionReturn { MethodName = _methodName });
+                if (_sale == null) return (null, ApplicationCommonFunctions.NotFound(Msg.SaleNotFound, _methodName));
+                _sale.CancelRequests = (await _databaseFunctions.QueryAsync(RequestSelect + "s.PublicId = @sale ORDER BY r.RequestedAtUtc DESC", MapRequest,
+                    new[] { P("@status", null), P("@sale", _id) }, _ct)).ToList();
+                return (_sale, new FunctionReturn { MethodName = _methodName });
             }
             catch (Exception ex)
             {
@@ -229,11 +256,13 @@ FROM dbo.SalesUsers WHERE ManagerId = @u AND IsDeleted = 0 ORDER BY FirstName, L
             string _methodName = "F:Sale:CancelSale";
             try
             {
-                string _reason = string.IsNullOrWhiteSpace(_params?.Reason) ? null : Sanitization.Sanitize(_params.Reason.Trim());
+                // Sales persons ask their manager instead (CreateCancelRequestAsync).
+                if (!_user.IsManager) return (null, ManagersOnly(_methodName, Msg.ManagersOnlyCancel));
+                string _reason = CleanText(_params?.Reason);
                 if (string.IsNullOrEmpty(_reason) || _reason.Length > 500)
                     return (null, ApplicationCommonFunctions.BadRequest(Msg.CancelReasonRequired, _methodName));
 
-                // The procedure allows the seller and the seller's manager only (404 for anyone else).
+                // The procedure allows the sale's manager, or a manager for their own sale (404 for anyone else).
                 (IFunctionReturn _functionReturn, long _) = await _databaseFunctions.ExecuteProcedureWriteAsync(SP.SaleCancel, new[]
                 {
                     P("@SalePublicId", _id), P("@SalesUserId", _user.Id), P("@Reason", _reason)
@@ -258,9 +287,124 @@ FROM dbo.SalesUsers WHERE ManagerId = @u AND IsDeleted = 0 ORDER BY FirstName, L
             {
                 if (!_user.IsManager) return (null, ManagersOnly(_methodName));
                 var _members = await _databaseFunctions.QueryAsync(TeamSelect,
-                    r => new TeamMember { Id = r.GetGuid(0), Name = r.GetString(1), Username = r.GetString(2), Status = r.GetString(3) },
+                    r => new TeamMember { Id = r.GetGuid(0), Name = r.GetString(1), Username = r.GetString(2), Status = r.GetString(3), CanRequestCancellation = r.GetBoolean(4), PendingRequests = r.GetInt32(5) },
                     new[] { P("@u", _user.Id) }, _ct);
                 return (_members.ToList(), new FunctionReturn { MethodName = _methodName });
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
+
+        public async Task<(CancelRequestDto request, IFunctionReturn functionReturn)> CreateCancelRequestAsync(Guid _saleId, HttpSaleCancelParams _params, SalesUserContext _user, string _ipAddress, CancellationToken _ct = default)
+        {
+            string _methodName = "F:Sale:CreateCancelRequest";
+            try
+            {
+                if (_user.IsManager) return (null, ApplicationCommonFunctions.BadRequest("Managers cancel sales directly.", _methodName));
+                if (!_user.CanRequestCancellation) return (null, ManagersOnly(_methodName, Msg.RequestNotAllowed));
+                string _reason = CleanText(_params?.Reason);
+                if (string.IsNullOrEmpty(_reason) || _reason.Length > 500) return (null, ApplicationCommonFunctions.BadRequest(Msg.ReasonRequired, _methodName));
+
+                Guid _requestId;
+                try
+                {
+                    _requestId = await _databaseFunctions.ExecuteProcedureScalarAsync<Guid>(SP.SaleCancelRequestCreate, new[]
+                    {
+                        P("@SalePublicId", _saleId), P("@SalesUserId", _user.Id), P("@Reason", _reason)
+                    }, _ct);
+                }
+                catch (AppException ex)
+                {
+                    return (null, FunctionReturn.Fail(ex.MessageType, ex.Message, ex.HttpStatusCode, _methodName));
+                }
+
+                CancelRequestDto _request = await _databaseFunctions.QuerySingleOrDefaultAsync(RequestSelect + "r.PublicId = @id", MapRequest,
+                    new[] { P("@status", null), P("@id", _requestId) }, _ct);
+                await SalesAudit.LogAsync(_databaseFunctions, _loggerFunctions, "CancelRequest", "Sale", _saleId, _user, new { _request.SaleNumber, Reason = _reason }, _ipAddress, _ct);
+                return (_request, new FunctionReturn { MethodName = _methodName, HttpStatusCode = Constants.HttpStatusCodes.Created, Message = new List<string> { Msg.CancelRequested } });
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
+
+        public async Task<(List<CancelRequestDto> requests, IFunctionReturn functionReturn)> GetCancelRequestsAsync(string _status, SalesUserContext _user, CancellationToken _ct = default)
+        {
+            string _methodName = "F:Sale:GetCancelRequests";
+            try
+            {
+                string _filter = _status == "Pending" || _status == "Approved" || _status == "Rejected" ? _status : null;
+                // A manager sees the requests on their team's sales; a sales person sees their own requests.
+                string _scope = _user.IsManager ? "s.ManagerId = @u" : "r.RequestedBySalesUserId = @u";
+                var _requests = await _databaseFunctions.QueryAsync(RequestSelect + _scope + " ORDER BY CASE WHEN r.Status = 'Pending' THEN 0 ELSE 1 END, r.RequestedAtUtc DESC",
+                    MapRequest, new[] { P("@status", _filter), P("@u", _user.Id) }, _ct);
+                return (_requests.ToList(), new FunctionReturn { MethodName = _methodName });
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
+
+        public async Task<(CancelRequestDto request, IFunctionReturn functionReturn)> DecideCancelRequestAsync(Guid _requestId, bool _approve, HttpCancelDecisionParams _params, SalesUserContext _user, string _ipAddress, CancellationToken _ct = default)
+        {
+            string _methodName = "F:Sale:DecideCancelRequest";
+            try
+            {
+                if (!_user.IsManager) return (null, ManagersOnly(_methodName, Msg.ManagersOnlyTeam));
+                string _note = CleanText(_params?.Note);
+                if (_note != null && _note.Length > 500) return (null, ApplicationCommonFunctions.BadRequest(Msg.NoteTooLong, _methodName));
+
+                Guid _saleId;
+                try
+                {
+                    _saleId = await _databaseFunctions.ExecuteProcedureScalarAsync<Guid>(SP.SaleCancelRequestDecide, new[]
+                    {
+                        P("@RequestPublicId", _requestId), P("@ManagerId", _user.Id), P("@Approve", _approve), P("@Note", _note)
+                    }, _ct);
+                }
+                catch (AppException ex)
+                {
+                    return (null, FunctionReturn.Fail(ex.MessageType, ex.Message, ex.HttpStatusCode, _methodName));
+                }
+
+                CancelRequestDto _request = await _databaseFunctions.QuerySingleOrDefaultAsync(RequestSelect + "r.PublicId = @id", MapRequest,
+                    new[] { P("@status", null), P("@id", _requestId) }, _ct);
+                await SalesAudit.LogAsync(_databaseFunctions, _loggerFunctions, _approve ? "CancelRequestApprove" : "CancelRequestReject", "Sale", _saleId, _user,
+                    new { _request.SaleNumber, _request.RequestedByName, _request.Reason, Note = _note }, _ipAddress, _ct);
+                return (_request, new FunctionReturn { MethodName = _methodName, Message = new List<string> { _approve ? Msg.RequestApproved : Msg.RequestRejected } });
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
+
+        public async Task<(TeamMember member, IFunctionReturn functionReturn)> SetCancelPermissionAsync(Guid _memberId, HttpCancelPermissionParams _params, SalesUserContext _user, string _ipAddress, CancellationToken _ct = default)
+        {
+            string _methodName = "F:Sale:SetCancelPermission";
+            try
+            {
+                if (!_user.IsManager) return (null, ManagersOnly(_methodName, Msg.ManagersOnlyTeam));
+                bool _allowed = _params?.CanRequestCancellation ?? false;
+                (IFunctionReturn _functionReturn, long _) = await _databaseFunctions.ExecuteProcedureWriteAsync(SP.SalesUserSetCancelPermission, new[]
+                {
+                    P("@ManagerId", _user.Id), P("@MemberPublicId", _memberId), P("@CanRequestCancellation", _allowed)
+                }, _methodName, null, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+
+                TeamMember _member = (await _databaseFunctions.QueryAsync(TeamSelect,
+                    r => new TeamMember { Id = r.GetGuid(0), Name = r.GetString(1), Username = r.GetString(2), Status = r.GetString(3), CanRequestCancellation = r.GetBoolean(4), PendingRequests = r.GetInt32(5) },
+                    new[] { P("@u", _user.Id) }, _ct)).FirstOrDefault(m => m.Id == _memberId);
+                await SalesAudit.LogAsync(_databaseFunctions, _loggerFunctions, "CancelPermission", "SalesUser", _memberId, _user, new { CanRequestCancellation = _allowed }, _ipAddress, _ct);
+                return (_member, new FunctionReturn { MethodName = _methodName, Message = new List<string> { Msg.PermissionSaved } });
             }
             catch (Exception ex)
             {

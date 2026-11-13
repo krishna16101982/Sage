@@ -32,6 +32,8 @@ export class Home implements OnInit {
   readonly team = signal<SalesPage | null>(null);
   readonly recent = signal<Sale[]>([]);
   readonly customerCount = signal<number | null>(null);
+  /** Managers: cancellation requests from the team waiting for a decision. */
+  readonly pendingRequests = signal(0);
   readonly error = signal<string | null>(null);
 
   readonly countChange = computed(() => percentChange(this.mine()?.totalCount ?? 0, this.mineLast()?.totalCount ?? 0));
@@ -73,6 +75,7 @@ export class Home implements OnInit {
     ];
     if (this.auth.isManager()) {
       jobs.push(this.sales.list({ scope: 'team', soldFrom: month.from, soldTo: month.to, status: 'Active', pageSize: 1 }).then((p) => this.team.set(p)));
+      jobs.push(this.sales.cancelRequests('Pending').then((r) => this.pendingRequests.set(r.length)));
     }
     const results = await Promise.allSettled(jobs);
     if (results.some((r) => r.status === 'rejected')) this.error.set('Some figures could not be loaded. Refresh the page to try again.');

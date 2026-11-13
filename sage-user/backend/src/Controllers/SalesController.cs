@@ -55,11 +55,52 @@ namespace SageUserApi.Controllers
             return Result(_sale, _fr);
         }, _ct);
 
+        /// <summary>Cancel a sale directly: sales managers only (their own sales and their team's).</summary>
         [HttpPost("{id:guid}/cancel")]
         public Task<IActionResult> CancelSale(Guid id, [FromBody] HttpSaleCancelParams _params, CancellationToken _ct) => WithUserAsync("C:Sales:CancelSale", async _user =>
         {
             var (_sale, _fr) = await _saleFunctions.CancelSaleAsync(id, _params, _user, ClientIp, _ct);
             return Result(_sale, _fr);
+        }, _ct);
+
+        /// <summary>A sales person asks their manager to cancel one of their own sales (only when the manager allowed it).</summary>
+        [HttpPost("{id:guid}/cancel-request")]
+        public Task<IActionResult> RequestCancel(Guid id, [FromBody] HttpSaleCancelParams _params, CancellationToken _ct) => WithUserAsync("C:Sales:RequestCancel", async _user =>
+        {
+            var (_request, _fr) = await _saleFunctions.CreateCancelRequestAsync(id, _params, _user, ClientIp, _ct);
+            return Result(_request, _fr);
+        }, _ct);
+
+        /// <summary>Cancellation requests: a manager sees their team's, a sales person their own. status=Pending|Approved|Rejected.</summary>
+        [HttpGet("cancel-requests")]
+        public Task<IActionResult> GetCancelRequests([FromQuery] string status, CancellationToken _ct) => WithUserAsync("C:Sales:GetCancelRequests", async _user =>
+        {
+            var (_requests, _fr) = await _saleFunctions.GetCancelRequestsAsync(status, _user, _ct);
+            return Result(_requests, _fr);
+        }, _ct);
+
+        /// <summary>The manager approves a request: the sale is cancelled.</summary>
+        [HttpPost("cancel-requests/{id:guid}/approve")]
+        public Task<IActionResult> ApproveCancel(Guid id, [FromBody] HttpCancelDecisionParams _params, CancellationToken _ct) => WithUserAsync("C:Sales:ApproveCancel", async _user =>
+        {
+            var (_request, _fr) = await _saleFunctions.DecideCancelRequestAsync(id, true, _params, _user, ClientIp, _ct);
+            return Result(_request, _fr);
+        }, _ct);
+
+        /// <summary>The manager rejects a request: the sale stays active.</summary>
+        [HttpPost("cancel-requests/{id:guid}/reject")]
+        public Task<IActionResult> RejectCancel(Guid id, [FromBody] HttpCancelDecisionParams _params, CancellationToken _ct) => WithUserAsync("C:Sales:RejectCancel", async _user =>
+        {
+            var (_request, _fr) = await _saleFunctions.DecideCancelRequestAsync(id, false, _params, _user, ClientIp, _ct);
+            return Result(_request, _fr);
+        }, _ct);
+
+        /// <summary>The manager allows (or stops) a team member asking for cancellations.</summary>
+        [HttpPut("team-members/{id:guid}/cancel-permission")]
+        public Task<IActionResult> SetCancelPermission(Guid id, [FromBody] HttpCancelPermissionParams _params, CancellationToken _ct) => WithUserAsync("C:Sales:SetCancelPermission", async _user =>
+        {
+            var (_member, _fr) = await _saleFunctions.SetCancelPermissionAsync(id, _params, _user, ClientIp, _ct);
+            return Result(_member, _fr);
         }, _ct);
     }
 }

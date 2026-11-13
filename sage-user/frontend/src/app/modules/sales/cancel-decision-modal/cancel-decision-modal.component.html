@@ -1,0 +1,24 @@
+<app-modal [title]="(approve() ? 'Approve' : 'Reject') + ' cancellation of ' + request().saleNumber" (closed)="closed.emit()">
+  <form class="form" (ngSubmit)="submit()">
+    @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+    <div class="card"><div class="card-body stack-xs text-sm">
+      <div><span class="text-muted">Requested by</span> <span class="font-medium">{{ request().requestedByName }}</span></div>
+      <div><span class="text-muted">Sale</span> {{ request().customerName }} · {{ request().productName }} · {{ inr(request().saleAmount) }}</div>
+      <div><span class="text-muted">Reason</span> {{ request().reason }}</div>
+    </div></div>
+    @if (approve()) {
+      <p class="text-sm">The sale will be <strong>cancelled</strong> with this reason and no longer count in the totals. This cannot be undone.</p>
+    } @else {
+      <p class="text-sm">The sale stays active. {{ request().requestedByName }} sees your note.</p>
+    }
+    <label class="field-label">Note to {{ request().requestedByName }} (optional)
+      <textarea class="field" name="note" rows="2" maxlength="500" [(ngModel)]="note"></textarea>
+    </label>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closed.emit()">Back</button>
+      <button type="submit" [class]="approve() ? 'btn btn-danger' : 'btn btn-primary'" [disabled]="busy()">
+        {{ busy() ? 'Please wait...' : approve() ? 'Approve and cancel the sale' : 'Reject the request' }}
+      </button>
+    </div>
+  </form>
+</app-modal>

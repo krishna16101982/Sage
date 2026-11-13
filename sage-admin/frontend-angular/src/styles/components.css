@@ -318,6 +318,16 @@
   .field-inline { width: auto; }   /* filters in a toolbar */
 
   .checkbox-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
+
+  /* On/off switch: <label class="switch"><input type="checkbox"><span class="switch-track"></span> text</label> */
+  .switch { position: relative; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+  .switch input { position: absolute; top: 0; left: 0; opacity: 0; width: 1px; height: 1px; margin: 0; }
+  .switch-track { position: relative; width: 2.25rem; height: 1.25rem; flex-shrink: 0; border-radius: 999px; background: var(--color-border-input); transition: background-color 0.15s ease; }
+  .switch-track::after { content: ""; position: absolute; top: 0.125rem; left: 0.125rem; width: 1rem; height: 1rem; border-radius: 999px; background: #ffffff; box-shadow: 0 1px 2px rgb(0 0 0 / 0.2); transition: transform 0.15s ease; }
+  .switch input:checked + .switch-track { background: var(--color-primary); }
+  .switch input:checked + .switch-track::after { transform: translateX(1rem); }
+  .switch input:focus-visible + .switch-track { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+  .switch input:disabled + .switch-track { opacity: 0.5; }
   input[type="checkbox"], input[type="radio"] { accent-color: var(--color-primary); }
 
   /* =================================================================================================

@@ -11,6 +11,8 @@ export interface CurrentUser {
   /** The sales person's manager; null for a manager. */
   managerName: string | null;
   mustChangePassword: boolean;
+  /** A sales person whose manager lets them ask for sales to be cancelled (managers cancel directly). */
+  canRequestCancellation: boolean;
 }
 
 /** Body of POST /api/user/auth/login and /refresh-token. The refresh token is an HttpOnly cookie, not in the body. */

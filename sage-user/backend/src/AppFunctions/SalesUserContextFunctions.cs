@@ -21,8 +21,8 @@ namespace SageUserApi.AppFunctions
 
         public Task<SalesUserContext> GetAsync(Guid _publicId, CancellationToken _ct = default)
             => _databaseFunctions.QuerySingleOrDefaultAsync(
-                "SELECT Id, PublicId, Role, CONCAT(FirstName, N' ', LastName) FROM dbo.SalesUsers WHERE PublicId = @p AND IsDeleted = 0 AND Status = 'Active'",
-                r => new SalesUserContext { Id = r.GetInt64(0), PublicId = r.GetGuid(1), Role = r.GetString(2), Name = r.GetString(3) },
+                "SELECT Id, PublicId, Role, CONCAT(FirstName, N' ', LastName), CanRequestCancellation FROM dbo.SalesUsers WHERE PublicId = @p AND IsDeleted = 0 AND Status = 'Active'",
+                r => new SalesUserContext { Id = r.GetInt64(0), PublicId = r.GetGuid(1), Role = r.GetString(2), Name = r.GetString(3), CanRequestCancellation = r.GetBoolean(4) },
                 new[] { new SqlParameter("@p", _publicId) }, _ct);
     }
 

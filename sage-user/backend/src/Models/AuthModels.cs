@@ -31,6 +31,7 @@ namespace SageUserApi.Models
         public DateTime? LockoutEndUtc { get; set; }
         public int PermissionVersion { get; set; }
         public string ManagerName { get; set; }
+        public bool CanRequestCancellation { get; set; }
     }
 
     /// <summary>The signed-in sales user as the User Panel sees it.</summary>
@@ -48,6 +49,8 @@ namespace SageUserApi.Models
         /// <summary>The sales person's manager (null for a manager).</summary>
         public string ManagerName { get; set; }
         public bool MustChangePassword { get; set; }
+        /// <summary>A sales person whose manager allows them to ask for sales to be cancelled (managers cancel directly).</summary>
+        public bool CanRequestCancellation { get; set; }
     }
 
     /// <summary>Body of login and refresh responses. The refresh token is NOT in the body; it is an HttpOnly cookie.</summary>

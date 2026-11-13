@@ -58,6 +58,7 @@
             <td class="date">{{ date(s.renewalDate) }}</td>
             <td>
               @if (s.status === 'Cancelled') { <span class="badge badge-danger">Cancelled</span> } @else { <span class="badge badge-success">Active</span> }
+              @if (s.hasPendingCancelRequest) { <span class="badge badge-warning" title="Cancellation requested">Cancel requested</span> }
             </td>
           </tr>
         } @empty {

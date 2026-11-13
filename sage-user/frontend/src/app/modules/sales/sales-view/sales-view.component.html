@@ -5,9 +5,13 @@
       <h1 class="page-title">Sale {{ sale()?.saleNumber ?? '' }}</h1>
       @if (sale(); as s) {
         @if (s.status === 'Cancelled') { <span class="badge badge-danger">Cancelled</span> } @else { <span class="badge badge-success">Active</span> }
+        @if (s.hasPendingCancelRequest) { <span class="badge badge-warning">Cancellation requested</span> }
         <div class="spacer"></div>
-        @if (s.status === 'Active') {
-          <button type="button" class="btn btn-danger" (click)="cancelling.set(true)">Cancel sale</button>
+        @if (canCancel()) {
+          <button type="button" class="btn btn-danger" (click)="dialog.set('cancel')">Cancel sale</button>
+        }
+        @if (canRequest()) {
+          <button type="button" class="btn btn-secondary" (click)="dialog.set('request')">Request cancellation</button>
         }
       }
     </div>
@@ -18,6 +22,33 @@
   @if (!sale() && !error()) { <p class="text-sm text-muted">Loading...</p> }
 
   @if (sale(); as s) {
+    <!-- Cancellation request waiting: the manager decides; the sales person waits. -->
+    @if (pendingRequest(); as r) {
+      <section class="card accent-orange">
+        <div class="card-body stack-sm">
+          <div class="row-tight">
+            <span class="stat-icon" style="width: 2rem; height: 2rem">!</span>
+            <div class="stack-xs" style="flex: 1">
+              <span class="font-semibold">{{ isMine() ? 'You asked to cancel this sale' : r.requestedByName + ' asked to cancel this sale' }}</span>
+              <span class="hint">{{ dateTime(r.requestedAtUtc) }} · Reason: {{ r.reason }}</span>
+            </div>
+          </div>
+          @if (canDecide()) {
+            <div class="row">
+              <button type="button" class="btn btn-danger" (click)="deciding.set({ request: r, approve: true })">Approve and cancel</button>
+              <button type="button" class="btn btn-secondary" (click)="deciding.set({ request: r, approve: false })">Reject</button>
+            </div>
+          } @else {
+            <p class="text-sm text-muted">Waiting for your manager to approve or reject it. The sale stays active until then.</p>
+          }
+        </div>
+      </section>
+    } @else if (latestRequest()?.status === 'Rejected' && isMine() && s.status === 'Active') {
+      <app-alert kind="error">
+        Your cancellation request was rejected{{ latestRequest()!.decidedByName ? ' by ' + latestRequest()!.decidedByName : '' }}{{ latestRequest()!.decisionNote ? ': ' + latestRequest()!.decisionNote : '.' }}
+      </app-alert>
+    }
+
     @if (s.status === 'Cancelled') {
       <app-alert kind="error">
         Cancelled {{ dateTime(s.cancelledAtUtc) }}{{ s.cancelledByName ? ' by ' + s.cancelledByName : '' }}: {{ s.cancelReason }}
@@ -62,8 +93,11 @@
       </div>
     </section>
 
-    @if (cancelling()) {
-      <app-sales-cancel-modal [sale]="s" (closed)="cancelling.set(false)" (cancelled)="onCancelled($event)" />
+    @if (dialog(); as mode) {
+      <app-sales-cancel-modal [sale]="s" [mode]="mode" (closed)="dialog.set(null)" (done)="finished($event)" />
+    }
+    @if (deciding(); as d) {
+      <app-cancel-decision-modal [request]="d.request" [approve]="d.approve" (closed)="deciding.set(null)" (decided)="finished($event)" />
     }
   }
 </div>

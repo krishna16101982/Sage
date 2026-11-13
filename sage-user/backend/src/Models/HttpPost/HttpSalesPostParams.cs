@@ -35,10 +35,22 @@ namespace SageUserApi.Models.HttpPost
         public string Notes { get; set; }
     }
 
-    /// <summary>Body of POST api/user/sales/{id}/cancel.</summary>
+    /// <summary>Body of POST api/user/sales/{id}/cancel (managers) and POST api/user/sales/{id}/cancel-request (sales persons).</summary>
     public class HttpSaleCancelParams
     {
         public string Reason { get; set; } = string.Empty;
+    }
+
+    /// <summary>Body of POST api/user/sales/cancel-requests/{id}/approve and /reject (optional note to the sales person).</summary>
+    public class HttpCancelDecisionParams
+    {
+        public string Note { get; set; }
+    }
+
+    /// <summary>Body of PUT api/user/sales/team-members/{id}/cancel-permission.</summary>
+    public class HttpCancelPermissionParams
+    {
+        public bool CanRequestCancellation { get; set; }
     }
 }
 
