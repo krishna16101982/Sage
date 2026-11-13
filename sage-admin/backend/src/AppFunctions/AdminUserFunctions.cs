@@ -318,5 +318,78 @@ WHERE u.PublicId = @id AND u.IsDeleted = 0";
                 return ApplicationCommonFunctions.SystemError(_methodName);
             }
         }
+
+        public async Task<(ProfileDto profile, IFunctionReturn functionReturn)> GetProfileAsync(Guid _id, CancellationToken _ct = default)
+        {
+            string _methodName = "F:AdminUser:GetProfile";
+            try
+            {
+                AdminUserDto _user = await GetRowAsync(_id, _ct);
+                if (_user == null) return (null, ApplicationCommonFunctions.NotFound(ApplicationConstants.ValidationMessages.AdminUserNotFound, _methodName));
+
+                DateTime _passwordUpdated = await _databaseFunctions.QuerySingleOrDefaultAsync(
+                    "SELECT PasswordUpdatedAtUtc FROM dbo.AdminUsers WHERE PublicId = @id", r => DateTime.SpecifyKind(r.GetDateTime(0), DateTimeKind.Utc), new[] { P("@id", _id) }, _ct);
+                var _activity = await _databaseFunctions.QueryAsync(@"SELECT TOP (10) a.Id, a.Action, a.EntityType, a.EntityId, a.CreatedAtUtc
+FROM dbo.AuditLogs a JOIN dbo.AdminUsers u ON u.Id = a.ActorUserId
+WHERE u.PublicId = @id ORDER BY a.Id DESC",
+                    r => new ProfileActivity
+                    {
+                        Id = r.GetInt64(0),
+                        Action = r.GetString(1),
+                        EntityType = r.GetString(2),
+                        EntityId = r.IsDBNull(3) ? null : r.GetString(3),
+                        CreatedAtUtc = DateTime.SpecifyKind(r.GetDateTime(4), DateTimeKind.Utc)
+                    }, new[] { P("@id", _id) }, _ct);
+
+                return (new ProfileDto
+                {
+                    Id = _user.Id, FirstName = _user.FirstName, LastName = _user.LastName, Username = _user.Username, Email = _user.Email,
+                    MobileNumber = _user.MobileNumber, Status = _user.Status, IsSuperAdmin = _user.IsSuperAdmin, GroupId = _user.GroupId,
+                    GroupName = _user.GroupName, GroupIsActive = _user.GroupIsActive, MustChangePassword = _user.MustChangePassword,
+                    IsLockedOut = _user.IsLockedOut, LastLoginAtUtc = _user.LastLoginAtUtc, CreatedAtUtc = _user.CreatedAtUtc,
+                    PasswordUpdatedAtUtc = _passwordUpdated, RecentActivity = _activity.ToList()
+                }, new FunctionReturn { MethodName = _methodName });
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
+
+        /// <summary>The signed-in admin changes their own name and mobile number (email, group and status stay as they are).</summary>
+        public async Task<(ProfileDto profile, IFunctionReturn functionReturn)> UpdateProfileAsync(Guid _id, HttpProfilePutParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default)
+        {
+            #region Local Variables
+            string _methodName = "F:AdminUser:UpdateProfile";
+            IFunctionReturn _functionReturn;
+            #endregion
+            try
+            {
+                AdminUserDto _existing = await GetRowAsync(_id, _ct);
+                if (_existing == null) return (null, ApplicationCommonFunctions.NotFound(ApplicationConstants.ValidationMessages.AdminUserNotFound, _methodName));
+
+                _functionReturn = ApplicationValidationFunctions.ValidateAdminUser(_params?.FirstName, _params?.LastName, null, false, _existing.Email,
+                    _params?.MobileNumber?.Trim(), _methodName);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+
+                (_functionReturn, _) = await _databaseFunctions.ExecuteProcedureWriteAsync(SP.AdminUserUpdateProfile, new[]
+                {
+                    P("@PublicId", _id), P("@FirstName", Clean(_params.FirstName)), P("@LastName", Clean(_params.LastName)), P("@MobileNumber", Clean(_params.MobileNumber))
+                }, _methodName, null, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+
+                AdminUserDto _updated = await GetRowAsync(_id, _ct);
+                await AuditAsync(_actorUserId, ApplicationEnumeration.AuditAction.UpdateProfile, _id, Snapshot(_existing), Snapshot(_updated), _ipAddress, _ct);
+                (ProfileDto _profile, IFunctionReturn _read) = await GetProfileAsync(_id, _ct);
+                if (!_read.Status) return (null, _read);
+                return (_profile, Ok(_methodName, "Your profile has been saved."));
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
     }
 }

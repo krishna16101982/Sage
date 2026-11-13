@@ -32,15 +32,15 @@ src/
   app/
     app.routes.ts               top level: LoginLayout (sign-in pages) and PrimaryLayout (signed-in area)
     app.config.ts
-    component/                  shared UI: alert, modal, pagination, sort-header, page-header,
-                                coming-soon, reset-password-form
+    component/                  shared UI: alert, modal, pagination, sort-header, page-header, icon, bar-chart,
+                                reset-password-form
     directives/                 can.directive.ts  (*appCan="perm.X" hides UI the user may not use)
     services/
-      rest/global-rest-service.ts   every API call (token in memory, silent refresh, error envelope)
+      rest/global-rest-service.ts   every API call (token in memory, silent refresh, error envelope) and download() for CSV files
       auth/                     auth.service.ts (signed-in user), auth.guard.ts (authGuard, guestGuard)
       permission/               permission.service.ts (has / hasAll), permission.guard.ts (route data.access_perms)
       message/                  message.service.ts (success notice carried from Add/Edit back to the list)
-      admin-users/ sales-users/ groups/ permissions/ products/ customers/ sales/   one service per API area
+      admin-users/ sales-users/ groups/ permissions/ products/ customers/ sales/ profile/   one service per API area
     shared/
       interfaces/               API types (*.interface.ts)
       enumarations/             permission-codes.ts (Perm)
@@ -49,6 +49,7 @@ src/
       layout/                   primary-layout, primary-header, primary-navigation (sidebar built from the API's menu)
       login/                    login-layout, login-prompt, forgot-password, reset-password
       changepassword/
+      profile/                  My Profile (/profile): details, name and mobile, password, permissions, recent activity
       dashboard/
       admin-users/              admin-users.routes.ts
         admin-users-list/       list page  + admin-users-filter/
@@ -62,7 +63,7 @@ src/
                                 products add/edit/form, product-plans add/edit/form
       customers/                customers-list (+ customers-filter), customers-add, customers-edit, customers-form
       sales/                    sales-list (+ sales-filter: sales person / manager team / status / dates), sales-summary
-                                (by sales person or by manager), sales-view (one sale), sales-tabs
+                                (by sales person or by manager), sales-view (one sale), sales-tabs; both lists have Export CSV
 ```
 
 Every component is a `.ts` file (logic) with a matching `.html` file (markup) beside it. Pages use the class names from `src/styles/` in their `.html`; there are no per-component CSS files.

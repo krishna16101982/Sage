@@ -15,7 +15,8 @@ namespace SageAdminApi.Globals
             Product,
             ProductPlan,
             SalesUser,
-            Customer
+            Customer,
+            Sale
         }
 
         public enum AuditAction
@@ -30,7 +31,9 @@ namespace SageAdminApi.Globals
             LoginFailed,
             Logout,
             PasswordChange,
-            PasswordReset
+            PasswordReset,
+            UpdateProfile,
+            Export
         }
     }
 }

@@ -1,0 +1,120 @@
+<div class="stack max-w-3xl">
+  <div class="page-header">
+    <div class="stack-xs">
+      <span class="page-eyebrow">Account</span>
+      <h1 class="page-title">My profile</h1>
+    </div>
+  </div>
+
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (!profile() && !error()) { <p class="text-sm text-muted">Loading...</p> }
+
+  @if (profile(); as p) {
+    <!-- Who -->
+    <section class="card">
+      <div class="card-body">
+        <div class="row" style="align-items: center">
+          <span class="avatar avatar-lg" aria-hidden="true">{{ initials() }}</span>
+          <div class="stack-xs" style="min-width: 0">
+            <span class="section-title">{{ p.firstName }} {{ p.lastName }}</span>
+            <span class="text-sm text-muted">{{ p.username }} · {{ p.email }}</span>
+            <span class="row-tight">
+              @if (p.isSuperAdmin) {
+                <span class="badge badge-warning">Super Admin</span>
+              } @else if (p.groupName) {
+                <span class="badge" [class.badge-success]="p.groupIsActive" [title]="p.groupIsActive ? 'Permission group' : 'This group is turned off, so it gives no permissions'">
+                  {{ p.groupName }}{{ p.groupIsActive ? '' : ' (off)' }}
+                </span>
+              } @else {
+                <span class="badge">No group</span>
+              }
+              <span class="badge" [class.badge-success]="p.status === 'Active'">{{ p.status }}</span>
+            </span>
+          </div>
+        </div>
+        <div class="form-grid-2 text-sm" style="margin-top: 1rem">
+          <div><span class="text-muted">Last sign-in</span><div>{{ dateTime(p.lastLoginAtUtc) }}</div></div>
+          <div><span class="text-muted">Account created</span><div>{{ dateTime(p.createdAtUtc) }}</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Your details -->
+    <section class="card">
+      <header class="card-header"><h2 class="section-title">Your details</h2></header>
+      <form class="card-body stack-sm" (ngSubmit)="save()">
+        @if (saveError()) { <app-alert kind="error">{{ saveError() }}</app-alert> }
+        @if (notice()) { <app-alert kind="success">{{ notice() }}</app-alert> }
+        <div class="form-grid-2">
+          <label class="field-label">First name
+            <input class="field" name="firstName" maxlength="100" required autocomplete="given-name" [(ngModel)]="firstName" />
+          </label>
+          <label class="field-label">Last name
+            <input class="field" name="lastName" maxlength="100" required autocomplete="family-name" [(ngModel)]="lastName" />
+          </label>
+          <label class="field-label">Mobile number (optional)
+            <input class="field" name="mobileNumber" type="tel" maxlength="20" autocomplete="tel" placeholder="+91 98765 43210" [(ngModel)]="mobileNumber" />
+          </label>
+          <label class="field-label">Email
+            <input class="field" name="email" type="email" [value]="p.email" disabled />
+          </label>
+        </div>
+        <p class="hint">Your username, email, group and status are changed by an administrator (Admin Users).</p>
+        <div class="row">
+          <button type="submit" class="btn btn-primary" [disabled]="busy() || !changed()">{{ busy() ? 'Saving...' : 'Save' }}</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Password -->
+    <section class="card">
+      <header class="card-header"><h2 class="section-title">Password</h2></header>
+      <div class="card-body row" style="align-items: center">
+        <p class="text-sm" style="flex: 1 1 18rem; margin: 0">
+          Last changed {{ dateTime(p.passwordUpdatedAtUtc) }}. Changing it signs you out everywhere, so you sign in again with the new one.
+        </p>
+        <a class="btn btn-secondary" routerLink="/change-password">Change password</a>
+      </div>
+    </section>
+
+    <!-- What you can do -->
+    <section class="card">
+      <header class="card-header"><h2 class="section-title">What you can do</h2></header>
+      @if (p.isSuperAdmin) {
+        <div class="card-body text-sm">As a Super Admin you can do everything in the Admin Panel.</div>
+      } @else if (access().length === 0) {
+        <div class="card-body text-sm">You have no permissions yet. Ask an administrator to put you in a permission group.</div>
+      } @else {
+        <ul class="card-list">
+          @for (a of access(); track a.name) {
+            <li class="row" style="justify-content: space-between">
+              <span class="font-medium">{{ a.name }}</span>
+              <span class="text-muted">{{ a.actions }}</span>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+
+    <!-- Recent activity -->
+    <section class="card">
+      <header class="card-header"><h2 class="section-title">Your recent activity</h2></header>
+      @if (p.recentActivity.length === 0) {
+        <div class="card-body text-sm text-muted">Nothing yet.</div>
+      } @else {
+        <ul class="card-list">
+          @for (a of p.recentActivity; track a.id) {
+            <li class="row" style="justify-content: space-between">
+              @if (canSeeAudit) {
+                <a class="link-button" [routerLink]="['/audit-logs', a.id]">{{ describe(a) }}</a>
+              } @else {
+                <span>{{ describe(a) }}</span>
+              }
+              <span class="text-muted">{{ dateTime(a.createdAtUtc) }}</span>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+</div>

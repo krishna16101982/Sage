@@ -63,6 +63,9 @@ namespace SageAdminApi.AppFunctions.Interfaces
         Task<(AdminUserDto user, IFunctionReturn functionReturn)> UpdateAdminUserAsync(Guid _id, HttpAdminUserPutParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
         Task<(AdminUserDto user, IFunctionReturn functionReturn)> SetStatusAsync(Guid _id, HttpUserStatusParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
         Task<IFunctionReturn> ResetPasswordAsync(Guid _id, HttpSalesUserPasswordParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
+        /// <summary>My Profile: the signed-in admin (by PublicId) with recent activity.</summary>
+        Task<(ProfileDto profile, IFunctionReturn functionReturn)> GetProfileAsync(Guid _id, CancellationToken _ct = default);
+        Task<(ProfileDto profile, IFunctionReturn functionReturn)> UpdateProfileAsync(Guid _id, HttpProfilePutParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
     }
 
     public interface IAuthorizationFunctions

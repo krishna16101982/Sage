@@ -31,4 +31,12 @@ namespace SageAdminApi.Models.HttpPost
         /// <summary>Active or Inactive.</summary>
         public string Status { get; set; } = string.Empty;
     }
+
+    /// <summary>PUT api/admin/profile: the signed-in admin's own name and mobile number (email, group and status are changed by an administrator).</summary>
+    public class HttpProfilePutParams
+    {
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string MobileNumber { get; set; }
+    }
 }

@@ -3,7 +3,6 @@ import { LoginLayout } from './modules/login/login-layout/login-layout';
 import { PrimaryLayout } from './modules/layout/primary-layout/primary-layout';
 import { authGuard, guestGuard } from './services/auth/auth.guard';
 
-const comingSoon = () => import('./component/coming-soon/coming-soon').then((m) => m.ComingSoon);
 
 /**
  * Top-level routes. Sign-in pages sit inside LoginLayout (centred card); admin screens sit inside PrimaryLayout
@@ -40,7 +39,7 @@ export const routes: Routes = [
       { path: 'sales', loadChildren: () => import('./modules/sales/sales.routes').then((m) => m.saleRoutes) },
       { path: 'audit-logs', loadChildren: () => import('./modules/audit-logs/audit-logs.routes').then((m) => m.auditLogRoutes) },
       { path: 'settings', loadChildren: () => import('./modules/settings/settings.routes').then((m) => m.settingRoutes) },
-      { path: 'profile', title: 'My Profile - Sage Admin', data: { title: 'My Profile' }, loadComponent: comingSoon },
+      { path: 'profile', title: 'My Profile - Sage Admin', loadComponent: () => import('./modules/profile/profile').then((m) => m.ProfilePage) },
       { path: 'change-password', title: 'Change password - Sage Admin', loadComponent: () => import('./modules/changepassword/changepassword').then((m) => m.Changepassword) },
     ],
   },

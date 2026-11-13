@@ -28,6 +28,7 @@ export class SalesSummary implements OnInit {
   readonly rows = signal<SalesSummaryRow[] | null>(null);
   readonly error = signal<string | null>(null);
   readonly loading = signal(false);
+  readonly exporting = signal(false);
 
   readonly totals = computed(() => {
     const rows = this.rows() ?? [];
@@ -67,6 +68,19 @@ export class SalesSummary implements OnInit {
       this.error.set(errorText(err, 'Unable to load the summary.'));
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  /** Downloads this summary (same grouping and dates) as a CSV file with a total row. */
+  async export(): Promise<void> {
+    this.exporting.set(true);
+    this.error.set(null);
+    try {
+      await this.service.exportSummary({ groupBy: this.groupBy(), soldFrom: this.soldFrom || undefined, soldTo: this.soldTo || undefined });
+    } catch (err) {
+      this.error.set(errorText(err, 'Unable to export the summary.'));
+    } finally {
+      this.exporting.set(false);
     }
   }
 

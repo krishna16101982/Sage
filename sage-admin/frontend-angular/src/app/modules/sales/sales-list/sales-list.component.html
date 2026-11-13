@@ -5,6 +5,11 @@
 
   <div class="toolbar">
     <app-sales-filter [sellers]="sellers()" [initial]="filter" (filterChange)="onFilter($event)" />
+    <span class="toolbar-spacer"></span>
+    <button type="button" class="btn btn-secondary" [disabled]="exporting() || !data()?.totalCount" (click)="export()"
+            title="Download every sale matching the filters as a CSV file (opens in Excel)">
+      {{ exporting() ? 'Exporting...' : 'Export CSV' }}
+    </button>
   </div>
   @if (customerId()) {
     <p class="text-sm">Showing one customer's sales. <a class="link-button" routerLink="/sales/list">Show all customers</a></p>

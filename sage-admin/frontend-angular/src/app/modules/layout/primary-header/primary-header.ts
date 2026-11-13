@@ -1,15 +1,15 @@
 import { Component, DestroyRef, computed, inject, output, signal } from '@angular/core';
-import { ActivatedRouteSnapshot, NavigationEnd, Router } from '@angular/router';
+import { ActivatedRouteSnapshot, NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter } from 'rxjs';
 import { Icon, initials } from '../../../component/icon/icon';
 import { AuthService } from '../../../services/auth/auth.service';
 import { ThemeService } from '../../../services/theme/theme.service';
 import { MODULE_ICONS } from '../primary-navigation/primary-navigation';
 
-/** Top bar: menu button, page title, page search, light/dark switch, signed-in user and Sign out. */
+/** Top bar: menu button, page title, page search, light/dark switch, signed-in user (links to My Profile) and Sign out. */
 @Component({
   selector: 'app-primary-header',
-  imports: [Icon],
+  imports: [Icon, RouterLink],
   templateUrl: './primary-header.html',
 })
 export class PrimaryHeader {

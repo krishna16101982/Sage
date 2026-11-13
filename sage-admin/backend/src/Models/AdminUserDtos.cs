@@ -33,4 +33,21 @@ namespace SageAdminApi.Models
         public string Name { get; set; } = string.Empty;
         public string Code { get; set; } = string.Empty;
     }
+
+    /// <summary>My Profile: the signed-in admin's own account, with when the password was last changed and their recent activity.</summary>
+    public class ProfileDto : AdminUserDto
+    {
+        public DateTime PasswordUpdatedAtUtc { get; set; }
+        /// <summary>The last changes this admin made (newest first), from the audit log.</summary>
+        public System.Collections.Generic.List<ProfileActivity> RecentActivity { get; set; } = new System.Collections.Generic.List<ProfileActivity>();
+    }
+
+    public class ProfileActivity
+    {
+        public long Id { get; set; }
+        public string Action { get; set; } = string.Empty;
+        public string EntityType { get; set; } = string.Empty;
+        public string EntityId { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
+    }
 }

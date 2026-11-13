@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using SageAdminApi.AppFunctions.Interfaces;
 using SageAdminApi.AppValidations;
+using SageAdminApi.Globals;
 using SageAdminApi.Models;
 using SageAdminApi.Models.Filter;
 using SageCommonLib.AppFunctions.Interfaces;
@@ -51,11 +52,16 @@ ORDER BY u.FirstName, u.LastName";
 
         private readonly ILoggerFunctions _loggerFunctions;
         private readonly IDatabaseFunctions _databaseFunctions;
+        private readonly IAuditFunctions _auditFunctions;
 
-        public SalesReportFunctions(ILoggerFunctions __loggerFunctions, IDatabaseFunctions __databaseFunctions)
+        /// <summary>An export is refused above this many sales (the admin narrows the dates or filters instead).</summary>
+        public const int MaxExportRows = 50000;
+
+        public SalesReportFunctions(ILoggerFunctions __loggerFunctions, IDatabaseFunctions __databaseFunctions, IAuditFunctions __auditFunctions)
         {
             _loggerFunctions = __loggerFunctions;
             _databaseFunctions = __databaseFunctions;
+            _auditFunctions = __auditFunctions;
         }
 
         #region Helpers
@@ -105,6 +111,32 @@ ORDER BY u.FirstName, u.LastName";
             };
         }
 
+        /// <summary>One page of sales (or, with _exportAll, every matching sale up to MaxExportRows) plus the totals.</summary>
+        private async Task<(IReadOnlyList<AdminSaleDto> items, PaginationParams paging, int totalCount, decimal totalSale, decimal totalMargin)> QuerySalesAsync(
+            AdminSaleFilter _filter, bool _exportAll, CancellationToken _ct)
+        {
+            _filter ??= new AdminSaleFilter();
+            PaginationParams _paging = new Pagination().GetPagingParams(_filter, SortKeys, "soldAt");
+            string _status = _filter.Status == "Active" || _filter.Status == "Cancelled" ? _filter.Status : null;
+            string _search = string.IsNullOrWhiteSpace(_filter.Search) ? null : "%" + _filter.Search.Trim().EscapeLike() + "%";
+            var _totalCount = new SqlParameter("@TotalCount", SqlDbType.Int) { Direction = ParameterDirection.Output };
+            var _totalSale = MoneyOut("@TotalSaleAmount");
+            var _totalMargin = MoneyOut("@TotalMargin");
+
+            IReadOnlyList<AdminSaleDto> _items = await _databaseFunctions.QueryProcedureAsync(SP.SaleAdminGetPaged, MapSale, new List<SqlParameter>
+            {
+                P("@SellerPublicId", _filter.SellerId), P("@ManagerPublicId", _filter.ManagerId), P("@CustomerPublicId", _filter.CustomerId),
+                P("@Search", _search), P("@Status", _status), Date("@SoldFrom", _filter.SoldFrom), Date("@SoldTo", _filter.SoldTo),
+                P("@SortBy", _paging.SortBy), P("@SortDirection", _paging.SortDirection),
+                P("@Offset", _exportAll ? 0 : _paging.Offset), P("@PageSize", _exportAll ? MaxExportRows + 1 : _paging.PageSize),
+                _totalCount, _totalSale, _totalMargin
+            }, _ct);
+            return (_items, _paging, _totalCount.Value is int _count ? _count : 0, _totalSale.Value is decimal _sum ? _sum : 0m, _totalMargin.Value is decimal _margin ? _margin : 0m);
+        }
+
+        private Task AuditExportAsync(long? _actorUserId, object _details, string _ipAddress, CancellationToken _ct)
+            => _auditFunctions.LogAsync(_actorUserId, ApplicationEnumeration.AuditAction.Export.ToString(), ApplicationEnumeration.ObjectType.Sale.ToString(), null, null, _details, _ipAddress, _ct);
+
         #endregion
 
         public async Task<(AdminSalesPage result, IFunctionReturn functionReturn)> GetSalesAsync(AdminSaleFilter _filter, CancellationToken _ct = default)
@@ -112,30 +144,15 @@ ORDER BY u.FirstName, u.LastName";
             string _methodName = "F:SalesReport:GetSales";
             try
             {
-                _filter ??= new AdminSaleFilter();
-                PaginationParams _paging = new Pagination().GetPagingParams(_filter, SortKeys, "soldAt");
-                string _status = _filter.Status == "Active" || _filter.Status == "Cancelled" ? _filter.Status : null;
-                string _search = string.IsNullOrWhiteSpace(_filter.Search) ? null : "%" + _filter.Search.Trim().EscapeLike() + "%";
-                var _totalCount = new SqlParameter("@TotalCount", SqlDbType.Int) { Direction = ParameterDirection.Output };
-                var _totalSale = MoneyOut("@TotalSaleAmount");
-                var _totalMargin = MoneyOut("@TotalMargin");
-
-                IReadOnlyList<AdminSaleDto> _items = await _databaseFunctions.QueryProcedureAsync(SP.SaleAdminGetPaged, MapSale, new List<SqlParameter>
-                {
-                    P("@SellerPublicId", _filter.SellerId), P("@ManagerPublicId", _filter.ManagerId), P("@CustomerPublicId", _filter.CustomerId),
-                    P("@Search", _search), P("@Status", _status), Date("@SoldFrom", _filter.SoldFrom), Date("@SoldTo", _filter.SoldTo),
-                    P("@SortBy", _paging.SortBy), P("@SortDirection", _paging.SortDirection), P("@Offset", _paging.Offset), P("@PageSize", _paging.PageSize),
-                    _totalCount, _totalSale, _totalMargin
-                }, _ct);
-
+                (IReadOnlyList<AdminSaleDto> _items, PaginationParams _paging, int _count, decimal _sum, decimal _margin) = await QuerySalesAsync(_filter, false, _ct);
                 return (new AdminSalesPage
                 {
                     Items = _items,
                     Page = _paging.Page,
                     PageSize = _paging.PageSize,
-                    TotalCount = _totalCount.Value is int _count ? _count : 0,
-                    TotalSaleAmount = _totalSale.Value is decimal _sum ? _sum : 0m,
-                    TotalMargin = _totalMargin.Value is decimal _margin ? _margin : 0m
+                    TotalCount = _count,
+                    TotalSaleAmount = _sum,
+                    TotalMargin = _margin
                 }, new FunctionReturn { MethodName = _methodName });
             }
             catch (Exception ex)
@@ -206,6 +223,104 @@ ORDER BY u.FirstName, u.LastName";
                 _loggerFunctions.Error(_methodName, ex.Message, ex);
                 return (null, ApplicationCommonFunctions.SystemError(_methodName));
             }
+        }
+
+        /// <summary>Every sale matching the same filters as the Sales list, as a CSV file (refused above MaxExportRows). Audited.</summary>
+        public async Task<(ExportFile file, IFunctionReturn functionReturn)> ExportSalesAsync(AdminSaleFilter _filter, long? _actorUserId, string _ipAddress, CancellationToken _ct = default)
+        {
+            string _methodName = "F:SalesReport:ExportSales";
+            try
+            {
+                _filter ??= new AdminSaleFilter();
+                (IReadOnlyList<AdminSaleDto> _items, _, int _count, decimal _sum, decimal _margin) = await QuerySalesAsync(_filter, true, _ct);
+                if (_count > MaxExportRows)
+                    return (null, ApplicationCommonFunctions.BadRequest(
+                        $"{_count:N0} sales match. An export can hold up to {MaxExportRows:N0}: choose a shorter date range or more filters, then export again.", _methodName));
+
+                var _csv = new CsvBuilder("Sale number", "Sold at (UTC)", "Customer", "Category", "Product", "Plan", "Sales person", "Role", "Manager",
+                    "Quantity", "Unit price", "List amount", "Discount", "Discount %", "Sale amount", "Cost", "Margin", "Duration",
+                    "Start date", "Renewal date", "Status", "Cancelled at (UTC)", "Cancelled by", "Cancel reason", "Notes");
+                foreach (AdminSaleDto x in _items)
+                {
+                    _csv.Row(CsvBuilder.Text(x.SaleNumber), CsvBuilder.Date(x.CreatedAtUtc), CsvBuilder.Text(x.CustomerName), CsvBuilder.Text(x.CategoryName),
+                        CsvBuilder.Text(x.ProductName), CsvBuilder.Text(x.PlanName), CsvBuilder.Text(x.SellerName), CsvBuilder.Text(x.SellerRole),
+                        CsvBuilder.Text(x.ManagerName), CsvBuilder.Number(x.Quantity), CsvBuilder.Number(x.UnitPrice), CsvBuilder.Number(x.ListAmount),
+                        CsvBuilder.Number(x.DiscountAmount), CsvBuilder.Number(x.DiscountPercent), CsvBuilder.Number(x.SaleAmount), CsvBuilder.Number(x.CostAmount),
+                        CsvBuilder.Number(x.Margin), CsvBuilder.Text($"{x.DurationCount} {x.DurationUnit}"), CsvBuilder.Date(x.StartDate), CsvBuilder.Date(x.RenewalDate),
+                        CsvBuilder.Text(x.Status), CsvBuilder.Date(x.CancelledAtUtc), CsvBuilder.Text(x.CancelledByName), CsvBuilder.Text(x.CancelReason),
+                        CsvBuilder.Text(x.Notes));
+                }
+
+                await AuditExportAsync(_actorUserId, new
+                {
+                    Report = "Sales", _filter.SellerId, _filter.ManagerId, _filter.CustomerId, _filter.Search, _filter.Status, _filter.SoldFrom, _filter.SoldTo,
+                    Rows = _csv.RowCount, TotalSaleAmount = _sum, TotalMargin = _margin
+                }, _ipAddress, _ct);
+                return (new ExportFile { FileName = FileName("sales", _filter.SoldFrom, _filter.SoldTo), Content = _csv.ToBytes(), RowCount = _csv.RowCount },
+                    new FunctionReturn { MethodName = _methodName });
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
+
+        /// <summary>The summary per sales person or per manager (own + team) as a CSV file, with a total row. Audited.</summary>
+        public async Task<(ExportFile file, IFunctionReturn functionReturn)> ExportSummaryAsync(SalesSummaryFilter _filter, long? _actorUserId, string _ipAddress, CancellationToken _ct = default)
+        {
+            string _methodName = "F:SalesReport:ExportSummary";
+            try
+            {
+                (List<SalesSummaryRow> _rows, IFunctionReturn _functionReturn) = await GetSummaryAsync(_filter, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+                bool _byManager = string.Equals(_filter?.GroupBy, "manager", StringComparison.OrdinalIgnoreCase);
+
+                var _csv = _byManager
+                    ? new CsvBuilder("Manager", "Username", "Team size", "Sales", "Cancelled", "Quantity", "List amount", "Discount", "Sale amount", "Cost", "Margin")
+                    : new CsvBuilder("Sales person", "Username", "Role", "Manager", "Sales", "Cancelled", "Quantity", "List amount", "Discount", "Sale amount", "Cost", "Margin");
+                static string[] Totals(SalesSummaryRow r) => new[]
+                {
+                    CsvBuilder.Number(r.SaleCount), CsvBuilder.Number(r.CancelledCount), CsvBuilder.Number(r.Quantity), CsvBuilder.Number(r.ListAmount),
+                    CsvBuilder.Number(r.DiscountAmount), CsvBuilder.Number(r.SaleAmount), CsvBuilder.Number(r.CostAmount), CsvBuilder.Number(r.Margin)
+                };
+                foreach (SalesSummaryRow r in _rows)
+                {
+                    string[] _who = _byManager
+                        ? new[] { CsvBuilder.Text(r.Name), CsvBuilder.Text(r.Username), CsvBuilder.Number(r.TeamSize) }
+                        : new[] { CsvBuilder.Text(r.Name), CsvBuilder.Text(r.Username), CsvBuilder.Text(r.Role), CsvBuilder.Text(r.ManagerName) };
+                    _csv.Row(_who.Concat(Totals(r)).ToArray());
+                }
+                var _total = new SalesSummaryRow
+                {
+                    SaleCount = _rows.Sum(r => r.SaleCount), CancelledCount = _rows.Sum(r => r.CancelledCount), Quantity = _rows.Sum(r => r.Quantity),
+                    ListAmount = _rows.Sum(r => r.ListAmount), DiscountAmount = _rows.Sum(r => r.DiscountAmount), SaleAmount = _rows.Sum(r => r.SaleAmount),
+                    CostAmount = _rows.Sum(r => r.CostAmount), Margin = _rows.Sum(r => r.Margin)
+                };
+                _csv.Row((_byManager ? new[] { "Total", "", "" } : new[] { "Total", "", "", "" }).Concat(Totals(_total)).ToArray());
+
+                await AuditExportAsync(_actorUserId, new { Report = _byManager ? "SummaryByManager" : "SummaryBySeller", _filter?.SoldFrom, _filter?.SoldTo, Rows = _rows.Count },
+                    _ipAddress, _ct);
+                return (new ExportFile
+                {
+                    FileName = FileName(_byManager ? "sales-by-manager" : "sales-by-person", _filter?.SoldFrom, _filter?.SoldTo),
+                    Content = _csv.ToBytes(),
+                    RowCount = _rows.Count
+                }, new FunctionReturn { MethodName = _methodName });
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
+
+        /// <summary>"sales_2026-11-01_to_2026-11-30.csv", or with today's date when no range is chosen.</summary>
+        private static string FileName(string _name, DateOnly? _from, DateOnly? _to)
+        {
+            if (_from.HasValue || _to.HasValue)
+                return $"{_name}_{(_from.HasValue ? CsvBuilder.Date(_from.Value) : "start")}_to_{(_to.HasValue ? CsvBuilder.Date(_to.Value) : "today")}.csv";
+            return $"{_name}_{CsvBuilder.Date(DateOnly.FromDateTime(DateTime.UtcNow))}.csv";
         }
     }
 }

@@ -50,6 +50,7 @@ namespace SageAdminApi.Globals
             public const string AdminUserGetPaged = "dbo.usp_AdminUser_GetPaged";
             public const string AdminUserCreate = "dbo.usp_AdminUser_Create";
             public const string AdminUserUpdate = "dbo.usp_AdminUser_Update";
+            public const string AdminUserUpdateProfile = "dbo.usp_AdminUser_UpdateProfile";
             public const string AdminUserSetStatus = "dbo.usp_AdminUser_SetStatus";
             public const string AdminUserAdminSetPassword = "dbo.usp_AdminUser_AdminSetPassword";
             public const string SalesUserGetPaged = "dbo.usp_SalesUser_GetPaged";

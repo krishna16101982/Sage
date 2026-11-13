@@ -34,10 +34,10 @@
   </button>
 
   @if (auth.user(); as u) {
-    <div class="header-user">
+    <a class="header-user" routerLink="/profile" title="My profile">
       <span class="avatar avatar-sm" aria-hidden="true">{{ initials() }}</span>
       <span class="header-user-name">{{ u.firstName }} {{ u.lastName }}</span>
-    </div>
+    </a>
   }
   <button type="button" class="icon-button" aria-label="Sign out" title="Sign out" (click)="logout()">
     <app-icon name="log-out" />

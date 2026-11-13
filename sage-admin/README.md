@@ -68,7 +68,22 @@ Integration tests create and drop their own database `SageAdmin_Test_<guid>` on 
 - Access token: 15 min JWT with `sub`, `jti`, and `pv` (permission version) only. Every request also checks the user is still active and `pv` matches the database, so deactivation, password changes and permission changes apply immediately.
 - Lockout: 5 consecutive failures lock the account for 15 minutes (`AuthSettings`). Login attempts go to `dbo.LoginHistories`; login, logout and password events go to `dbo.AuditLogs`.
 - Auth endpoints are rate limited per IP (`RateLimiting:AuthPermitPerMinute`).
-- Password reset email: no mail provider is configured yet. In Development the reset link is written to the API log; elsewhere nothing is sent (`IPasswordResetNotifier`).
+- Password reset email: sent over SMTP when the `Email` settings are filled in (see **Email** below). Without them, Development writes the reset link to the API log and other environments send nothing (`IPasswordResetNotifier`). The link points at `AuthSettings:FrontendBaseUrl` (the Angular app, `http://localhost:4200`, in Development).
+
+### Email (SMTP)
+| Setting | Where | Example |
+|---------|-------|---------|
+| `Email:Host`, `Email:Port` (587), `Email:EnableSsl` (true = STARTTLS) | `appsettings.Local.json` (git-ignored) or environment variables | `mail.example.com` |
+| `Email:UserName`, `Email:FromAddress`, `Email:FromName` | same | the sender usually has to match the SMTP login |
+| `Email:Password` | **User Secrets** on a developer machine, `Email__Password` environment variable on a server; never in a committed file | |
+
+```powershell
+cd sage-admin\backend\src
+dotnet user-secrets set "Email:Password" "<smtp password>"
+```
+
+- Emails are queued and sent by a background service (`EmailBackgroundService`, three tries), so *Forgot password* answers at once and takes the same time whether or not the address has an account. Failures are logged with the recipient masked (`k***@example.com`); the reset token is never logged.
+- Port 465 (implicit TLS) is not supported by `System.Net.Mail`; use 587 with STARTTLS.
 - Production cookie settings: `AuthSettings:RefreshCookieSecure=true` (default) and `RefreshCookieSameSite` (`None` if the frontend is on another site).
 
 ## Permissions (Sprint 3)
@@ -151,7 +166,20 @@ Customers are shared with the User Panel (sales users add them there; admins add
 
 - "Team" means the people who reported to the manager **when the sale was made** (`Sales.ManagerId`), so moving a person to another manager does not move their past sales.
 - Procedures: `usp_Customer_Create`, `usp_Customer_Update`, `usp_Customer_GetPaged`, `usp_Sale_AdminGetPaged`, `usp_Sale_Summary`. `Customers.CreatedByAdminUserId` / `UpdatedByAdminUserId` (DDL 023) record admin changes.
+| `GET /api/admin/sales/export` | `Sales.View` | the same filters and sort as the list, no paging, as a CSV file (up to 50,000 sales; more gives 400 "choose a shorter date range") |
+| `GET /api/admin/sales/summary/export?groupBy=seller|manager` | `Sales.View` | the summary as a CSV file with a total row |
+
 - UI: `/customers` (sidebar **Customers**: list, add, edit) and `/sales` (sidebar **Sales**: all sales with filters and totals, summary by sales person / manager, sale details). Both appear in the sidebar through their module's menu link.
+- Exports (`CsvBuilder`): UTF-8 with a byte-order mark so Excel shows names correctly, amounts as plain numbers (`1234.50`), dates `yyyy-MM-dd`, times in UTC. Text starting with `=`, `+`, `-` or `@` gets a leading `'` so a spreadsheet never runs a customer name or note as a formula. Each export is in the audit log (action `Export`, entity `Sale`) with the filters used and the row count. The **Export CSV** button on Sales downloads exactly what the filters show (all pages).
+
+## My Profile
+| Endpoint | Permission | Notes |
+|----------|------------|-------|
+| `GET /api/admin/profile` | any signed-in admin | own account, group, last sign-in, when the password was changed, and the last 10 audit entries made by this admin |
+| `PUT /api/admin/profile` | any signed-in admin | `{firstName, lastName, mobileNumber}` only (`usp_AdminUser_UpdateProfile`); username, email, group and status are changed by an administrator. Audited as `UpdateProfile` |
+
+- The password is changed with `POST /api/admin/auth/change-password` (signs out every session).
+- UI: `/profile` (click your name in the top bar): details, your name and mobile number, password, what you can do (permissions by module), recent activity.
 
 ## Audit logs and settings
 | Endpoint | Permission | Notes |

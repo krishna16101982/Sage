@@ -192,7 +192,19 @@ namespace SageAdminApi
             services.AddScoped<IStatusFunctions, StatusFunctions>();
             services.AddScoped<ITokenFunctions, TokenFunctions>();
             services.AddScoped<IAuditFunctions, AuditFunctions>();
-            services.AddScoped<IPasswordResetNotifier, LogPasswordResetNotifier>();
+            // Password-reset emails go out over SMTP when the "Email" settings are filled in; otherwise they are only logged.
+            services.Configure<EmailSettings>(Configuration.GetSection(EmailSettings.SectionName));
+            if (Configuration.GetSection(EmailSettings.SectionName).Get<EmailSettings>()?.IsConfigured == true)
+            {
+                services.AddSingleton<IEmailQueue, EmailQueue>();
+                services.AddSingleton<IEmailTransport, SmtpEmailTransport>();
+                services.AddHostedService<EmailBackgroundService>();
+                services.AddScoped<IPasswordResetNotifier, EmailPasswordResetNotifier>();
+            }
+            else
+            {
+                services.AddScoped<IPasswordResetNotifier, LogPasswordResetNotifier>();
+            }
             services.AddScoped<IAuthFunctions, AuthFunctions>();
             services.AddScoped<IAuthorizationFunctions, AuthorizationFunctions>();
             services.AddScoped<IPermissionFunctions, PermissionFunctions>();
@@ -216,7 +228,8 @@ namespace SageAdminApi
             {
                 if (_origins.Length > 0)
                 {
-                    builder.WithOrigins(_origins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+                    builder.WithOrigins(_origins).AllowAnyHeader().AllowAnyMethod().AllowCredentials()
+                        .WithExposedHeaders("Content-Disposition", "X-Row-Count");   // file name and row count of CSV exports
                 }
             });
         }

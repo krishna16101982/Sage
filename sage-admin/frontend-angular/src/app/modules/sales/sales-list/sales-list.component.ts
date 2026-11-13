@@ -43,6 +43,7 @@ export class SalesList implements OnInit {
   readonly data = signal<SalesPage | null>(null);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  readonly exporting = signal(false);
 
   ngOnInit(): void {
     this.filter = {
@@ -59,29 +60,43 @@ export class SalesList implements OnInit {
     this.load();
   }
 
+  /** The filters and sort on screen (shared by the list and the export). */
+  private query(): Omit<SaleQuery, 'page' | 'pageSize'> {
+    return {
+      sellerId: this.filter.sellerId || undefined,
+      managerId: this.filter.managerId || undefined,
+      customerId: this.customerId() || undefined,
+      search: this.filter.search.trim() || undefined,
+      status: this.filter.status || undefined,
+      soldFrom: this.filter.soldFrom || undefined,
+      soldTo: this.filter.soldTo || undefined,
+      sortBy: this.sortBy(),
+      sortDirection: this.sortDirection(),
+    };
+  }
+
   async load(): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
     try {
-      this.data.set(
-        await this.service.list({
-          sellerId: this.filter.sellerId || undefined,
-          managerId: this.filter.managerId || undefined,
-          customerId: this.customerId() || undefined,
-          search: this.filter.search.trim() || undefined,
-          status: this.filter.status || undefined,
-          soldFrom: this.filter.soldFrom || undefined,
-          soldTo: this.filter.soldTo || undefined,
-          sortBy: this.sortBy(),
-          sortDirection: this.sortDirection(),
-          page: this.page,
-          pageSize: 20,
-        }),
-      );
+      this.data.set(await this.service.list({ ...this.query(), page: this.page, pageSize: 20 }));
     } catch (err) {
       this.error.set(errorText(err, 'Unable to load sales.'));
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  /** Downloads every sale matching the current filters (all pages) as a CSV file. */
+  async export(): Promise<void> {
+    this.exporting.set(true);
+    this.error.set(null);
+    try {
+      await this.service.exportList(this.query());
+    } catch (err) {
+      this.error.set(errorText(err, 'Unable to export the sales.'));
+    } finally {
+      this.exporting.set(false);
     }
   }
 

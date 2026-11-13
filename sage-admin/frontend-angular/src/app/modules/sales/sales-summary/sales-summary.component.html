@@ -14,6 +14,11 @@
       <input class="field field-inline" type="date" aria-label="Sold to" [(ngModel)]="soldTo" (ngModelChange)="load()" />
       <button type="button" class="link-button" (click)="allTime()">All time</button>
     </span>
+    <span class="toolbar-spacer"></span>
+    <button type="button" class="btn btn-secondary" [disabled]="exporting() || !rows()?.length" (click)="export()"
+            title="Download this summary as a CSV file (opens in Excel)">
+      {{ exporting() ? 'Exporting...' : 'Export CSV' }}
+    </button>
   </div>
   <p class="hint">
     @if (groupBy() === 'manager') {
