@@ -41,7 +41,7 @@ namespace SageUserApi.Globals
             public const string CustomerRequired = "Choose a customer.";
             public const string PlanRequired = "Choose a plan.";
             public const string StartDateRequired = "Start date is required.";
-            public const string StartDateOutOfRange = "Start date must be within one year of today.";
+            public const string StartDateTooFarAhead = "The start date cannot be more than a year ahead.";
             public const string AmountDecimals = "Amounts can have at most 2 decimal places.";
             public const string NotesTooLong = "Notes must be 1000 characters or fewer.";
             public const string SaleCreated = "Sale recorded.";

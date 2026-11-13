@@ -153,6 +153,21 @@ Customers are shared with the User Panel (sales users add them there; admins add
 - Procedures: `usp_Customer_Create`, `usp_Customer_Update`, `usp_Customer_GetPaged`, `usp_Sale_AdminGetPaged`, `usp_Sale_Summary`. `Customers.CreatedByAdminUserId` / `UpdatedByAdminUserId` (DDL 023) record admin changes.
 - UI: `/customers` (sidebar **Customers**: list, add, edit) and `/sales` (sidebar **Sales**: all sales with filters and totals, summary by sales person / manager, sale details). Both appear in the sidebar through their module's menu link.
 
+## Audit logs and settings
+| Endpoint | Permission | Notes |
+|----------|------------|-------|
+| `GET /api/admin/audit-logs` | `AuditLog.View` | newest first; `search` (record id, action, person, IP), `entityType`, `action`, `actorType` (admin / sales / system), `actorId` (one admin), `from`, `to`, paging |
+| `GET /api/admin/audit-logs/{id}` · `/options` | `AuditLog.View` | one entry with `oldValues` / `newValues`; the values for the filters |
+| `GET /api/admin/settings` | `Setting.View` | every setting with its type, limits and who changed it last |
+| `PUT /api/admin/settings/{key}` | `Setting.Edit` | `{value}`, checked against the setting's type and limits; audited |
+
+- The audit log is read-only. Entries come from both panels: admin users (`ActorUserId`), sales users (User Panel; the name is in `NewValues.SalesUserName`), and the system (e.g. failed sign-ins). The entry page lists each field before and after, changed ones first.
+- Settings describe themselves in `dbo.Settings` (category, label, type, min/max, max length, pattern; DDL 025), so the screen needs no code per setting. Only settings the system reads exist (SeedData 008):
+  - `Sales.MaxDiscountPercent`: `usp_Sale_Create` refuses a bigger discount; the sale page shows the limit.
+  - `Sales.SaleNumberPrefix`: start of new sale numbers.
+  - `Sales.MaxBackdateDays`: how far back a sale's start date may be (User API).
+- UI: `/audit-logs` (list with filters, entry page) and `/settings`.
+
 If a running API locks `backend/src/bin`, build or test side by side with `dotnet test backend\SageAdmin.sln --artifacts-path backend\.artifacts` (ignored by git).
 
 ## Writing SQL (ixcheck pattern)

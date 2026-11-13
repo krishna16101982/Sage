@@ -62,6 +62,8 @@ namespace SageAdminApi.Globals
             public const string CustomerGetPaged = "dbo.usp_Customer_GetPaged";
             public const string SaleAdminGetPaged = "dbo.usp_Sale_AdminGetPaged";
             public const string SaleSummary = "dbo.usp_Sale_Summary";
+            public const string AuditLogGetPaged = "dbo.usp_AuditLog_GetPaged";
+            public const string SettingUpdate = "dbo.usp_Setting_Update";
         }
 
         public static class ColumnNames

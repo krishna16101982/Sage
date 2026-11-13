@@ -18,6 +18,8 @@ namespace SageUserApi.AppFunctions.Interfaces
 
     public interface ICatalogFunctions
     {
+        /// <summary>Company rules for the sale page (maximum discount, backdating limit, sale number prefix).</summary>
+        Task<SalesRules> GetSalesRulesAsync(CancellationToken _ct = default);
         /// <summary>Active categories > products > plans that can be sold (products without an active plan are left out).</summary>
         Task<(List<CatalogCategory> catalog, IFunctionReturn functionReturn)> GetCatalogAsync(CancellationToken _ct = default);
     }

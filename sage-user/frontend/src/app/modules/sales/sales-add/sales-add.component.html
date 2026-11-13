@@ -83,7 +83,10 @@
               <div><button type="button" class="link-button text-sm" [disabled]="!plan()" (click)="noDiscount()">No discount (sell at list price)</button></div>
             </div>
           </div>
-          <p class="hint">Enter either the sale price or the discount; the other is calculated.</p>
+          <p class="hint">
+            Enter either the sale price or the discount; the other is calculated.
+            @if (rules().maxDiscountPercent < 100) { The largest discount allowed is <strong>{{ rules().maxDiscountPercent }}%</strong>. }
+          </p>
           @if (saleAmount() !== null) {
             <p class="text-sm">
               <span class="text-muted">Customer pays</span> <span class="font-semibold">{{ inr(saleAmount()!) }}</span>

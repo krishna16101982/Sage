@@ -1,0 +1,27 @@
+<input class="field field-inline w-64" type="search" aria-label="Search the audit log" placeholder="Record id, action, person or IP"
+       [(ngModel)]="search" (ngModelChange)="changed(true)" />
+<select class="field field-inline" aria-label="Record type" [(ngModel)]="entityType" (ngModelChange)="changed(false)">
+  <option value="">Any record</option>
+  @for (t of options()?.entityTypes ?? []; track t) { <option [value]="t">{{ t }}</option> }
+</select>
+<select class="field field-inline" aria-label="Action" [(ngModel)]="action" (ngModelChange)="changed(false)">
+  <option value="">Any action</option>
+  @for (a of options()?.actions ?? []; track a) { <option [value]="a">{{ a }}</option> }
+</select>
+<select class="field field-inline" aria-label="Done by" [(ngModel)]="actorType" (ngModelChange)="pickActorType()">
+  <option value="">Anyone</option>
+  <option value="admin">Admin users</option>
+  <option value="sales">Sales users</option>
+  <option value="system">System / not signed in</option>
+</select>
+<select class="field field-inline" aria-label="Admin user" [(ngModel)]="actorId" (ngModelChange)="pickAdmin()">
+  <option value="">Any admin user</option>
+  @for (a of options()?.admins ?? []; track a.id) { <option [value]="a.id">{{ a.name }}</option> }
+</select>
+<span class="row-tight text-sm">
+  From
+  <input class="field field-inline" type="date" aria-label="From" [(ngModel)]="from" (ngModelChange)="changed(false)" />
+  to
+  <input class="field field-inline" type="date" aria-label="To" [(ngModel)]="to" (ngModelChange)="changed(false)" />
+</span>
+<button type="button" class="link-button text-sm" (click)="clear()">Clear</button>

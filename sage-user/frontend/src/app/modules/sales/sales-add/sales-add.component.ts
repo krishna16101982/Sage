@@ -6,10 +6,10 @@ import { CatalogService } from '../../../services/catalog/catalog.service';
 import { MessageService } from '../../../services/message/message.service';
 import { errorText } from '../../../services/rest/global-rest-service';
 import { SalesService } from '../../../services/sales/sales.service';
-import { DURATION_UNITS, type CatalogCategory, type DurationUnit } from '../../../shared/interfaces/catalog.interface';
+import { DURATION_UNITS, type CatalogCategory, type DurationUnit, type SalesRules } from '../../../shared/interfaces/catalog.interface';
 import type { Customer } from '../../../shared/interfaces/customer.interface';
 import type { SaleInput } from '../../../shared/interfaces/sale.interface';
-import { formatDate, renewalDate, today } from '../../../shared/utils/dates';
+import { addDays, formatDate, renewalDate, today } from '../../../shared/utils/dates';
 import { formatDuration, formatInr } from '../../../shared/utils/format';
 import { CustomerPicker } from './customer-picker/customer-picker.component';
 
@@ -38,6 +38,10 @@ export class SalesAdd implements OnInit {
   protected readonly units = DURATION_UNITS;
 
   readonly catalog = signal<CatalogCategory[] | null>(null);
+  /** Company rules (Admin Panel > Settings); the server checks them again when saving. */
+  readonly rules = signal<SalesRules>({ maxDiscountPercent: 100, maxBackdateDays: 365, saleNumberPrefix: 'S' });
+  /** Earliest start date the company allows. */
+  readonly earliestStart = computed(() => addDays(today(), -this.rules().maxBackdateDays));
   readonly loadError = signal<string | null>(null);
   readonly saveError = signal<string | null>(null);
   readonly busy = signal(false);
@@ -94,15 +98,20 @@ export class SalesAdd implements OnInit {
     if (sale === null) p.push('Enter the sale price or the discount.');
     else if (sale < 0) p.push('The discount cannot be more than the list amount.');
     else if (sale > this.listAmount()) p.push('The sale price cannot be more than the list amount.');
+    else if (this.rules().maxDiscountPercent < 100 && (this.discountPercent() ?? 0) > this.rules().maxDiscountPercent)
+      p.push(`The discount cannot be more than ${this.rules().maxDiscountPercent}% of the list amount (company limit).`);
     const count = this.durationCount();
     if (count === null || count < 1 || count > 120) p.push('Duration must be from 1 to 120.');
     if (!this.startDate()) p.push('Enter the start date.');
+    else if (this.startDate() < this.earliestStart())
+      p.push(this.rules().maxBackdateDays === 0 ? 'The start date cannot be in the past (company setting).' : `The start date cannot be more than ${this.rules().maxBackdateDays} days in the past (company setting).`);
     else if (!this.renewal() || this.renewal() <= this.startDate()) p.push('The renewal date must be after the start date.');
     return p;
   });
 
   async ngOnInit(): Promise<void> {
     try {
+      this.catalogService.rules().then((r) => this.rules.set(r), () => undefined);
       const catalog = await this.catalogService.catalog();
       this.catalog.set(catalog);
       if (catalog.length === 1) this.chooseCategory(catalog[0].id);

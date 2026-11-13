@@ -132,6 +132,16 @@ namespace SageUserApi.Models
         public decimal TotalMargin { get; set; }
     }
 
+    /// <summary>Company rules for recording a sale (Admin Panel > Settings).</summary>
+    public class SalesRules
+    {
+        /// <summary>Largest discount allowed, in % of the list amount (100 = no limit).</summary>
+        public decimal MaxDiscountPercent { get; set; } = 100;
+        /// <summary>How many days in the past a start date may be.</summary>
+        public int MaxBackdateDays { get; set; } = 365;
+        public string SaleNumberPrefix { get; set; } = "S";
+    }
+
     /// <summary>A sales person in the signed-in manager's team (for the Team sales filter).</summary>
     public class TeamMember
     {

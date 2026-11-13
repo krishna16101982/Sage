@@ -1,0 +1,58 @@
+<div class="stack">
+  <div class="page-header">
+    <div class="stack-xs">
+      <span class="page-eyebrow">Administration</span>
+      <h1 class="page-title">Audit Logs</h1>
+    </div>
+  </div>
+  <p class="hint">Every change and sign-in in both panels, newest first. Entries cannot be edited or deleted. Click a row to see what changed.</p>
+
+  <div class="toolbar">
+    <app-audit-logs-filter [options]="options()" (filterChange)="onFilter($event)" />
+  </div>
+
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th appSort [active]="true" [direction]="direction()" (sort)="sort($event)">When</th>
+          <th>Who</th>
+          <th>Action</th>
+          <th>Record</th>
+          <th>IP address</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (a of data()?.items ?? []; track a.id) {
+          <tr style="cursor: pointer" (click)="open(a)">
+            <td class="date">{{ dateTime(a.createdAtUtc) }}</td>
+            <td>
+              @switch (a.actorType) {
+                @case ('admin') { {{ a.actorName ?? 'Admin user' }} <div class="hint">Admin · <span class="code">{{ a.actorUsername }}</span></div> }
+                @case ('sales') { {{ a.actorName ?? 'Sales user' }} <div class="hint">Sales user</div> }
+                @default { <span class="text-muted">System</span> <div class="hint">not signed in</div> }
+              }
+            </td>
+            <td>
+              <span class="badge" [class.badge-success]="a.action === 'Create' || a.action === 'Login'"
+                    [class.badge-danger]="a.action === 'Delete' || a.action === 'LoginFailed' || a.action === 'Cancel'"
+                    [class.badge-warning]="a.action === 'StatusChange' || a.action === 'CancelRequest' || a.action === 'PasswordReset'">{{ actionText(a.action) }}</span>
+            </td>
+            <td>{{ a.entityType }} @if (a.entityId) { <div class="hint code truncate" style="max-width: 18rem">{{ a.entityId }}</div> }</td>
+            <td class="code">{{ a.ipAddress ?? '-' }}</td>
+            <td class="actions"><a class="link-button" [routerLink]="['/audit-logs', a.id]" (click)="$event.stopPropagation()">Details</a></td>
+          </tr>
+        } @empty {
+          <tr><td colspan="6" class="table-empty">{{ loading() ? 'Loading...' : 'No entries match.' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (data(); as d) {
+    <app-pagination [page]="d.page" [totalPages]="d.totalPages" [totalCount]="d.totalCount" (pageChange)="goTo($event)" />
+  }
+</div>

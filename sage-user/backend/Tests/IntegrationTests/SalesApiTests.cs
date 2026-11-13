@@ -167,7 +167,7 @@ public class SalesApiTests
         await Expect(Sale(customerId, inactivePlanId, 1, saleAmount: 1m), 400, "not available for sale");
         await Expect(Sale(customerId, 999_999_999, 1, saleAmount: 1m), 404, "Plan not found");
         await Expect(Sale(Guid.NewGuid(), planId, 1, saleAmount: 1m), 404, "Customer not found");
-        await Expect(Sale(customerId, planId, 1, saleAmount: 1m, startDate: "2020-01-01"), 400, "within one year");
+        await Expect(Sale(customerId, planId, 1, saleAmount: 1m, startDate: "2020-01-01"), 400, "days in the past");
         await Expect(new { customerId, planId, quantity = 1, saleAmount = 1m, startDate = "2026-03-01", renewalDate = "2026-03-01" }, 400, "after the start date");
     }
 
@@ -336,5 +336,44 @@ public class SalesApiTests
         at = await TokenAsync(alice);
         var a3 = (await Call(HttpMethod.Post, $"{Api}/sales", Sale(customerId, planId, 1, saleAmount: 500m), at)).Data.GetProperty("id").GetGuid();
         (await Call(HttpMethod.Post, $"{Api}/sales/{a3}/cancel-request", new { reason = "Duplicate" }, at)).Status.ShouldBe(403);
+    }
+
+    // ---------------- company settings (Admin Panel > Settings) ----------------
+
+    [Fact]
+    public async Task Settings_LimitDiscount_SetSaleNumberPrefix_AndBackdating()
+    {
+        async Task Set(string key, string value) => await _fx.Db.ExecuteNonQueryAsync("UPDATE dbo.Settings SET SettingValue = @v WHERE SettingKey = @k", new[] { TestDb.P("@v", value), TestDb.P("@k", key) });
+        var token = await TokenAsync(await SalesData.CreateAsync(_fx.Db));
+        var (_, _, planId) = await PlanAsync(price: 1000m, cost: 400m);
+        var customerId = await CustomerAsync(token);
+        try
+        {
+            await Set("Sales.MaxDiscountPercent", "20");
+            await Set("Sales.SaleNumberPrefix", "QA");
+            await Set("Sales.MaxBackdateDays", "0");
+
+            var rules = await Call(HttpMethod.Get, $"{Api}/catalog/rules", bearer: token);
+            rules.Data.GetProperty("maxDiscountPercent").GetDecimal().ShouldBe(20m);
+            rules.Data.GetProperty("maxBackdateDays").GetInt32().ShouldBe(0);
+
+            var tooMuch = await Call(HttpMethod.Post, $"{Api}/sales", Sale(customerId, planId, 1, saleAmount: 799m), token);
+            tooMuch.Status.ShouldBe(400);
+            tooMuch.FirstMessage.ShouldContain("20 percent of the list amount");
+            var ok = await Call(HttpMethod.Post, $"{Api}/sales", Sale(customerId, planId, 1, discountAmount: 200m), token);
+            ok.Status.ShouldBe(201, ok.Root.ToString());
+            ok.Data.GetProperty("saleNumber").GetString()!.ShouldStartWith("QA-");
+
+            var yesterday = DateTime.UtcNow.AddDays(-1).ToString("yyyy-MM-dd");
+            var backdated = await Call(HttpMethod.Post, $"{Api}/sales", Sale(customerId, planId, 1, saleAmount: 1000m, startDate: yesterday), token);
+            backdated.Status.ShouldBe(400);
+            backdated.FirstMessage.ShouldContain("cannot be in the past");
+        }
+        finally
+        {
+            await Set("Sales.MaxDiscountPercent", "100");
+            await Set("Sales.SaleNumberPrefix", "S");
+            await Set("Sales.MaxBackdateDays", "365");
+        }
     }
 }

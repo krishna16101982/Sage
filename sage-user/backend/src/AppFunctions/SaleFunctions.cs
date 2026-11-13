@@ -65,11 +65,13 @@ WHERE (@status IS NULL OR r.Status = @status) AND ";
 
         private readonly ILoggerFunctions _loggerFunctions;
         private readonly IDatabaseFunctions _databaseFunctions;
+        private readonly ICatalogFunctions _catalogFunctions;
 
-        public SaleFunctions(ILoggerFunctions __loggerFunctions, IDatabaseFunctions __databaseFunctions)
+        public SaleFunctions(ILoggerFunctions __loggerFunctions, IDatabaseFunctions __databaseFunctions, ICatalogFunctions __catalogFunctions)
         {
             _loggerFunctions = __loggerFunctions;
             _databaseFunctions = __databaseFunctions;
+            _catalogFunctions = __catalogFunctions;
         }
 
         #region Helpers
@@ -213,7 +215,14 @@ WHERE (@status IS NULL OR r.Status = @status) AND ";
                 if (_params.PlanId <= 0) _errors.Add(Msg.PlanRequired);
                 DateOnly _today = DateOnly.FromDateTime(DateTime.UtcNow);
                 if (!_params.StartDate.HasValue) _errors.Add(Msg.StartDateRequired);
-                else if (_params.StartDate.Value < _today.AddYears(-1) || _params.StartDate.Value > _today.AddYears(1)) _errors.Add(Msg.StartDateOutOfRange);
+                else
+                {
+                    // Backdating limit from Admin Panel > Settings; the start date may be at most a year ahead.
+                    int _maxBack = (await _catalogFunctions.GetSalesRulesAsync(_ct)).MaxBackdateDays;
+                    if (_params.StartDate.Value < _today.AddDays(-_maxBack))
+                        _errors.Add(_maxBack == 0 ? "The start date cannot be in the past (company setting)." : $"The start date cannot be more than {_maxBack} days in the past (company setting).");
+                    else if (_params.StartDate.Value > _today.AddYears(1)) _errors.Add(Msg.StartDateTooFarAhead);
+                }
                 if (HasMoreThanTwoDecimals(_params.SaleAmount) || HasMoreThanTwoDecimals(_params.DiscountAmount)) _errors.Add(Msg.AmountDecimals);
                 string _notes = string.IsNullOrWhiteSpace(_params.Notes) ? null : Sanitization.Sanitize(_params.Notes.Trim());
                 if (_notes != null && _notes.Length > 1000) _errors.Add(Msg.NotesTooLong);

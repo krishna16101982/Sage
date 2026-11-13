@@ -59,6 +59,7 @@ Writes with rules (sale creation and totals, manager assignment, plan price chan
 | 8 | User | `sage-user` foundation: backend (shared common lib, same DB), sales-user login/refresh/logout/change password, Angular frontend shell — done |
 | 9 | User | Customers + sale page + My sales / Team sales — done |
 | 9+ | Admin | Customers (add / edit) and Sales (all sales by sales person or manager-wise, summary) — done; HR and Accounts modules removed |
-| later | Admin | Dashboard & Audit log screens, Settings |
+| 10 | Admin | Audit log screen (filters, before/after), Settings screen (maximum discount, sale number prefix, backdating limit) — done |
+| later | Admin | Admin profile page, sales reports export |
 
 `sage-user/bakend` was renamed to `sage-user/backend` (Sprint 8). The User Panel frontend is Angular.

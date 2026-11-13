@@ -2,8 +2,6 @@ import { Routes } from '@angular/router';
 import { LoginLayout } from './modules/login/login-layout/login-layout';
 import { PrimaryLayout } from './modules/layout/primary-layout/primary-layout';
 import { authGuard, guestGuard } from './services/auth/auth.guard';
-import { PermissionGuard } from './services/permission/permission.guard';
-import { Perm } from './shared/enumarations/permission-codes';
 
 const comingSoon = () => import('./component/coming-soon/coming-soon').then((m) => m.ComingSoon);
 
@@ -40,21 +38,9 @@ export const routes: Routes = [
       { path: 'sales-users', loadChildren: () => import('./modules/sales-users/sales-users.routes').then((m) => m.salesUserRoutes) },
       { path: 'customers', loadChildren: () => import('./modules/customers/customers.routes').then((m) => m.customerRoutes) },
       { path: 'sales', loadChildren: () => import('./modules/sales/sales.routes').then((m) => m.saleRoutes) },
-      {
-        path: 'audit-logs',
-        title: 'Audit Logs - Sage Admin',
-        data: { title: 'Audit Logs', access_perms: [Perm.AuditLogView] },
-        canActivate: [PermissionGuard],
-        loadComponent: comingSoon,
-      },
+      { path: 'audit-logs', loadChildren: () => import('./modules/audit-logs/audit-logs.routes').then((m) => m.auditLogRoutes) },
+      { path: 'settings', loadChildren: () => import('./modules/settings/settings.routes').then((m) => m.settingRoutes) },
       { path: 'profile', title: 'My Profile - Sage Admin', data: { title: 'My Profile' }, loadComponent: comingSoon },
-      {
-        path: 'settings',
-        title: 'Settings - Sage Admin',
-        data: { title: 'Settings', access_perms: [Perm.SettingView] },
-        canActivate: [PermissionGuard],
-        loadComponent: comingSoon,
-      },
       { path: 'change-password', title: 'Change password - Sage Admin', loadComponent: () => import('./modules/changepassword/changepassword').then((m) => m.Changepassword) },
     ],
   },

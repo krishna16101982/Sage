@@ -21,6 +21,14 @@ namespace SageUserApi.Controllers
             _catalogFunctions = __catalogFunctions;
         }
 
+        /// <summary>Company rules for the sale page: maximum discount %, backdating limit, sale number prefix.</summary>
+        [HttpGet("rules")]
+        public Task<IActionResult> GetRules(CancellationToken _ct) => WithUserAsync("C:Catalog:GetRules", async _ =>
+        {
+            SageUserApi.Models.SalesRules _rules = await _catalogFunctions.GetSalesRulesAsync(_ct);
+            return Result(_rules, new SageCommonLib.Models.FunctionReturn { MethodName = "C:Catalog:GetRules" });
+        }, _ct);
+
         [HttpGet]
         public Task<IActionResult> GetCatalog(CancellationToken _ct) => WithUserAsync("C:Catalog:GetCatalog", async _ =>
         {

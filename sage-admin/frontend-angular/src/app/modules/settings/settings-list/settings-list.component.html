@@ -1,0 +1,74 @@
+<div class="stack max-w-3xl">
+  <div class="page-header">
+    <div class="stack-xs">
+      <span class="page-eyebrow">Administration</span>
+      <h1 class="page-title">Settings</h1>
+    </div>
+    <div class="spacer"></div>
+    @if (canSeeAudit) { <a class="btn btn-secondary" routerLink="/audit-logs/list" [queryParams]="{}">Audit log</a> }
+  </div>
+  <p class="hint">
+    These settings change how the system behaves right away, in both panels. Every change is kept in the audit log.
+    @if (!canEdit) { You can view them; changing them needs the Settings · Edit permission. }
+  </p>
+
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (notice()) { <app-alert kind="success">{{ notice() }}</app-alert> }
+  @if (!settings() && !error()) { <p class="text-sm text-muted">Loading...</p> }
+
+  @for (g of groups(); track g.category) {
+    <section class="card">
+      <header class="card-header"><h2 class="section-title">{{ g.category }}</h2></header>
+      <ul class="card-list">
+        @for (s of g.items; track s.key) {
+          <li>
+            <div class="row" style="align-items: flex-start">
+              <div class="stack-xs" style="flex: 1 1 18rem; min-width: 0">
+                <label class="font-medium" [attr.for]="'setting-' + s.key">{{ s.label }}</label>
+                @if (s.description) { <span class="hint">{{ s.description }}</span> }
+                <span class="hint">
+                  {{ limits(s) }} · <span class="code">{{ s.key }}</span>
+                  @if (s.updatedAtUtc) { · changed {{ dateTime(s.updatedAtUtc) }}{{ s.updatedByName ? ' by ' + s.updatedByName : '' }} }
+                </span>
+              </div>
+
+              <div class="row-tight" style="flex: 0 1 auto">
+                @switch (s.valueType) {
+                  @case ('bool') {
+                    <label class="switch">
+                      <input type="checkbox" [id]="'setting-' + s.key" [disabled]="!canEdit" [checked]="draft(s.key) === 'true'"
+                             (change)="setDraft(s.key, $any($event.target).checked ? 'true' : 'false')" />
+                      <span class="switch-track" aria-hidden="true"></span>
+                      <span class="text-sm">{{ draft(s.key) === 'true' ? 'On' : 'Off' }}</span>
+                    </label>
+                  }
+                  @case ('int') {
+                    <input class="field field-inline w-56" type="number" step="1" [id]="'setting-' + s.key" [disabled]="!canEdit"
+                           [attr.min]="s.minValue" [attr.max]="s.maxValue" [ngModel]="draft(s.key)" (ngModelChange)="setDraft(s.key, $event)" />
+                  }
+                  @case ('json') {
+                    <textarea class="field code w-72" rows="3" [id]="'setting-' + s.key" [disabled]="!canEdit"
+                              [ngModel]="draft(s.key)" (ngModelChange)="setDraft(s.key, $event)"></textarea>
+                  }
+                  @default {
+                    <input class="field field-inline w-56" [id]="'setting-' + s.key" [disabled]="!canEdit" [attr.maxlength]="s.maxLength"
+                           [ngModel]="draft(s.key)" (ngModelChange)="setDraft(s.key, $event)" />
+                  }
+                }
+                @if (canEdit) {
+                  <button type="button" class="btn btn-primary" [disabled]="!isChanged(s) || saving() === s.key" (click)="save(s)">
+                    {{ saving() === s.key ? 'Saving...' : 'Save' }}
+                  </button>
+                  @if (isChanged(s)) { <button type="button" class="link-button text-sm" (click)="reset(s)">Undo</button> }
+                }
+              </div>
+            </div>
+            @if (rowError()?.key === s.key) { <p class="text-sm text-danger mt-2">{{ rowError()!.message }}</p> }
+          </li>
+        }
+      </ul>
+    </section>
+  } @empty {
+    @if (settings()) { <p class="text-sm text-muted">There are no settings yet.</p> }
+  }
+</div>

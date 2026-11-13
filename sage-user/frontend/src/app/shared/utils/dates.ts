@@ -26,6 +26,13 @@ export function addMonths(date: string, months: number): string {
   return `${year}-${pad(month)}-${pad(Math.min(d, lastDay))}`;
 }
 
+/** Adds (or with a negative number subtracts) days, 'yyyy-MM-dd'. */
+export function addDays(date: string, days: number): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const result = new Date(y, m - 1, d + days);
+  return `${result.getFullYear()}-${pad(result.getMonth() + 1)}-${pad(result.getDate())}`;
+}
+
 /** Renewal date = start + duration (same rule as the server). */
 export function renewalDate(start: string, unit: DurationUnit, count: number): string {
   if (!start || !count) return '';

@@ -202,6 +202,8 @@ namespace SageAdminApi
             services.AddScoped<IAdminUserFunctions, AdminUserFunctions>();
             services.AddScoped<ICustomerFunctions, CustomerFunctions>();
             services.AddScoped<ISalesReportFunctions, SalesReportFunctions>();
+            services.AddScoped<IAuditLogFunctions, AuditLogFunctions>();
+            services.AddScoped<ISettingFunctions, SettingFunctions>();
         }
 
         /// <summary>

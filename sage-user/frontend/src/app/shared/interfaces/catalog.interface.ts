@@ -22,6 +22,15 @@ export interface CatalogProduct {
   plans: CatalogPlan[];
 }
 
+/** Company rules for recording a sale (Admin Panel > Settings). */
+export interface SalesRules {
+  /** Largest discount allowed, in % of the list amount (100 = no limit). */
+  maxDiscountPercent: number;
+  /** How many days in the past a start date may be. */
+  maxBackdateDays: number;
+  saleNumberPrefix: string;
+}
+
 export interface CatalogCategory {
   id: number;
   code: string;

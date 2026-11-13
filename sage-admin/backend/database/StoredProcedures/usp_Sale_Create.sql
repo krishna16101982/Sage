@@ -2,6 +2,7 @@
 --   ListAmount = Price x Quantity, CostAmount = Cost x Quantity.
 -- The caller gives EITHER @SaleAmount OR @DiscountAmount (amounts in INR); the other is calculated.
 -- Duration defaults to the plan's; RenewalDate defaults to StartDate + duration and may be overridden (must be after StartDate).
+-- The discount may not exceed Settings Sales.MaxDiscountPercent; the sale number starts with Sales.SaleNumberPrefix.
 -- Raises 50404 (customer / plan not found) or 50400 (anything not allowed). Returns the new sale's PublicId.
 CREATE OR ALTER PROCEDURE dbo.usp_Sale_Create
     @SalesUserId       BIGINT,
@@ -77,6 +78,14 @@ BEGIN
         SET @sale = @SaleAmount;
     END
 
+    -- Company limit on the discount (Admin Panel > Settings > Maximum discount). 100 or missing = no limit.
+    DECLARE @maxDiscount DECIMAL(9,2) = ISNULL(TRY_CAST((SELECT SettingValue FROM dbo.Settings WHERE SettingKey = 'Sales.MaxDiscountPercent') AS DECIMAL(9,2)), 100);
+    IF @list > 0 AND @maxDiscount < 100 AND (@list - @sale) * 100 > @maxDiscount * @list
+    BEGIN
+        DECLARE @limitMessage NVARCHAR(200) = CONCAT(N'The discount cannot be more than ', FORMAT(@maxDiscount, '0.##'), N' percent of the list amount (company limit)');
+        THROW 50400, @limitMessage, 1;
+    END
+
     -- Duration and renewal date.
     DECLARE @unit VARCHAR(10) = ISNULL(@DurationUnit, @planUnit);
     DECLARE @count INT = ISNULL(@DurationCount, @planCount);
@@ -96,7 +105,10 @@ BEGIN
 
     DECLARE @n BIGINT = NEXT VALUE FOR dbo.SaleNumberSequence;
     DECLARE @digits VARCHAR(20) = CAST(@n AS VARCHAR(20));
-    DECLARE @saleNumber VARCHAR(20) = CONCAT('S-', YEAR(SYSUTCDATETIME()), '-', CASE WHEN LEN(@digits) < 6 THEN RIGHT('000000' + @digits, 6) ELSE @digits END);
+    -- Prefix from Admin Panel > Settings (1-5 capital letters); 'S' when missing or invalid.
+    DECLARE @prefix VARCHAR(5) = (SELECT CAST(SettingValue AS VARCHAR(5)) FROM dbo.Settings WHERE SettingKey = 'Sales.SaleNumberPrefix');
+    IF @prefix IS NULL OR @prefix = '' OR @prefix LIKE '%[^A-Z]%' COLLATE Latin1_General_CS_AS SET @prefix = 'S';
+    DECLARE @saleNumber VARCHAR(20) = CONCAT(@prefix, '-', YEAR(SYSUTCDATETIME()), '-', CASE WHEN LEN(@digits) < 6 THEN RIGHT('000000' + @digits, 6) ELSE @digits END);
     DECLARE @publicId UNIQUEIDENTIFIER = NEWID();
 
     INSERT dbo.Sales (PublicId, SaleNumber, CustomerId, CategoryId, ProductId, PlanId, SalesUserId, ManagerId, Quantity,
