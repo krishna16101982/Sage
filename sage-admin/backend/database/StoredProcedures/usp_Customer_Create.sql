@@ -1,5 +1,5 @@
--- Adds a customer (User Panel). Raises 50409 when the GSTIN is already used, or when a customer with the same name
--- already exists in the same city. Returns the new PublicId.
+-- Adds a customer, from the User Panel (@SalesUserId) or the Admin Panel (@AdminUserId). Raises 50409 when the GSTIN
+-- is already used, or when a customer with the same name already exists in the same city. Returns the new PublicId.
 CREATE OR ALTER PROCEDURE dbo.usp_Customer_Create
     @Name           NVARCHAR(200),
     @ContactPerson  NVARCHAR(150) = NULL,
@@ -10,7 +10,8 @@ CREATE OR ALTER PROCEDURE dbo.usp_Customer_Create
     @City           NVARCHAR(100) = NULL,
     @State          NVARCHAR(100) = NULL,
     @Country        NVARCHAR(100) = N'India',
-    @SalesUserId    BIGINT
+    @SalesUserId    BIGINT        = NULL,
+    @AdminUserId    BIGINT        = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -27,8 +28,8 @@ BEGIN
 
     DECLARE @publicId UNIQUEIDENTIFIER = NEWID();
 
-    INSERT dbo.Customers (PublicId, Name, ContactPerson, Email, Phone, GSTIN, Address, City, State, Country, CreatedBySalesUserId)
-    VALUES (@publicId, @Name, @ContactPerson, @Email, @Phone, @GSTIN, @Address, @City, @State, ISNULL(@Country, N'India'), @SalesUserId);
+    INSERT dbo.Customers (PublicId, Name, ContactPerson, Email, Phone, GSTIN, Address, City, State, Country, CreatedBySalesUserId, CreatedByAdminUserId)
+    VALUES (@publicId, @Name, @ContactPerson, @Email, @Phone, @GSTIN, @Address, @City, @State, ISNULL(@Country, N'India'), @SalesUserId, @AdminUserId);
 
     COMMIT;
 

@@ -65,9 +65,9 @@ public class PermissionsApiTests
     {
         var perms = profile switch
         {
-            "hr" => new[] { "Customer.View", "Customer.Add", "Customer.Edit", "Invoice.View" },
+            "hr" => new[] { "Customer.View", "Customer.Add", "Customer.Edit" },
             "sales" => new[] { "Customer.View", "Sales.View", "Sales.Add" },
-            "accounts" => new[] { "Invoice.View", "Payment.View", "FinancialReports.View" },
+            "accounts" => new[] { "Sales.View", "Product.View", "SalesUser.View" },
             _ => Array.Empty<string>()
         };
         var (_, token) = await UserWithAsync(perms);
@@ -118,7 +118,7 @@ public class PermissionsApiTests
         var res = await Call(HttpMethod.Get, "/api/admin/permissions?pageSize=10", await AdminTokenAsync());
         res.Status.ShouldBe(200);
         res.Data.GetProperty("items").GetArrayLength().ShouldBe(10);
-        res.Data.GetProperty("totalCount").GetInt32().ShouldBeGreaterThan(40);
+        res.Data.GetProperty("totalCount").GetInt32().ShouldBeGreaterThan(30);
         res.Data.GetProperty("totalPages").GetInt32().ShouldBeGreaterThan(1);
         var first = res.Data.GetProperty("items")[0];
         foreach (var p in new[] { "id", "moduleId", "moduleCode", "moduleName", "action", "code", "name", "isActive", "isSystem" })
@@ -155,10 +155,10 @@ public class PermissionsApiTests
     public async Task List_SearchMatchesCodeNameOrModule_CaseInsensitive()
     {
         var token = await AdminTokenAsync();
-        var res = await Call(HttpMethod.Get, "/api/admin/permissions?search=payment&pageSize=50", token);
+        var res = await Call(HttpMethod.Get, "/api/admin/permissions?search=customer&pageSize=50", token);
         var codes = res.Data.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("code").GetString()!).ToList();
-        codes.Count.ShouldBe(3);
-        codes.ShouldAllBe(c => c.StartsWith("Payment."));
+        codes.Count.ShouldBe(4);
+        codes.ShouldAllBe(c => c.StartsWith("Customer."));
     }
 
     [Fact]
@@ -533,8 +533,9 @@ public class PermissionsApiTests
     }
 
     [Fact]
-    public async Task HrModules_AreRemoved()
+    public async Task HrAndAccountsModules_AreRemoved()
     {
+        (await _fx.Db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM dbo.Modules WHERE Category = N'Accounts' OR Code IN ('Invoice','Payment','FinancialReports')")).ShouldBe(0);
         (await _fx.Db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM dbo.Modules WHERE Category = N'HR' OR Code IN ('Employee','Attendance','Payroll')")).ShouldBe(0);
         (await _fx.Db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM dbo.Permissions WHERE Code LIKE 'Employee.%' OR Code LIKE 'Attendance.%' OR Code LIKE 'Payroll.%'")).ShouldBe(0);
     }

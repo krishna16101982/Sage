@@ -38,6 +38,8 @@ export const routes: Routes = [
       { path: 'permissions', loadChildren: () => import('./modules/permissions/permissions.routes').then((m) => m.permissionRoutes) },
       { path: 'products', loadChildren: () => import('./modules/products/products.routes').then((m) => m.productRoutes) },
       { path: 'sales-users', loadChildren: () => import('./modules/sales-users/sales-users.routes').then((m) => m.salesUserRoutes) },
+      { path: 'customers', loadChildren: () => import('./modules/customers/customers.routes').then((m) => m.customerRoutes) },
+      { path: 'sales', loadChildren: () => import('./modules/sales/sales.routes').then((m) => m.saleRoutes) },
       {
         path: 'audit-logs',
         title: 'Audit Logs - Sage Admin',

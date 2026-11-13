@@ -29,9 +29,9 @@ namespace SageUserApi.AppFunctions
 
         /// <summary>Same columns, in the same order, as dbo.usp_Customer_GetPaged.</summary>
         private const string CustomerSelect = @"SELECT c.PublicId, c.Name, c.ContactPerson, c.Email, c.Phone, c.GSTIN, c.Address, c.City, c.State, c.Country, c.CreatedAtUtc,
-    CASE WHEN u.Id IS NULL THEN NULL ELSE CONCAT(u.FirstName, N' ', u.LastName) END,
+    CASE WHEN u.Id IS NOT NULL THEN CONCAT(u.FirstName, N' ', u.LastName) WHEN a.Id IS NOT NULL THEN CONCAT(a.FirstName, N' ', a.LastName, N' (Admin)') END,
     (SELECT COUNT(*) FROM dbo.Sales s WHERE s.CustomerId = c.Id AND s.Status = 'Active')
-FROM dbo.Customers c LEFT JOIN dbo.SalesUsers u ON u.Id = c.CreatedBySalesUserId
+FROM dbo.Customers c LEFT JOIN dbo.SalesUsers u ON u.Id = c.CreatedBySalesUserId LEFT JOIN dbo.AdminUsers a ON a.Id = c.CreatedByAdminUserId
 WHERE c.PublicId = @id AND c.IsActive = 1";
 
         [GeneratedRegex(@"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$")]

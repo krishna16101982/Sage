@@ -9,7 +9,7 @@ Three application folders (do not add more without approval):
 | `frontend/` | Admin Panel UI | Next.js (App Router), React, TypeScript, Tailwind |
 | `frontend-angular/` | Admin Panel UI, Angular version (same API and screens; both kept) — see its README | Angular 21, TypeScript |
 
-Design and plan: [SAGE_ANALYSIS.md](SAGE_ANALYSIS.md). Current status: **Sprint 9 (User Panel customers and sales, see `../sage-user/README.md`) done.** Sales are recorded in the User Panel; new tables `Customers` and `Sales` (DDL 020, 021). An Admin Panel sales report is a later sprint. Sales plan: [../SALES_DESIGN.md](../SALES_DESIGN.md).
+Design and plan: [SAGE_ANALYSIS.md](SAGE_ANALYSIS.md). Current status: **Sprint 9 (User Panel customers and sales, see `../sage-user/README.md`) done.** Sales are recorded in the User Panel; new tables `Customers` and `Sales` (DDL 020, 021). The Admin Panel adds and edits customers and reports every sale by sales person or manager-wise (see **Customers and sales** below). Sales plan: [../SALES_DESIGN.md](../SALES_DESIGN.md).
 
 ## First-time local setup
 
@@ -75,7 +75,7 @@ Integration tests create and drop their own database `SageAdmin_Test_<guid>` on 
 - `GET /api/admin/permissions` (paged: `page`, `pageSize`, `search`, `moduleId`, `isActive`, `sortBy`, `sortDirection`), `GET /api/admin/permissions/modules?includeInactive=`, `POST /api/admin/permissions`, `PUT /api/admin/permissions/{id}`, `POST /api/admin/permissions/modules`, `PUT /api/admin/permissions/modules/{id}`.
 - Every endpoint declares its permission with `[RequirePermission(PermissionConstants.X)]`. The backend checks it against SQL on every request: 401 without a valid session, 403 without the permission.
 - **Sidebar = modules.** Each module can have a **menu link** (`MenuPath`, e.g. `/products`; edited on Permissions > Modules). The sidebar lists every active module with a link whose `<Code>.View` the user holds (Super Admin: all), in sort order under its category. The API sends it with the signed-in user (`menu` in login / refresh / `GET /api/admin/auth/me`). Modules without a link only carry permissions. A link must be a screen the Admin Panel has. Editing a module without sending `menuPath` keeps its link (the Next.js app, whose sidebar is still a fixed list, does not send it); an empty `menuPath` removes it.
-- The HR modules (Employee, Attendance, Payroll) were removed (`SeedData/005_Remove_HR_Modules.sql`).
+- The HR modules (Employee, Attendance, Payroll) and the Accounts modules (Invoices, Payments, Financial Reports) were removed (`SeedData/005_Remove_HR_Modules.sql`, `006_Remove_Accounts_Modules.sql`).
 - A permission's code is `Module.Action`; module code, permission module and action never change after creation. System modules/permissions cannot be deactivated. Deactivating a module or permission bumps `PermissionVersion` of every affected user, so it takes effect on their next request.
 
 ## Permission groups (Sprint 4)
@@ -137,6 +137,21 @@ User Panel accounts, kept in `dbo.SalesUsers` (separate from admin users). Roles
 - Username and email are unique among non-deleted sales users. Role, manager, status and password changes bump `PermissionVersion`, so User Panel sessions pick them up on the next request (enforced once the User Panel exists).
 - Create, edit, status and password resets are audited; password data never appears in responses or audit rows.
 - UI: `/sales-users` (sidebar **Sales Users**).
+
+## Customers and sales
+Customers are shared with the User Panel (sales users add them there; admins add and edit them here). Sales are recorded and cancelled in the User Panel; the Admin Panel reads them.
+
+| Endpoint | Permission | Notes |
+|----------|------------|-------|
+| `GET /api/admin/customers` · `GET /api/admin/customers/{id}` | `Customer.View` | search (name, contact, email, phone, GSTIN, city), paging, sortBy name/city/createdAtUtc; each with its active sale count |
+| `POST /api/admin/customers` · `PUT /api/admin/customers/{id}` | `Customer.Add` · `Customer.Edit` | 409 for the same GSTIN, or the same name in the same city; audited |
+| `GET /api/admin/sales` | `Sales.View` | every sale; `sellerId` (one sales person), `managerId` (manager-wise: their own sales plus their team's), `customerId`, `search`, `status`, `soldFrom`, `soldTo`, sorting, paging; `totalSaleAmount` and `totalMargin` of the matching active sales |
+| `GET /api/admin/sales/summary?groupBy=seller|manager` | `Sales.View` | totals per sales person, or per manager with their team (`soldFrom`, `soldTo`); active sales only, cancelled ones counted |
+| `GET /api/admin/sales/{id}` · `GET /api/admin/sales/sellers` | `Sales.View` | one sale; sales persons and managers for the filters |
+
+- "Team" means the people who reported to the manager **when the sale was made** (`Sales.ManagerId`), so moving a person to another manager does not move their past sales.
+- Procedures: `usp_Customer_Create`, `usp_Customer_Update`, `usp_Customer_GetPaged`, `usp_Sale_AdminGetPaged`, `usp_Sale_Summary`. `Customers.CreatedByAdminUserId` / `UpdatedByAdminUserId` (DDL 023) record admin changes.
+- UI: `/customers` (sidebar **Customers**: list, add, edit) and `/sales` (sidebar **Sales**: all sales with filters and totals, summary by sales person / manager, sale details). Both appear in the sidebar through their module's menu link.
 
 If a running API locks `backend/src/bin`, build or test side by side with `dotnet test backend\SageAdmin.sln --artifacts-path backend\.artifacts` (ignored by git).
 

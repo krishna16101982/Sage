@@ -24,7 +24,7 @@ Status: **built** — Sprints 5–9 are done (catalog, sales users, admin users,
 | A5 | Currency is **INR** for everything (no multi-currency). |
 | A6 | Sales users can see the cost and margin on the sale page. *(Say if cost must be hidden from sales persons.)* |
 | A7 | Customers are **shared**: every sales user can search all customers and add new ones (avoids duplicates). Customer fields: company/name, contact person, email, phone, GSTIN, address, city, state, country. |
-| A8 | Visibility: a sales person sees **their own** sales; a manager sees **own + their team's**; Admin Panel sees all (reports later). |
+| A8 | Visibility: a sales person sees **their own** sales; a manager sees **own + their team's**; Admin Panel sees all: by sales person, manager-wise, and a summary per person / manager (built). |
 | A9 | One reporting level: sales person → manager. A manager has no manager. Changing a person's manager does not move their past sales. |
 | A10 | A sale can be **cancelled** (not deleted). Editing a saved sale is out of scope for the first version. |
 | A11 | Sales users are a **separate table** from admin users (separate login, tokens, lockout, history), using the same security rules as the Admin Panel. |
@@ -58,6 +58,7 @@ Writes with rules (sale creation and totals, manager assignment, plan price chan
 | 7 | Admin | Admin Users (create, group, activate/deactivate, reset password) — pulled forward, done |
 | 8 | User | `sage-user` foundation: backend (shared common lib, same DB), sales-user login/refresh/logout/change password, Angular frontend shell — done |
 | 9 | User | Customers + sale page + My sales / Team sales — done |
-| later | Admin | Dashboard & Audit log screens, Settings, sales reports |
+| 9+ | Admin | Customers (add / edit) and Sales (all sales by sales person or manager-wise, summary) — done; HR and Accounts modules removed |
+| later | Admin | Dashboard & Audit log screens, Settings |
 
 `sage-user/bakend` was renamed to `sage-user/backend` (Sprint 8). The User Panel frontend is Angular.

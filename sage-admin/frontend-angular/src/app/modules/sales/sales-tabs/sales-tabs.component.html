@@ -1,0 +1,4 @@
+<nav class="tabs" aria-label="Sales sections">
+  <a class="tab" routerLink="/sales/list" routerLinkActive #l="routerLinkActive" [attr.aria-selected]="l.isActive" style="text-decoration: none">All sales</a>
+  <a class="tab" routerLink="/sales/summary" routerLinkActive #s="routerLinkActive" [attr.aria-selected]="s.isActive" style="text-decoration: none">Summary by person / manager</a>
+</nav>

@@ -22,10 +22,11 @@ BEGIN
     OPTION (RECOMPILE);
 
     SELECT c.PublicId, c.Name, c.ContactPerson, c.Email, c.Phone, c.GSTIN, c.Address, c.City, c.State, c.Country, c.CreatedAtUtc,
-           CASE WHEN u.Id IS NULL THEN NULL ELSE CONCAT(u.FirstName, N' ', u.LastName) END AS CreatedByName,
+           CASE WHEN u.Id IS NOT NULL THEN CONCAT(u.FirstName, N' ', u.LastName) WHEN a.Id IS NOT NULL THEN CONCAT(a.FirstName, N' ', a.LastName, N' (Admin)') END AS CreatedByName,
            (SELECT COUNT(*) FROM dbo.Sales s WHERE s.CustomerId = c.Id AND s.Status = 'Active') AS SaleCount
     FROM dbo.Customers c
     LEFT JOIN dbo.SalesUsers u ON u.Id = c.CreatedBySalesUserId
+    LEFT JOIN dbo.AdminUsers a ON a.Id = c.CreatedByAdminUserId
     WHERE c.IsActive = 1
       AND (@Search IS NULL OR c.Name LIKE @Search ESCAPE '\' OR c.ContactPerson LIKE @Search ESCAPE '\' OR c.Email LIKE @Search ESCAPE '\'
            OR c.Phone LIKE @Search ESCAPE '\' OR c.GSTIN LIKE @Search ESCAPE '\' OR c.City LIKE @Search ESCAPE '\')

@@ -94,15 +94,15 @@ public class JwtAndMeTests
     {
         var c = _fx.CreateClient();
         var user = await TestData.CreateUserAsync(_fx.Db);
-        await TestData.AssignGroupAsync(_fx.Db, user, "Customer.View", "Customer.Add", "Customer.Edit", "Invoice.View");
+        await TestData.AssignGroupAsync(_fx.Db, user, "Customer.View", "Customer.Add", "Customer.Edit", "Sales.View");
         var login = await AuthHttp.LoginAsync(c, user.Username, user.Password);
         var me = await AuthHttp.MeAsync(c, login.AccessToken);
 
         var perms = me.Data.GetProperty("permissions").EnumerateArray().Select(x => x.GetString()!).OrderBy(x => x).ToList();
-        perms.ShouldBe(new[] { "Customer.Add", "Customer.Edit", "Customer.View", "Invoice.View" });
+        perms.ShouldBe(new[] { "Customer.Add", "Customer.Edit", "Customer.View", "Sales.View" });
         perms.ShouldNotContain("Customer.Delete");
         me.Data.GetProperty("modules").EnumerateArray().Select(m => m.GetProperty("code").GetString()).OrderBy(x => x)
-            .ShouldBe(new[] { "Customer", "Invoice" });
+            .ShouldBe(new[] { "Customer", "Sales" });
     }
 
     [Fact]
@@ -129,11 +129,11 @@ public class JwtAndMeTests
         var me = await AuthHttp.MeAsync(c, (await AuthHttp.LoginAsync(c, user.Username, user.Password)).AccessToken);
 
         var menu = me.Data.GetProperty("menu").EnumerateArray().ToList();
-        var seeded = new[] { "/dashboard", "/users", "/groups", "/permissions", "/audit-logs", "/settings", "/products", "/sales-users" };
+        var seeded = new[] { "/dashboard", "/users", "/groups", "/permissions", "/audit-logs", "/settings", "/products", "/sales-users", "/customers", "/sales" };
         menu.Select(m => m.GetProperty("path").GetString()).Where(seeded.Contains).ShouldBe(seeded);
         menu.First().GetProperty("category").GetString().ShouldBe("Administration");
         menu.Single(m => m.GetProperty("code").GetString() == "Product").GetProperty("name").GetString().ShouldBe("Product Catalog");
-        menu.ShouldNotContain(m => m.GetProperty("code").GetString() == "Customer"); // no screen (no link): not in the menu
+        menu.Single(m => m.GetProperty("code").GetString() == "Customer").GetProperty("category").GetString().ShouldBe("Sales");
     }
 
     [Fact]
@@ -141,10 +141,10 @@ public class JwtAndMeTests
     {
         var c = _fx.CreateClient();
         var user = await TestData.CreateUserAsync(_fx.Db);
-        await TestData.AssignGroupAsync(_fx.Db, user, "Product.View", "Product.Add", "Customer.View", "SalesUser.Add");
+        await TestData.AssignGroupAsync(_fx.Db, user, "Product.View", "Product.Add", "Customer.View", "SalesUser.Add", "Sales.Add");
         var me = await AuthHttp.MeAsync(c, (await AuthHttp.LoginAsync(c, user.Username, user.Password)).AccessToken);
 
-        // Product.View -> Products. Customer has no link; SalesUser.Add without SalesUser.View does not show the menu item.
-        me.Data.GetProperty("menu").EnumerateArray().Select(m => m.GetProperty("path").GetString()).ShouldBe(new[] { "/products" });
+        // Product.View -> Products, Customer.View -> Customers. Add without View (SalesUser, Sales) does not show the menu item.
+        me.Data.GetProperty("menu").EnumerateArray().Select(m => m.GetProperty("path").GetString()).ShouldBe(new[] { "/products", "/customers" });
     }
 }

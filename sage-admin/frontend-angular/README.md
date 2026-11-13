@@ -40,7 +40,7 @@ src/
       auth/                     auth.service.ts (signed-in user), auth.guard.ts (authGuard, guestGuard)
       permission/               permission.service.ts (has / hasAll), permission.guard.ts (route data.access_perms)
       message/                  message.service.ts (success notice carried from Add/Edit back to the list)
-      admin-users/ sales-users/ groups/ permissions/ products/   one service per API area
+      admin-users/ sales-users/ groups/ permissions/ products/ customers/ sales/   one service per API area
     shared/
       interfaces/               API types (*.interface.ts)
       enumarations/             permission-codes.ts (Perm)
@@ -60,6 +60,9 @@ src/
       permissions/              permissions list/add/edit/form, permission-modules list/add/edit/form, tabs
       products/                 products-list (catalog), product-categories add/edit/form,
                                 products add/edit/form, product-plans add/edit/form
+      customers/                customers-list (+ customers-filter), customers-add, customers-edit, customers-form
+      sales/                    sales-list (+ sales-filter: sales person / manager team / status / dates), sales-summary
+                                (by sales person or by manager), sales-view (one sale), sales-tabs
 ```
 
 Every component is a `.ts` file (logic) with a matching `.html` file (markup) beside it. Pages use the class names from `src/styles/` in their `.html`; there are no per-component CSS files.

@@ -60,7 +60,7 @@ public class DatabaseSchemaTests
     {
         var db = TestDb.Create(_fx.ConnectionString);
         (await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM dbo.Permissions WHERE Code = 'Customer.View'")).ShouldBe(1);
-        (await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM dbo.Permissions WHERE Code LIKE 'FinancialReports.%'")).ShouldBe(2);
+        (await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM dbo.Permissions WHERE Code LIKE 'Sales.%'")).ShouldBe(4);
         (await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM sys.views WHERE name = 'vw_AdminUserEffectivePermissions'")).ShouldBe(1);
         (await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM sys.objects WHERE name = 'fn_UserHasPermission' AND type = 'FN'")).ShouldBe(1);
     }

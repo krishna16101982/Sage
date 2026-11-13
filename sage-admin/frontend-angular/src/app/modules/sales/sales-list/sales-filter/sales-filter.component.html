@@ -1,0 +1,23 @@
+<input class="field field-inline w-64" aria-label="Search sales" placeholder="Sale number, customer or product"
+       [(ngModel)]="search" (ngModelChange)="changed(true)" />
+<select class="field field-inline" aria-label="Sales person" [(ngModel)]="sellerId" (ngModelChange)="pickSeller()">
+  <option value="">Any sales person</option>
+  @for (s of sellers(); track s.id) {
+    <option [value]="s.id">{{ s.name }}{{ s.role === 'SalesManager' ? ' (manager)' : '' }}{{ s.status === 'Active' ? '' : ' - ' + s.status }}</option>
+  }
+</select>
+<select class="field field-inline" aria-label="Manager (team)" [(ngModel)]="managerId" (ngModelChange)="pickManager()">
+  <option value="">Any manager</option>
+  @for (m of managers(); track m.id) { <option [value]="m.id">Team of {{ m.name }}</option> }
+</select>
+<select class="field field-inline" aria-label="Status" [(ngModel)]="status" (ngModelChange)="changed(false)">
+  <option value="">Any status</option>
+  <option value="Active">Active</option>
+  <option value="Cancelled">Cancelled</option>
+</select>
+<span class="row-tight text-sm">
+  Sold
+  <input class="field field-inline" type="date" aria-label="Sold from" [(ngModel)]="soldFrom" (ngModelChange)="changed(false)" />
+  to
+  <input class="field field-inline" type="date" aria-label="Sold to" [(ngModel)]="soldTo" (ngModelChange)="changed(false)" />
+</span>

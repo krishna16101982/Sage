@@ -40,6 +40,14 @@ namespace SageAdminApi.Globals
         internal const string SalesUserChangeStatus = "SalesUser.ChangeStatus";
         internal const string SalesUserResetPassword = "SalesUser.ResetPassword";
 
+        //Customers (shared with the User Panel)
+        internal const string CustomerView = "Customer.View";
+        internal const string CustomerAdd = "Customer.Add";
+        internal const string CustomerEdit = "Customer.Edit";
+
+        //Sales (recorded in the User Panel; read-only here)
+        internal const string SalesView = "Sales.View";
+
         //Audit logs
         internal const string AuditLogView = "AuditLog.View";
 

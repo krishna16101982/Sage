@@ -1,0 +1,77 @@
+<div class="stack">
+  <h1 class="page-title">Sales</h1>
+  <app-sales-tabs />
+  <p class="hint">Sales are recorded by sales users in the User Panel. "Team of …" shows a manager's own sales plus their team's.</p>
+
+  <div class="toolbar">
+    <app-sales-filter [sellers]="sellers()" [initial]="filter" (filterChange)="onFilter($event)" />
+  </div>
+  @if (customerId()) {
+    <p class="text-sm">Showing one customer's sales. <a class="link-button" routerLink="/sales/list">Show all customers</a></p>
+  }
+
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+
+  @if (data(); as d) {
+    <div class="tile-grid" aria-label="Totals">
+      <div class="card"><div class="card-body stack-xs">
+        <span class="text-xs text-muted">Sales</span><span class="font-semibold">{{ d.totalCount }}</span>
+      </div></div>
+      <div class="card"><div class="card-body stack-xs">
+        <span class="text-xs text-muted">Sale amount (active)</span><span class="font-semibold">{{ inr(d.totalSaleAmount) }}</span>
+      </div></div>
+      <div class="card"><div class="card-body stack-xs">
+        <span class="text-xs text-muted">Margin (active)</span>
+        <span class="font-semibold" [class.text-danger]="d.totalMargin < 0">{{ inr(d.totalMargin) }}</span>
+      </div></div>
+    </div>
+  }
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th appSort [active]="sortBy() === 'saleNumber'" [direction]="sortDirection()" (sort)="sort('saleNumber', $event)">Sale</th>
+          <th appSort [active]="sortBy() === 'soldAt'" [direction]="sortDirection()" (sort)="sort('soldAt', $event)">Sold on</th>
+          <th appSort [active]="sortBy() === 'customer'" [direction]="sortDirection()" (sort)="sort('customer', $event)">Customer</th>
+          <th appSort [active]="sortBy() === 'product'" [direction]="sortDirection()" (sort)="sort('product', $event)">Product / plan</th>
+          <th appSort [active]="sortBy() === 'seller'" [direction]="sortDirection()" (sort)="sort('seller', $event)">Sales person</th>
+          <th class="amount">Qty</th>
+          <th class="amount" appSort [active]="sortBy() === 'saleAmount'" [direction]="sortDirection()" (sort)="sort('saleAmount', $event)">Sale amount</th>
+          <th class="amount">Discount</th>
+          <th class="amount">Margin</th>
+          <th appSort [active]="sortBy() === 'renewalDate'" [direction]="sortDirection()" (sort)="sort('renewalDate', $event)">Renewal</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (s of data()?.items ?? []; track s.id) {
+          <tr [class.dim]="s.status === 'Cancelled'">
+            <td><a class="link-button code" style="white-space: nowrap" [routerLink]="['/sales', s.id]">{{ s.saleNumber }}</a></td>
+            <td class="date">{{ dateTime(s.createdAtUtc) }}</td>
+            <td>{{ s.customerName }}</td>
+            <td>{{ s.productName }} <div class="hint">{{ s.planName }}</div></td>
+            <td>
+              {{ s.sellerName }}
+              <div class="hint">{{ s.sellerRole === 'SalesManager' ? 'Manager' : (s.managerName ? 'Team of ' + s.managerName : '') }}</div>
+            </td>
+            <td class="amount">{{ s.quantity }}</td>
+            <td class="amount">{{ inr(s.saleAmount) }}</td>
+            <td class="amount">{{ inr(s.discountAmount) }} <div class="hint">{{ s.discountPercent }}%</div></td>
+            <td class="amount" [class.text-danger]="s.margin < 0">{{ inr(s.margin) }}</td>
+            <td class="date">{{ date(s.renewalDate) }}</td>
+            <td>
+              @if (s.status === 'Cancelled') { <span class="badge badge-danger">Cancelled</span> } @else { <span class="badge">Active</span> }
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="11" class="table-empty">{{ loading() ? 'Loading...' : 'No sales match.' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (data(); as d) {
+    <app-pagination [page]="d.page" [totalPages]="d.totalPages" [totalCount]="d.totalCount" (pageChange)="goTo($event)" />
+  }
+</div>

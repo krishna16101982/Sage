@@ -1,0 +1,85 @@
+<div class="stack">
+  <h1 class="page-title">Sales</h1>
+  <app-sales-tabs />
+
+  <div class="toolbar">
+    <div class="row-tight" role="group" aria-label="Group by">
+      <button type="button" class="btn" [class.btn-primary]="groupBy() === 'seller'" [class.btn-secondary]="groupBy() !== 'seller'" (click)="setGroup('seller')">By sales person</button>
+      <button type="button" class="btn" [class.btn-primary]="groupBy() === 'manager'" [class.btn-secondary]="groupBy() !== 'manager'" (click)="setGroup('manager')">By manager (team)</button>
+    </div>
+    <span class="row-tight text-sm">
+      Sold
+      <input class="field field-inline" type="date" aria-label="Sold from" [(ngModel)]="soldFrom" (ngModelChange)="load()" />
+      to
+      <input class="field field-inline" type="date" aria-label="Sold to" [(ngModel)]="soldTo" (ngModelChange)="load()" />
+      <button type="button" class="link-button" (click)="allTime()">All time</button>
+    </span>
+  </div>
+  <p class="hint">
+    @if (groupBy() === 'manager') {
+      Each manager's own sales plus the sales of the people who reported to them when the sale was made.
+    } @else {
+      Each sales person's own sales (managers sell too).
+    }
+    Amounts cover active sales; cancelled sales are only counted.
+  </p>
+
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>{{ groupBy() === 'manager' ? 'Manager' : 'Sales person' }}</th>
+          <th>{{ groupBy() === 'manager' ? 'Team size' : 'Manager' }}</th>
+          <th class="amount">Sales</th>
+          <th class="amount">Cancelled</th>
+          <th class="amount">List amount</th>
+          <th class="amount">Discount</th>
+          <th class="amount">Sale amount</th>
+          <th class="amount">Margin</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of rows() ?? []; track r.id) {
+          <tr [class.dim]="r.saleCount === 0 && r.cancelledCount === 0">
+            <td>{{ r.name }} <div class="hint">{{ r.username }}</div></td>
+            <td>
+              @if (groupBy() === 'manager') { {{ r.teamSize }} }
+              @else { {{ r.role === 'SalesManager' ? 'Manager' : (r.managerName ?? '-') }} }
+            </td>
+            <td class="amount">{{ r.saleCount }}</td>
+            <td class="amount">{{ r.cancelledCount }}</td>
+            <td class="amount">{{ inr(r.listAmount) }}</td>
+            <td class="amount">{{ inr(r.discountAmount) }}</td>
+            <td class="amount font-semibold">{{ inr(r.saleAmount) }}</td>
+            <td class="amount" [class.text-danger]="r.margin < 0">{{ inr(r.margin) }}</td>
+            <td class="actions">
+              @if (r.saleCount + r.cancelledCount > 0) {
+                <a class="link-button" routerLink="/sales/list" [queryParams]="salesQuery(r)">View sales</a>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="9" class="table-empty">{{ loading() || !rows() ? 'Loading...' : 'No sales users yet.' }}</td></tr>
+        }
+      </tbody>
+      @if ((rows()?.length ?? 0) > 0) {
+        <tfoot>
+          <tr class="font-semibold">
+            <td>Total</td>
+            <td></td>
+            <td class="amount">{{ totals().saleCount }}</td>
+            <td class="amount">{{ totals().cancelledCount }}</td>
+            <td class="amount">{{ inr(totals().listAmount) }}</td>
+            <td class="amount">{{ inr(totals().discountAmount) }}</td>
+            <td class="amount">{{ inr(totals().saleAmount) }}</td>
+            <td class="amount">{{ inr(totals().margin) }}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      }
+    </table>
+  </div>
+</div>
