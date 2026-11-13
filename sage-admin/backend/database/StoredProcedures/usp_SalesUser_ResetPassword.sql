@@ -26,6 +26,10 @@ BEGIN
     UPDATE dbo.SalesUserRefreshTokens SET RevokedAtUtc = SYSUTCDATETIME(), RevokedReason = 'password_reset_by_admin'
     WHERE SalesUserId = @id AND RevokedAtUtc IS NULL;
 
+    -- An emailed reset link stops working once an admin has set a password.
+    UPDATE dbo.SalesUserPasswordResetTokens SET UsedAtUtc = SYSUTCDATETIME()
+    WHERE SalesUserId = @id AND UsedAtUtc IS NULL;
+
     COMMIT;
 
     SELECT CAST(1 AS BIGINT);

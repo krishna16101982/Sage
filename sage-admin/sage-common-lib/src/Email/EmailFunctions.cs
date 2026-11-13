@@ -7,10 +7,11 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using SageAdminApi.Models;
 
-namespace SageAdminApi.AppFunctions
+namespace SageCommonLib.Email
 {
     /// <summary>One email to send: a plain-text body and an HTML body with the same content.</summary>
     public sealed record EmailMessage(string To, string Subject, string TextBody, string HtmlBody);
@@ -137,10 +138,64 @@ namespace SageAdminApi.AppFunctions
         }
 
         /// <summary>"kumar@example.com" becomes "k***@example.com" in the logs.</summary>
-        public static string MaskEmail(string _email)
+        public static string MaskEmail(string? _email)
         {
             int _at = _email?.IndexOf('@') ?? -1;
-            return _at <= 0 ? "***" : _email[0] + "***" + _email[_at..];
+            return _at <= 0 || _email == null ? "***" : _email[0] + "***" + _email[_at..];
+        }
+    }
+
+    public static class EmailServiceCollectionExtensions
+    {
+        /// <summary>
+        /// Binds the "Email" settings and, when they are filled in, registers the queue, the SMTP transport and the background
+        /// sender. Returns true when email is configured (the caller then registers its email-based notifiers).
+        /// </summary>
+        public static bool AddSageEmail(this IServiceCollection _services, IConfiguration _configuration)
+        {
+            IConfigurationSection _section = _configuration.GetSection(EmailSettings.SectionName);
+            _services.Configure<EmailSettings>(_section);
+            if (_section.Get<EmailSettings>()?.IsConfigured != true) return false;
+            _services.AddSingleton<IEmailQueue, EmailQueue>();
+            _services.AddSingleton<IEmailTransport, SmtpEmailTransport>();
+            _services.AddHostedService<EmailBackgroundService>();
+            return true;
+        }
+    }
+
+    /// <summary>The "reset your password" email, shared by both panels (only the product name differs).</summary>
+    public static class PasswordResetEmail
+    {
+        /// <summary>The link, how long it is valid, and what to do if the user did not ask for it. The name is HTML-encoded.</summary>
+        public static EmailMessage Build(string _productName, string _email, string? _firstName, string _rawToken, DateTime _expiresAtUtc, string _frontendBaseUrl, DateTime _nowUtc)
+        {
+            string _link = $"{_frontendBaseUrl.TrimEnd('/')}/reset-password?token={Uri.EscapeDataString(_rawToken)}";
+            int _minutes = Math.Max(1, (int)Math.Round((_expiresAtUtc - _nowUtc).TotalMinutes));
+            string _name = string.IsNullOrWhiteSpace(_firstName) ? "there" : _firstName.Trim();
+
+            string _text =
+                $"Hello {_name},\r\n\r\n" +
+                $"We received a request to reset your {_productName} password. Open this link to choose a new one:\r\n\r\n" +
+                $"{_link}\r\n\r\n" +
+                $"The link works once and expires in {_minutes} minutes.\r\n\r\n" +
+                "If you did not ask for this, you can ignore this email; your password stays the same.\r\n\r\n" +
+                _productName;
+
+            string _safeName = WebUtility.HtmlEncode(_name);
+            string _safeLink = WebUtility.HtmlEncode(_link);
+            string _safeProduct = WebUtility.HtmlEncode(_productName);
+            string _html =
+                "<!DOCTYPE html><html><body style=\"margin:0;padding:24px;background:#eceff4;font-family:Segoe UI,Arial,sans-serif;color:#2a3f54\">" +
+                "<div style=\"max-width:520px;margin:0 auto;background:#ffffff;border-radius:6px;padding:28px\">" +
+                "<h2 style=\"margin:0 0 16px;font-size:20px\">Reset your password</h2>" +
+                $"<p>Hello {_safeName},</p>" +
+                $"<p>We received a request to reset your {_safeProduct} password. Click the button to choose a new one.</p>" +
+                $"<p style=\"margin:24px 0\"><a href=\"{_safeLink}\" style=\"background:#1abb9c;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:4px;display:inline-block\">Choose a new password</a></p>" +
+                $"<p style=\"font-size:13px;color:#73879c\">The link works once and expires in {_minutes} minutes. If the button does not work, copy this address into your browser:<br>{_safeLink}</p>" +
+                "<p style=\"font-size:13px;color:#73879c\">If you did not ask for this, you can ignore this email; your password stays the same.</p>" +
+                "</div></body></html>";
+
+            return new EmailMessage(_email, $"Reset your {_productName} password", _text, _html);
         }
     }
 }

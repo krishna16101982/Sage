@@ -13,6 +13,10 @@ namespace SageUserApi.Models
         public int PasswordHashIterations { get; set; } = Constants.Password.Pbkdf2Iterations;
         public bool RefreshCookieSecure { get; set; } = true;
         public string RefreshCookieSameSite { get; set; } = "Lax";
+        /// <summary>How long an emailed "forgot password" link works.</summary>
+        public int PasswordResetMinutes { get; set; } = 30;
+        /// <summary>The User Panel's address, used to build the reset link.</summary>
+        public string FrontendBaseUrl { get; set; } = "http://localhost:4300";
     }
 
     /// <summary>Row model for dbo.SalesUsers (sign-in columns).</summary>

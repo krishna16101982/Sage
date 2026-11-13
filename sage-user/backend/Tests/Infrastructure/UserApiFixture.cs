@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -6,12 +7,27 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.Security;
+using SageUserApi.AppFunctions.Interfaces;
 
 namespace SageUserApi.Tests.Infrastructure;
+
+/// <summary>Captures "forgot password" tokens instead of sending email.</summary>
+public sealed class CapturingNotifier : IPasswordResetNotifier
+{
+    public ConcurrentDictionary<string, string> LastTokenByEmail { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Task SendAsync(string email, string firstName, string rawToken, DateTime expiresAtUtc, CancellationToken ct = default)
+    {
+        LastTokenByEmail[email] = rawToken;
+        return Task.CompletedTask;
+    }
+}
 
 /// <summary>A throw-away database plus an in-memory User API wired to it (fast password hashing, no rate-limit noise).</summary>
 public sealed class UserApiFixture : IAsyncLifetime
@@ -24,6 +40,7 @@ public sealed class UserApiFixture : IAsyncLifetime
     private readonly SqlServerFixture _sql = new();
     public WebApplicationFactory<Program> Factory { get; private set; } = default!;
     public IDatabaseFunctions Db { get; private set; } = default!;
+    public CapturingNotifier Notifier { get; } = new();
 
     public async Task InitializeAsync()
     {
@@ -42,6 +59,11 @@ public sealed class UserApiFixture : IAsyncLifetime
                 ["RateLimiting:AuthPermitPerMinute"] = "100000",
                 ["Serilog:FilePath"] = Path.Combine(Path.GetTempPath(), "sage-user-tests-logs"),
             }));
+            b.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IPasswordResetNotifier>();
+                services.AddSingleton<IPasswordResetNotifier>(Notifier);
+            });
         });
     }
 

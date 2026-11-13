@@ -16,6 +16,8 @@ export const routes: Routes = [
     component: LoginLayout,
     children: [
       { path: 'login', title: 'Sign in - Sage Sales', canActivate: [guestGuard], loadComponent: () => import('./modules/login/login-prompt/login-prompt').then((m) => m.LoginPrompt) },
+      { path: 'forgot-password', title: 'Forgot password - Sage Sales', loadComponent: () => import('./modules/login/forgot-password/forgot-password').then((m) => m.ForgotPassword) },
+      { path: 'reset-password', title: 'Reset password - Sage Sales', loadComponent: () => import('./modules/login/reset-password/reset-password').then((m) => m.ResetPassword) },
     ],
   },
 

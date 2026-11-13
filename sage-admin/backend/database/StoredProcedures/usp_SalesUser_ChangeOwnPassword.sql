@@ -21,6 +21,10 @@ BEGIN
     UPDATE dbo.SalesUserRefreshTokens SET RevokedAtUtc = @NowUtc, RevokedReason = 'password_changed'
     WHERE SalesUserId = @SalesUserId AND RevokedAtUtc IS NULL;
 
+    -- An emailed reset link stops working once the password has changed.
+    UPDATE dbo.SalesUserPasswordResetTokens SET UsedAtUtc = @NowUtc
+    WHERE SalesUserId = @SalesUserId AND UsedAtUtc IS NULL;
+
     COMMIT;
 
     SELECT @rows;

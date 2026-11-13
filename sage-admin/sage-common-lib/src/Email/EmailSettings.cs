@@ -1,8 +1,8 @@
-namespace SageAdminApi.Models
+namespace SageCommonLib.Email
 {
     /// <summary>
     /// Bound from the "Email" configuration section. When Host and FromAddress are set, password-reset emails are sent over
-    /// SMTP; otherwise the API falls back to logging (the reset link only in Development).
+    /// SMTP; otherwise each API falls back to logging (the reset link only in Development). Used by both APIs.
     /// Keep the password out of git: use User Secrets (dotnet user-secrets set "Email:Password" "...") on a developer
     /// machine, or an environment variable (Email__Password) on a server.
     /// </summary>
@@ -19,7 +19,8 @@ namespace SageAdminApi.Models
         public string Password { get; set; } = string.Empty;
         /// <summary>The sender address. Many servers require it to match UserName.</summary>
         public string FromAddress { get; set; } = string.Empty;
-        public string FromName { get; set; } = "Sage Admin";
+        /// <summary>The name shown as the sender, e.g. "Sage Admin" or "Sage Sales".</summary>
+        public string FromName { get; set; } = "Sage";
         public int TimeoutSeconds { get; set; } = 30;
 
         public bool IsConfigured => !string.IsNullOrWhiteSpace(Host) && !string.IsNullOrWhiteSpace(FromAddress);

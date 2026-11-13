@@ -12,6 +12,8 @@
   </ItemGroup>
 
   <PropertyGroup>
+    <!-- Shared with the Admin API: one "dotnet user-secrets set Email:Password" serves both. -->
+    <UserSecretsId>875c9add-6ed8-4d26-b7c7-ea2a286016fd</UserSecretsId>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

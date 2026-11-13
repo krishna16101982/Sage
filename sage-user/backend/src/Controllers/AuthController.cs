@@ -103,6 +103,28 @@ namespace SageUserApi.Controllers
             return _fr.Status ? Ok(_apiResponse.Success<object>(null, _fr.Message[0])) : ApplicationCommonFunctions.ErrorResult(_apiResponse, _fr);
         });
 
+        /// <summary>Emails a one-time reset link. Always the same answer, so it does not reveal which emails have an account.</summary>
+        [HttpPost("forgot-password")]
+        [AllowAnonymous]
+        [EnableRateLimiting(ApplicationConstants.Auth.RateLimitPolicy)]
+        public Task<IActionResult> ForgotPassword([FromBody] HttpForgotPasswordPostParams _params, CancellationToken _ct) => RunAsync("C:Auth:ForgotPassword", async () =>
+        {
+            IFunctionReturn _fr = await _authFunctions.ForgotPasswordAsync(_params?.Email, ClientIp, _ct);
+            return _fr.Status ? Ok(_apiResponse.Success<object>(null, _fr.Message[0])) : ApplicationCommonFunctions.ErrorResult(_apiResponse, _fr);
+        });
+
+        /// <summary>Sets a new password from the emailed link (single use, 30 minutes). Every session ends.</summary>
+        [HttpPost("reset-password")]
+        [AllowAnonymous]
+        [EnableRateLimiting(ApplicationConstants.Auth.RateLimitPolicy)]
+        public Task<IActionResult> ResetPassword([FromBody] HttpResetPasswordPostParams _params, CancellationToken _ct) => RunAsync("C:Auth:ResetPassword", async () =>
+        {
+            IFunctionReturn _fr = await _authFunctions.ResetPasswordAsync(_params, ClientIp, _ct);
+            if (!_fr.Status) return ApplicationCommonFunctions.ErrorResult(_apiResponse, _fr);
+            ClearRefreshCookie();
+            return Ok(_apiResponse.Success<object>(null, _fr.Message[0]));
+        });
+
         /// <summary>Change the signed-in sales user's password. Every session ends, so they sign in again.</summary>
         [HttpPost("change-password")]
         [Authorize]

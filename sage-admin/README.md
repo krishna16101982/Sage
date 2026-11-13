@@ -82,8 +82,10 @@ cd sage-admin\backend\src
 dotnet user-secrets set "Email:Password" "<smtp password>"
 ```
 
+- The sender lives in `sage-common-lib/src/Email` and is shared with the User API (its "forgot password" emails); both APIs use the same User Secrets store, so the password is set once.
 - Emails are queued and sent by a background service (`EmailBackgroundService`, three tries), so *Forgot password* answers at once and takes the same time whether or not the address has an account. Failures are logged with the recipient masked (`k***@example.com`); the reset token is never logged.
 - Port 465 (implicit TLS) is not supported by `System.Net.Mail`; use 587 with STARTTLS.
+- No email arriving? Look in the API log for `could not be sent`. A connection timeout (10060) means the network blocks outgoing mail ports from that machine (common on office networks): send from a server that may reach the mail server, or ask IT to open port 587 to it.
 - Production cookie settings: `AuthSettings:RefreshCookieSecure=true` (default) and `RefreshCookieSameSite` (`None` if the frontend is on another site).
 
 ## Permissions (Sprint 3)

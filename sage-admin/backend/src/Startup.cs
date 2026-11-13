@@ -25,6 +25,7 @@ using SageAdminApi.AppFunctions.Interfaces;
 using SageAdminApi.Globals;
 using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
+using SageCommonLib.Email;
 using SageCommonLib.Globals;
 using SageCommonLib.Models;
 using SageCommonLib.Models.Interfaces;
@@ -193,12 +194,8 @@ namespace SageAdminApi
             services.AddScoped<ITokenFunctions, TokenFunctions>();
             services.AddScoped<IAuditFunctions, AuditFunctions>();
             // Password-reset emails go out over SMTP when the "Email" settings are filled in; otherwise they are only logged.
-            services.Configure<EmailSettings>(Configuration.GetSection(EmailSettings.SectionName));
-            if (Configuration.GetSection(EmailSettings.SectionName).Get<EmailSettings>()?.IsConfigured == true)
+            if (services.AddSageEmail(Configuration))
             {
-                services.AddSingleton<IEmailQueue, EmailQueue>();
-                services.AddSingleton<IEmailTransport, SmtpEmailTransport>();
-                services.AddHostedService<EmailBackgroundService>();
                 services.AddScoped<IPasswordResetNotifier, EmailPasswordResetNotifier>();
             }
             else

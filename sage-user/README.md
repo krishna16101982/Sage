@@ -14,6 +14,7 @@ Status: **Sprint 8 (foundation) and Sprint 9 (sales) done** — sign-in, session
 ## Screens
 | Screen | URL | Who |
 |--------|-----|-----|
+| Forgot password (emailed link), Reset password | `/forgot-password`, `/reset-password?token=` | anyone (signed out) |
 | Home (this month's sales, team figures for a manager) | `/home` | everyone |
 | New sale | `/sales/add` | everyone |
 | My sales | `/sales/list` | everyone |
@@ -65,6 +66,8 @@ New screens go in `modules/<feature>/` with their own `<feature>.routes.ts` and 
 | `POST /api/user/auth/refresh-token` | refresh cookie | rotates the token; replaying an old one ends the whole session |
 | `POST /api/user/auth/logout` | refresh cookie | ends this session; idempotent |
 | `POST /api/user/auth/change-password` | bearer | ends every session; clears "must change password" |
+| `POST /api/user/auth/forgot-password` | anonymous | `{email}`; emails a one-time link (30 min) to an active sales user; the same answer for every email; rate limited |
+| `POST /api/user/auth/reset-password` | reset link | `{token, newPassword, confirmPassword}`; single use; ends every session, clears "must change password" and any lockout |
 | `GET /api/user/auth/me` | bearer | user, role (`SalesPerson`/`SalesManager`), `isManager`, `managerName` |
 | `GET /api/user/status` | anonymous | API and database health |
 | `GET /api/user/catalog` | bearer | active categories > products > plans (price, cost, duration); products without an active plan are left out |
@@ -84,7 +87,8 @@ New screens go in `modules/<feature>/` with their own `<feature>.routes.ts` and 
 
 - Separate identity from the Admin API: own issuer/audience (`sage.user`), own signing key, own cookie (`sage_user_rt`), own session tables (`SalesUserRefreshTokens`, `SalesUserLoginHistories`). Admin tokens are refused here and the reverse.
 - Same rules as the Admin Panel: 15-minute access tokens, 5 failed sign-ins lock the account for 15 minutes, every request re-checks that the user is active and the token is current. An admin deactivating a sales user or resetting their password ends their User Panel sessions immediately.
-- There is no self-service "forgot password": an admin resets it in the Admin Panel, and the user must change it at next sign-in.
+- **Forgot password:** the sign-in page links to `/forgot-password`. The link in the email opens `/reset-password?token=…` (`AuthSettings:FrontendBaseUrl`, `http://localhost:4300` locally). Only the token's SHA-256 hash is stored (`dbo.SalesUserPasswordResetTokens`, DDL 026); asking again, changing the password, or an admin reset makes older links stop working. `usp_SalesUser_ResetPasswordWithToken` checks and uses up the link in the same transaction as the password change, so a link cannot be used twice. An admin can still set a temporary password in the Admin Panel.
+- **Email:** the same `Email` settings and shared sender as the Admin API (`sage-common-lib/src/Email`, see the Admin README). The User API uses the Admin API's User Secrets store, so `dotnet user-secrets set "Email:Password" "…"` (run once, in either API folder) serves both. Without email settings, Development writes the reset link to the API log.
 
 ## Tests
 ```powershell

@@ -9,4 +9,4 @@
   </label>
   <button type="submit" class="btn btn-primary btn-block" [disabled]="busy()">{{ busy() ? 'Please wait...' : 'Sign in' }}</button>
 </form>
-<p class="hint">Forgot your password? Ask your administrator to reset it.</p>
+<a routerLink="/forgot-password" class="link-button text-sm">Forgot password?</a>

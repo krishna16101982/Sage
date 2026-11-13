@@ -23,6 +23,9 @@ namespace SageUserApi.Globals
             public const string LoggedOut = "Logged out.";
             public const string RateLimited = "Too many requests. Please try again later.";
             public const string PasswordMismatch = "Password and confirm password do not match";
+            public const string ForgotPasswordGeneric = "If the email belongs to an active account, a reset link has been sent.";
+            public const string InvalidResetToken = "This reset link is invalid or has expired. Ask for a new one.";
+            public const string PasswordResetDone = "Password reset. Please sign in.";
         }
 
         public static class Messages
@@ -84,6 +87,8 @@ namespace SageUserApi.Globals
         {
             public const string SalesUserRecordLogin = "dbo.usp_SalesUser_RecordLogin";
             public const string SalesUserChangeOwnPassword = "dbo.usp_SalesUser_ChangeOwnPassword";
+            public const string SalesUserPasswordResetTokenCreate = "dbo.usp_SalesUserPasswordResetToken_Create";
+            public const string SalesUserResetPasswordWithToken = "dbo.usp_SalesUser_ResetPasswordWithToken";
             public const string SalesUserRefreshTokenRotate = "dbo.usp_SalesUserRefreshToken_Rotate";
             public const string CustomerCreate = "dbo.usp_Customer_Create";
             public const string CustomerGetPaged = "dbo.usp_Customer_GetPaged";

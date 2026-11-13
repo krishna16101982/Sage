@@ -1,5 +1,6 @@
 using System.Text;
 using SageAdminApi.AppFunctions;
+using SageCommonLib.Email;
 using Shouldly;
 
 namespace SageAdminApi.Tests.UnitTests.AdminUsers;
@@ -33,7 +34,7 @@ public class CsvAndEmailUnitTests
     public void ResetEmail_HasTheLink_TheExpiry_AndEscapesTheName()
     {
         var now = new DateTime(2026, 11, 13, 10, 0, 0, DateTimeKind.Utc);
-        var mail = EmailPasswordResetNotifier.Build("asha@example.com", "<b>Asha</b>", "a+b/c=", now.AddMinutes(30), "http://localhost:4200/", now);
+        var mail = PasswordResetEmail.Build("Sage Admin", "asha@example.com", "<b>Asha</b>", "a+b/c=", now.AddMinutes(30), "http://localhost:4200/", now);
 
         mail.To.ShouldBe("asha@example.com");
         mail.Subject.ShouldBe("Reset your Sage Admin password");

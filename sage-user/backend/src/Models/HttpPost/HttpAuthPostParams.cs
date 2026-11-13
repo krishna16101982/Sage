@@ -8,6 +8,19 @@ namespace SageUserApi.Models.HttpPost
     }
 
 
+    public class HttpForgotPasswordPostParams
+    {
+        public string Email { get; set; } = string.Empty;
+    }
+
+    /// <summary>From the emailed link: the token, and the new password twice.</summary>
+    public class HttpResetPasswordPostParams
+    {
+        public string Token { get; set; } = string.Empty;
+        public string NewPassword { get; set; } = string.Empty;
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+
     public class HttpChangePasswordPostParams
     {
         public string CurrentPassword { get; set; } = string.Empty;

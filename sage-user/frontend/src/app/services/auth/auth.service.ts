@@ -46,6 +46,16 @@ export class AuthService {
   }
 
   /** The server ends every session afterwards, so the user signs in again. */
+  /** Emails a one-time reset link (same answer whether or not the email has an account). */
+  forgotPassword(email: string): Promise<null> {
+    return this.api.post<null>('/api/user/auth/forgot-password', { email });
+  }
+
+  /** From the emailed link. Every session ends, so the user signs in again. */
+  resetPassword(token: string, newPassword: string, confirmPassword: string): Promise<null> {
+    return this.api.post<null>('/api/user/auth/reset-password', { token, newPassword, confirmPassword });
+  }
+
   async changePassword(currentPassword: string, newPassword: string, confirmPassword: string): Promise<void> {
     await this.api.post<null>('/api/user/auth/change-password', { currentPassword, newPassword, confirmPassword });
     this.api.setAccessToken(null);

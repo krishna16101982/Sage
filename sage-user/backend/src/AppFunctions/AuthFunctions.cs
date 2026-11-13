@@ -41,10 +41,12 @@ WHERE u.IsDeleted = 0 AND ";
         private readonly ITokenFunctions _tokenFunctions;
         private readonly JwtIssuerOptions _jwtIssuerOptions;
         private readonly AuthSettings _authSettings;
+        private readonly IPasswordResetNotifier _passwordResetNotifier;
 
         public AuthFunctions(ILoggerFunctions __loggerFunctions, IDatabaseFunctions __databaseFunctions, ITokenFunctions __tokenFunctions,
-            IOptions<JwtIssuerOptions> __jwtIssuerOptions, IOptions<AuthSettings> __authSettings)
+            IOptions<JwtIssuerOptions> __jwtIssuerOptions, IOptions<AuthSettings> __authSettings, IPasswordResetNotifier __passwordResetNotifier)
         {
+            _passwordResetNotifier = __passwordResetNotifier;
             _loggerFunctions = __loggerFunctions;
             _databaseFunctions = __databaseFunctions;
             _tokenFunctions = __tokenFunctions;
@@ -338,6 +340,73 @@ WHERE u.IsDeleted = 0 AND ";
                 }, _methodName, null, _ct));
                 await AuditAsync("PasswordChange", _user, _ipAddress, _ct);
                 return CommonFunctions.AppSuccess(ApplicationConstants.Auth.PasswordChanged, _methodName);
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return ApplicationCommonFunctions.SystemError(_methodName);
+            }
+        }
+
+        public async Task<IFunctionReturn> ForgotPasswordAsync(string _email, string _ipAddress, CancellationToken _ct = default)
+        {
+            string _methodName = "F:Auth:ForgotPassword";
+            try
+            {
+                string _normalized = (_email ?? string.Empty).Trim();
+                if (ValidationFunctions.IsValidEmail(_normalized))
+                {
+                    SalesUser _user = await QueryUserAsync("u.Email = @e", P("@e", _normalized), _ct);
+                    if (_user != null && _user.Status == ApplicationDatabaseConstants.Status.Active)
+                    {
+                        string _raw = TokenGenerator.CreateSecureToken();
+                        DateTime _now = DateTime.UtcNow;
+                        DateTime _expires = _now.AddMinutes(_authSettings.PasswordResetMinutes);
+                        // Older links stop working; only the newest one is valid.
+                        EnsureOk(await _databaseFunctions.ExecuteProcedureWriteAsync(SP.SalesUserPasswordResetTokenCreate, new[]
+                        {
+                            P("@SalesUserId", _user.Id), P("@TokenHash", TokenGenerator.Hash(_raw)), Dt("@ExpiresAtUtc", _expires), Dt("@NowUtc", _now),
+                            P("@RequestedIp", Truncate(_ipAddress, 45))
+                        }, _methodName, null, _ct));
+                        await _passwordResetNotifier.SendAsync(_user.Email, _user.FirstName, _raw, _expires, _ct);
+                        await AuditAsync("PasswordResetRequested", _user, _ipAddress, _ct);
+                    }
+                }
+                // Same answer whether or not the account exists (no account enumeration).
+                return CommonFunctions.AppSuccess(ApplicationConstants.Auth.ForgotPasswordGeneric, _methodName);
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return ApplicationCommonFunctions.SystemError(_methodName);
+            }
+        }
+
+        public async Task<IFunctionReturn> ResetPasswordAsync(HttpResetPasswordPostParams _params, string _ipAddress, CancellationToken _ct = default)
+        {
+            string _methodName = "F:Auth:ResetPassword";
+            try
+            {
+                var _errors = new List<string>(ValidationFunctions.CheckPasswordStrength(_params?.NewPassword));
+                if (_params?.NewPassword != _params?.ConfirmPassword) _errors.Add(ApplicationConstants.Auth.PasswordMismatch);
+                if (_errors.Count > 0)
+                    return new FunctionReturn { Status = false, MessageType = Constants.ReturnMessageTypes.ValidationError, Message = _errors, HttpStatusCode = Constants.HttpStatusCodes.BadRequest, MethodName = _methodName };
+                if (string.IsNullOrWhiteSpace(_params.Token))
+                    return CommonFunctions.AppError(ApplicationConstants.Auth.InvalidResetToken, _methodName);
+
+                // Checks the link, uses it up and sets the password in one transaction (0 = invalid, expired or already used).
+                (IFunctionReturn _write, long _userId) = await _databaseFunctions.ExecuteProcedureWriteAsync(SP.SalesUserResetPasswordWithToken, new[]
+                {
+                    P("@TokenHash", TokenGenerator.Hash(_params.Token.Trim())),
+                    P("@PasswordHash", SecurityHash.HashPassword(_params.NewPassword, _authSettings.PasswordHashIterations)),
+                    Dt("@NowUtc", DateTime.UtcNow)
+                }, _methodName, null, _ct);
+                EnsureOk((_write, _userId));
+                if (_userId == 0) return CommonFunctions.AppError(ApplicationConstants.Auth.InvalidResetToken, _methodName);
+
+                SalesUser _user = await GetUserByIdAsync(_userId, _ct);
+                if (_user != null) await AuditAsync("PasswordReset", _user, _ipAddress, _ct);
+                return CommonFunctions.AppSuccess(ApplicationConstants.Auth.PasswordResetDone, _methodName);
             }
             catch (Exception ex)
             {

@@ -20,6 +20,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
+using SageCommonLib.Email;
 using SageCommonLib.Globals;
 using SageCommonLib.Models;
 using SageCommonLib.Models.Interfaces;
@@ -113,6 +114,11 @@ namespace SageUserApi
             services.AddScoped<IDatabaseFunctions, DatabaseFunctions>();
             services.AddScoped<IApiResponse, ApiResponse>();
             services.AddScoped<ITokenFunctions, TokenFunctions>();
+            // "Forgot password" emails go out over SMTP when the "Email" settings are filled in; otherwise they are only logged.
+            if (services.AddSageEmail(Configuration))
+                services.AddScoped<IPasswordResetNotifier, EmailPasswordResetNotifier>();
+            else
+                services.AddScoped<IPasswordResetNotifier, LogPasswordResetNotifier>();
             services.AddScoped<IAuthFunctions, AuthFunctions>();
             services.AddScoped<ISalesUserContextFunctions, SalesUserContextFunctions>();
             services.AddScoped<ICatalogFunctions, CatalogFunctions>();

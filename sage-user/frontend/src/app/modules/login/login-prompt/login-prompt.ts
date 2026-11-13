@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Alert } from '../../../component/alert/alert';
 import { AuthService } from '../../../services/auth/auth.service';
 import { errorText } from '../../../services/rest/global-rest-service';
@@ -8,7 +8,7 @@ import { errorText } from '../../../services/rest/global-rest-service';
 /** /login — sign in with username or email and password. */
 @Component({
   selector: 'app-login-prompt',
-  imports: [FormsModule, Alert],
+  imports: [FormsModule, RouterLink, Alert],
   templateUrl: './login-prompt.html',
 })
 export class LoginPrompt {
