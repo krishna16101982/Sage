@@ -31,6 +31,14 @@ namespace SageUserApi.AppFunctions.Interfaces
         Task<(CustomerDto customer, IFunctionReturn functionReturn)> CreateCustomerAsync(HttpCustomerPostParams _params, SalesUserContext _user, string _ipAddress, CancellationToken _ct = default);
     }
 
+    /// <summary>The New order form: lists and defaults, saving an order, its details for a sale.</summary>
+    public interface IOrderFormFunctions
+    {
+        Task<(OrderFormOptions options, IFunctionReturn functionReturn)> GetOptionsAsync(CancellationToken _ct = default);
+        Task<(SaleDto sale, IFunctionReturn functionReturn)> CreateOrderAsync(HttpOrderFormPostParams _params, SalesUserContext _user, string _ipAddress, CancellationToken _ct = default);
+        Task<(OrderDetailsDto details, IFunctionReturn functionReturn)> GetOrderDetailsAsync(Guid _saleId, SalesUserContext _user, CancellationToken _ct = default);
+    }
+
     public interface ISaleFunctions
     {
         Task<(SalesPage result, IFunctionReturn functionReturn)> GetSalesAsync(SaleFilter _filter, SalesUserContext _user, CancellationToken _ct = default);

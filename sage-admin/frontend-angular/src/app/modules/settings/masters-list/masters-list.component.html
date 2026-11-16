@@ -1,0 +1,76 @@
+<div class="stack max-w-3xl">
+  <div class="page-header">
+    <div class="stack-xs">
+      <a class="link-button text-sm" routerLink="/settings">← Settings</a>
+      <span class="page-eyebrow">Administration</span>
+      <h1 class="page-title">Order form lists</h1>
+    </div>
+  </div>
+  <p class="hint">
+    Every drop-down on the User Panel's New order form comes from these lists. The default is filled in on a new order.
+    A value already used by orders can be turned off (it stays on those orders) but not removed.
+    @if (!canEdit) { You can view the lists; changing them needs the Settings · Edit permission. }
+  </p>
+
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (notice()) { <app-alert kind="success">{{ notice() }}</app-alert> }
+  @if (!lists() && !error()) { <p class="text-sm text-muted">Loading...</p> }
+
+  @for (list of lists() ?? []; track list.masterType) {
+    <section class="card">
+      <header class="card-header row">
+        <h2 class="section-title">{{ list.label }}</h2>
+        <span class="spacer"></span>
+        @if (canEdit && !draft()) { <button type="button" class="btn btn-secondary" (click)="add(list)">Add value</button> }
+      </header>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Name</th><th>Code</th><th class="amount">Order</th><th>Status</th><th class="amount">Used by</th><th></th></tr>
+          </thead>
+          <tbody>
+            @for (v of list.values; track v.id) {
+              @if (isEditing(list, v)) {
+                <ng-container *ngTemplateOutlet="editRow" />
+              } @else {
+                <tr>
+                  <td class="font-medium">{{ v.name }} @if (v.isDefault) { <span class="badge badge-success">Default</span> }</td>
+                  <td><span class="code">{{ v.code }}</span></td>
+                  <td class="amount">{{ v.sortOrder }}</td>
+                  <td>@if (v.isActive) { <span class="badge badge-success">On</span> } @else { <span class="badge">Off</span> }</td>
+                  <td class="amount">{{ v.usedBy }}</td>
+                  <td class="amount">@if (canEdit && !draft()) { <button type="button" class="link-button text-sm" (click)="edit(v)">Edit</button> }</td>
+                </tr>
+              }
+            }
+            @if (isEditing(list, null)) {
+              <ng-container *ngTemplateOutlet="editRow" />
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+
+  <!-- The row being added or edited (only one at a time). -->
+  <ng-template #editRow>
+    @if (draft(); as d) {
+      <tr>
+        <td><input class="field" name="name" maxlength="100" placeholder="Name" [ngModel]="d.name" (ngModelChange)="setDraft('name', $event)" /></td>
+        <td><input class="field" name="code" maxlength="30" placeholder="CODE" [ngModel]="d.code" (ngModelChange)="setDraft('code', $event)" /></td>
+        <td><input class="field" name="sortOrder" type="number" min="0" max="10000" [ngModel]="d.sortOrder" (ngModelChange)="setDraft('sortOrder', $event)" /></td>
+        <td class="stack-xs">
+          <label class="checkbox-label"><input type="checkbox" name="isActive" [disabled]="d.isDefault" [ngModel]="d.isActive" (ngModelChange)="setDraft('isActive', $event)" /> On</label>
+          <label class="checkbox-label"><input type="checkbox" name="isDefault" [ngModel]="d.isDefault" (ngModelChange)="setDraft('isDefault', $event)" /> Default</label>
+        </td>
+        <td colspan="2" class="amount">
+          <div class="row-tight" style="justify-content: flex-end">
+            <button type="button" class="btn btn-secondary" (click)="draft.set(null)">Cancel</button>
+            <button type="button" class="btn btn-primary" [disabled]="saving() || !d.name.trim() || !d.code.trim()" (click)="save()">{{ saving() ? 'Saving...' : 'Save' }}</button>
+          </div>
+        </td>
+      </tr>
+      @if (draftError()) { <tr><td colspan="6"><app-alert kind="error">{{ draftError() }}</app-alert></td></tr> }
+    }
+  </ng-template>
+</div>

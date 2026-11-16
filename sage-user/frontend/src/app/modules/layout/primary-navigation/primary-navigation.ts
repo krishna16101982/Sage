@@ -15,6 +15,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { href: '/home', label: 'Home', icon: 'home', section: 'Overview', managerOnly: false },
   { href: '/sales/add', label: 'New sale', icon: 'plus-circle', section: 'Sales', managerOnly: false },
+  { href: '/sales/order-form', label: 'New order form', icon: 'file-text', section: 'Sales', managerOnly: false },
   { href: '/sales/list', label: 'My sales', icon: 'list', section: 'Sales', managerOnly: false },
   { href: '/sales/team', label: 'Team sales', icon: 'users', section: 'Sales', managerOnly: true },
   { href: '/team', label: 'My team', icon: 'user-check', section: 'Sales', managerOnly: true },

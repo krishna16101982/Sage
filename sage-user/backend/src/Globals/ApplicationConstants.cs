@@ -93,6 +93,7 @@ namespace SageUserApi.Globals
             public const string CustomerCreate = "dbo.usp_Customer_Create";
             public const string CustomerGetPaged = "dbo.usp_Customer_GetPaged";
             public const string SaleCreate = "dbo.usp_Sale_Create";
+            public const string SaleOrderCreate = "dbo.usp_SaleOrder_Create";
             public const string SaleCancel = "dbo.usp_Sale_Cancel";
             public const string SaleGetPaged = "dbo.usp_Sale_GetPaged";
             public const string SaleCancelRequestCreate = "dbo.usp_SaleCancelRequest_Create";

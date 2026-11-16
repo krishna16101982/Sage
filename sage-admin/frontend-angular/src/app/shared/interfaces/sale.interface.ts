@@ -1,3 +1,4 @@
+import type { AdminOrderDetails } from './master.interface';
 import type { PagedResult } from './api.interface';
 
 export type SaleStatus = 'Active' | 'Cancelled';
@@ -35,6 +36,13 @@ export interface Sale {
   cancelledAtUtc: string | null;
   cancelledByName: string | null;
   cancelReason: string | null;
+  /** GST on the sale amount (0 for a sale from the simple page) and the total the customer pays. */
+  gstPercent: number;
+  taxAmount: number;
+  totalAmount: number;
+  freeMonths: number;
+  /** Order-form details (single-sale view only; null for a sale from the simple page). */
+  orderDetails?: AdminOrderDetails | null;
 }
 
 /** A page of sales plus totals of every matching ACTIVE sale. */

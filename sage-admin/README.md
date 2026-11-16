@@ -174,6 +174,15 @@ Customers are shared with the User Panel (sales users add them there; admins add
 - UI: `/customers` (sidebar **Customers**: list, add, edit) and `/sales` (sidebar **Sales**: all sales with filters and totals, summary by sales person / manager, sale details). Both appear in the sidebar through their module's menu link.
 - Exports (`CsvBuilder`): UTF-8 with a byte-order mark so Excel shows names correctly, amounts as plain numbers (`1234.50`), dates `yyyy-MM-dd`, times in UTC. Text starting with `=`, `+`, `-` or `@` gets a leading `'` so a spreadsheet never runs a customer name or note as a formula. Each export is in the audit log (action `Export`, entity `Sale`) with the filters used and the row count. The **Export CSV** button on Sales downloads exactly what the filters show (all pages).
 
+## Order form lists and order details
+| Endpoint | Permission | Notes |
+|----------|------------|-------|
+| `GET /api/admin/masters` | `Setting.View` | the five order-form lists (`dbo.MasterValues`, DDL 028/030): billing frequency, billing method, payment method, payment term, currency, with each value's use count |
+| `POST /api/admin/masters` · `PUT /api/admin/masters/{id}` | `Setting.Edit` | add / change a value (`usp_MasterValue_Save`): making a value the default clears the old default in the same transaction; the default cannot be turned off; a value in use is turned off, never removed; audited |
+
+- Order details live on the same `dbo.Sales` row (DDL 029/030): `GstPercent`, `TaxAmount`, `TotalAmount` (computed: sale amount + tax), `FreeMonths`, the five list ids (foreign keys to `MasterValues`), primary / billing contact and `BillToAddress`. A sale from the simple New sale page keeps GST 0 and no details.
+- Settings > Order form: `Sales.DefaultGstPercent` (18) and `Sales.MaxFreeMonths` (12). UI: Settings > **Order form lists** (`/settings/masters`); the Admin sale page shows GST, order total and the order details; the CSV export has GST %, Tax, Total and Free months.
+
 ## My Profile
 | Endpoint | Permission | Notes |
 |----------|------------|-------|

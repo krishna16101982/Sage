@@ -46,12 +46,39 @@
             <tr><td>List amount ({{ s.quantity }} × {{ inr(s.unitPrice) }})</td><td class="amount">{{ inr(s.listAmount) }}</td></tr>
             <tr><td>Discount ({{ s.discountPercent }}%)</td><td class="amount">− {{ inr(s.discountAmount) }}</td></tr>
             <tr><td class="font-semibold">Sale amount</td><td class="amount font-semibold">{{ inr(s.saleAmount) }}</td></tr>
+            @if (s.taxAmount > 0 || s.orderDetails) {
+              <tr><td>GST ({{ s.gstPercent }}%)</td><td class="amount">{{ inr(s.taxAmount) }}</td></tr>
+              <tr><td class="font-semibold">Order total</td><td class="amount font-semibold">{{ inr(s.totalAmount) }}</td></tr>
+            }
             <tr><td>Cost ({{ s.quantity }} × {{ inr(s.unitCost) }})</td><td class="amount">{{ inr(s.costAmount) }}</td></tr>
             <tr><td>Margin</td><td class="amount" [class.text-danger]="s.margin < 0">{{ inr(s.margin) }}</td></tr>
           </tbody>
         </table>
       </div>
     </section>
+
+    @if (s.orderDetails; as o) {
+      <section class="card">
+        <header class="card-header"><h2 class="section-title">Order form</h2></header>
+        <div class="card-body stack-sm text-sm">
+          <div class="form-grid-3">
+            <div><span class="text-muted">Free months</span><div>{{ o.freeMonths > 0 ? '+' + o.freeMonths : 'None' }}</div></div>
+            <div><span class="text-muted">Billing</span><div>{{ o.billingFrequency }}, {{ o.billingMethod }}</div></div>
+            <div><span class="text-muted">Payment</span><div>{{ o.paymentMethod }}, {{ o.paymentTerm }}</div></div>
+            <div><span class="text-muted">Currency</span><div>{{ o.currency }}</div></div>
+            <div><span class="text-muted">Primary contact</span>
+              <div>{{ o.primaryContactName }}{{ o.primaryContactDesignation ? ', ' + o.primaryContactDesignation : '' }}</div>
+              <div class="text-muted">{{ o.primaryContactEmail }} {{ o.primaryContactPhone }}</div></div>
+            @if (o.billingContactName) {
+              <div><span class="text-muted">Billing contact</span>
+                <div>{{ o.billingContactName }}{{ o.billingContactDesignation ? ', ' + o.billingContactDesignation : '' }}</div>
+                <div class="text-muted">{{ o.billingContactEmail }} {{ o.billingContactPhone }}</div></div>
+            }
+          </div>
+          @if (o.billToAddress) { <div><span class="text-muted">Bill to</span><div style="white-space: pre-line">{{ o.billToAddress }}</div></div> }
+        </div>
+      </section>
+    }
 
     <section class="card">
       <header class="card-header"><h2 class="section-title">Term</h2></header>

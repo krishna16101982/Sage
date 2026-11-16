@@ -573,4 +573,32 @@
     box-shadow: var(--shadow-card);
   }
   .auth-title { font-size: 1.25rem; font-weight: 600; }
+
+  /* =================================================================================================
+     Order form: numbered sections on the left, order summary and actions on the right (sticky)
+     ================================================================================================= */
+  .order-layout { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: 1.25rem; align-items: start; }
+  .order-aside { position: sticky; top: 4.75rem; display: flex; flex-direction: column; gap: 0.75rem; }
+  @media (max-width: 1100px) {
+    .order-layout { grid-template-columns: 1fr; }
+    .order-aside { position: static; }
+  }
+  .step-head { display: flex; align-items: flex-start; gap: 0.625rem; }
+  .step-head .hint { margin: 0.125rem 0 0; }
+  .step-badge {
+    display: inline-flex; width: 1.5rem; height: 1.5rem; flex-shrink: 0; align-items: center; justify-content: center;
+    border-radius: 999px; background: var(--color-primary); color: #ffffff; font-size: 0.75rem; font-weight: 600;
+  }
+  .subcard { padding: 0.875rem; border-radius: var(--radius); background: var(--color-surface-muted); }
+  .summary-row { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.1875rem 0; }
+  .summary-row > :last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .summary-total { margin-top: 0.25rem; padding-top: 0.5rem; border-top: 1px solid var(--color-border); font-weight: 600; }
+  .field-muted { background: var(--color-surface-muted); color: var(--color-text-muted); }
+  .text-right { text-align: right; }
+  .form-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.875rem; }
+  .form-grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.875rem; }
+  .form-grid-5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.875rem; }
+  @media (max-width: 1280px) { .form-grid-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 900px) { .form-grid-3, .form-grid-4, .form-grid-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 640px) { .form-grid-3, .form-grid-4, .form-grid-5 { grid-template-columns: 1fr; } }
 }

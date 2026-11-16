@@ -83,6 +83,40 @@
       </div>
     </section>
 
+    @if (order(); as o) {
+      @if (o.hasOrderForm) {
+        <section class="card">
+          <header class="card-header"><h2 class="section-title">Order form</h2></header>
+          <div class="card-body stack-sm text-sm">
+            <table class="data-table">
+              <tbody>
+                <tr><td>Sale amount</td><td class="amount">{{ inr(s.saleAmount) }}</td></tr>
+                <tr><td>GST ({{ o.gstPercent }}%)</td><td class="amount">{{ inr(o.taxAmount) }}</td></tr>
+                <tr><td class="font-semibold">Order total</td><td class="amount font-semibold">{{ inr(o.totalAmount) }}</td></tr>
+              </tbody>
+            </table>
+            <div class="form-grid-3">
+              <div><span class="text-muted">Free months</span><div>{{ o.freeMonths > 0 ? '+' + o.freeMonths : 'None' }}</div></div>
+              <div><span class="text-muted">Billing</span><div>{{ o.billingFrequency }}, {{ o.billingMethod }}</div></div>
+              <div><span class="text-muted">Payment</span><div>{{ o.paymentMethod }}, {{ o.paymentTerm }}</div></div>
+              <div><span class="text-muted">Currency</span><div>{{ o.currency }}</div></div>
+              @if (o.primaryContact; as c) {
+                <div><span class="text-muted">Primary contact</span>
+                  <div>{{ c.name }}{{ c.designation ? ', ' + c.designation : '' }}</div>
+                  <div class="text-muted">{{ c.email }} {{ c.phone }}</div></div>
+              }
+              @if (o.billingContact; as c) {
+                <div><span class="text-muted">Billing contact</span>
+                  <div>{{ c.name }}{{ c.designation ? ', ' + c.designation : '' }}</div>
+                  <div class="text-muted">{{ c.email }} {{ c.phone }}</div></div>
+              }
+            </div>
+            @if (o.billToAddress) { <div><span class="text-muted">Bill to</span><div style="white-space: pre-line">{{ o.billToAddress }}</div></div> }
+          </div>
+        </section>
+      }
+    }
+
     <section class="card">
       <header class="card-header"><h2 class="section-title">Term</h2></header>
       <div class="card-body form-grid-2 text-sm">

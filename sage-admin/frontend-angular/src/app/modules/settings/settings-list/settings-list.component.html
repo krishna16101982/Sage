@@ -5,6 +5,7 @@
       <h1 class="page-title">Settings</h1>
     </div>
     <div class="spacer"></div>
+    <a class="btn btn-secondary" routerLink="/settings/masters">Order form lists</a>
     @if (canSeeAudit) { <a class="btn btn-secondary" routerLink="/audit-logs/list" [queryParams]="{}">Audit log</a> }
   </div>
   <p class="hint">

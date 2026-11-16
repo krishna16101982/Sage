@@ -82,7 +82,32 @@ namespace SageAdminApi.AppFunctions
                 CreatedAtUtc = _row.GetUtc("CreatedAtUtc"),
                 CancelledAtUtc = _row.GetNullableUtc("CancelledAtUtc"),
                 CancelledByName = _row.GetText("CancelledByName"),
-                CancelReason = _row.GetText("CancelReason")
+                CancelReason = _row.GetText("CancelReason"),
+                GstPercent = _row.GetDecimal("GstPercent"),
+                TaxAmount = _row.GetDecimal("TaxAmount"),
+                TotalAmount = _row.GetDecimal("TotalAmount"),
+                FreeMonths = _row.GetInt("FreeMonths"),
+                // The single-sale query also returns the order-form details; the list does not.
+                OrderDetails = _row.Table.Columns.Contains("BillingFrequency") && _row.GetText("BillingFrequency") != null
+                    ? new AdminOrderDetails
+                    {
+                        FreeMonths = _row.GetInt("FreeMonths"),
+                        BillingFrequency = _row.GetText("BillingFrequency"),
+                        BillingMethod = _row.GetText("BillingMethod"),
+                        PaymentMethod = _row.GetText("PaymentMethod"),
+                        PaymentTerm = _row.GetText("PaymentTerm"),
+                        Currency = _row.GetText("Currency"),
+                        PrimaryContactName = _row.GetText("PrimaryContactName"),
+                        PrimaryContactDesignation = _row.GetText("PrimaryContactDesignation"),
+                        PrimaryContactEmail = _row.GetText("PrimaryContactEmail"),
+                        PrimaryContactPhone = _row.GetText("PrimaryContactPhone"),
+                        BillingContactName = _row.GetText("BillingContactName"),
+                        BillingContactDesignation = _row.GetText("BillingContactDesignation"),
+                        BillingContactEmail = _row.GetText("BillingContactEmail"),
+                        BillingContactPhone = _row.GetText("BillingContactPhone"),
+                        BillToAddress = _row.GetText("BillToAddress")
+                    }
+                    : null
             };
         }
 
@@ -151,7 +176,11 @@ namespace SageAdminApi.AppFunctions
                 _sqlQuery.Append("        CASE WHEN mg.Id IS NULL THEN NULL ELSE CONCAT(mg.FirstName, N' ', mg.LastName) END AS ManagerName, ");
                 _sqlQuery.Append("        s.Quantity, s.UnitPrice, s.UnitCost, s.ListAmount, s.SaleAmount, s.DiscountAmount, s.CostAmount, ");
                 _sqlQuery.Append("        s.DurationUnit, s.DurationCount, s.StartDate, s.RenewalDate, s.Status, s.Notes, s.CreatedAtUtc, s.CancelledAtUtc, ");
-                _sqlQuery.Append("        CASE WHEN cb.Id IS NULL THEN NULL ELSE CONCAT(cb.FirstName, N' ', cb.LastName) END AS CancelledByName, s.CancelReason ");
+                _sqlQuery.Append("        CASE WHEN cb.Id IS NULL THEN NULL ELSE CONCAT(cb.FirstName, N' ', cb.LastName) END AS CancelledByName, s.CancelReason, ");
+                _sqlQuery.Append("        s.GstPercent, s.TaxAmount, s.TotalAmount, s.FreeMonths, ");
+                _sqlQuery.Append("        bf.Name AS BillingFrequency, bm.Name AS BillingMethod, pm.Name AS PaymentMethod, pt.Name AS PaymentTerm, cy.Name AS Currency, ");
+                _sqlQuery.Append("        s.PrimaryContactName, s.PrimaryContactDesignation, s.PrimaryContactEmail, s.PrimaryContactPhone, ");
+                _sqlQuery.Append("        s.BillingContactName, s.BillingContactDesignation, s.BillingContactEmail, s.BillingContactPhone, s.BillToAddress ");
                 _sqlQuery.Append(" FROM dbo.Sales s ");
                 _sqlQuery.Append(" JOIN dbo.Customers cu ON cu.Id = s.CustomerId ");
                 _sqlQuery.Append(" JOIN dbo.ProductCategories c ON c.Id = s.CategoryId ");
@@ -160,6 +189,11 @@ namespace SageAdminApi.AppFunctions
                 _sqlQuery.Append(" JOIN dbo.SalesUsers su ON su.Id = s.SalesUserId ");
                 _sqlQuery.Append(" LEFT JOIN dbo.SalesUsers mg ON mg.Id = s.ManagerId ");
                 _sqlQuery.Append(" LEFT JOIN dbo.SalesUsers cb ON cb.Id = s.CancelledBySalesUserId ");
+                _sqlQuery.Append(" LEFT JOIN dbo.MasterValues bf ON bf.Id = s.BillingFrequencyId ");
+                _sqlQuery.Append(" LEFT JOIN dbo.MasterValues bm ON bm.Id = s.BillingMethodId ");
+                _sqlQuery.Append(" LEFT JOIN dbo.MasterValues pm ON pm.Id = s.PaymentMethodId ");
+                _sqlQuery.Append(" LEFT JOIN dbo.MasterValues pt ON pt.Id = s.PaymentTermId ");
+                _sqlQuery.Append(" LEFT JOIN dbo.MasterValues cy ON cy.Id = s.CurrencyId ");
                 _sqlQuery.Append(" WHERE s.PublicId = @id ");
 
                 (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
@@ -260,15 +294,16 @@ namespace SageAdminApi.AppFunctions
                         $"{_count:N0} sales match. An export can hold up to {MaxExportRows:N0}: choose a shorter date range or more filters, then export again.", _methodName));
 
                 var _csv = new CsvBuilder("Sale number", "Sold at (UTC)", "Customer", "Category", "Product", "Plan", "Sales person", "Role", "Manager",
-                    "Quantity", "Unit price", "List amount", "Discount", "Discount %", "Sale amount", "Cost", "Margin", "Duration",
+                    "Quantity", "Unit price", "List amount", "Discount", "Discount %", "Sale amount", "GST %", "Tax", "Total", "Cost", "Margin", "Duration", "Free months",
                     "Start date", "Renewal date", "Status", "Cancelled at (UTC)", "Cancelled by", "Cancel reason", "Notes");
                 foreach (AdminSaleDto x in _items)
                 {
                     _csv.Row(CsvBuilder.Text(x.SaleNumber), CsvBuilder.Date(x.CreatedAtUtc), CsvBuilder.Text(x.CustomerName), CsvBuilder.Text(x.CategoryName),
                         CsvBuilder.Text(x.ProductName), CsvBuilder.Text(x.PlanName), CsvBuilder.Text(x.SellerName), CsvBuilder.Text(x.SellerRole),
                         CsvBuilder.Text(x.ManagerName), CsvBuilder.Number(x.Quantity), CsvBuilder.Number(x.UnitPrice), CsvBuilder.Number(x.ListAmount),
-                        CsvBuilder.Number(x.DiscountAmount), CsvBuilder.Number(x.DiscountPercent), CsvBuilder.Number(x.SaleAmount), CsvBuilder.Number(x.CostAmount),
-                        CsvBuilder.Number(x.Margin), CsvBuilder.Text($"{x.DurationCount} {x.DurationUnit}"), CsvBuilder.Date(x.StartDate), CsvBuilder.Date(x.RenewalDate),
+                        CsvBuilder.Number(x.DiscountAmount), CsvBuilder.Number(x.DiscountPercent), CsvBuilder.Number(x.SaleAmount),
+                        CsvBuilder.Number(x.GstPercent), CsvBuilder.Number(x.TaxAmount), CsvBuilder.Number(x.TotalAmount), CsvBuilder.Number(x.CostAmount),
+                        CsvBuilder.Number(x.Margin), CsvBuilder.Text($"{x.DurationCount} {x.DurationUnit}"), CsvBuilder.Number(x.FreeMonths), CsvBuilder.Date(x.StartDate), CsvBuilder.Date(x.RenewalDate),
                         CsvBuilder.Text(x.Status), CsvBuilder.Date(x.CancelledAtUtc), CsvBuilder.Text(x.CancelledByName), CsvBuilder.Text(x.CancelReason),
                         CsvBuilder.Text(x.Notes));
                 }

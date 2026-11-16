@@ -53,7 +53,7 @@ BEGIN
            CASE WHEN mg.Id IS NULL THEN NULL ELSE CONCAT(mg.FirstName, N' ', mg.LastName) END AS ManagerName,
            s.Quantity, s.UnitPrice, s.UnitCost, s.ListAmount, s.SaleAmount, s.DiscountAmount, s.CostAmount,
            s.DurationUnit, s.DurationCount, s.StartDate, s.RenewalDate, s.Status, s.Notes, s.CreatedAtUtc,
-           s.CancelledAtUtc, CASE WHEN cb.Id IS NULL THEN NULL ELSE CONCAT(cb.FirstName, N' ', cb.LastName) END AS CancelledByName, s.CancelReason
+           s.CancelledAtUtc, CASE WHEN cb.Id IS NULL THEN NULL ELSE CONCAT(cb.FirstName, N' ', cb.LastName) END AS CancelledByName, s.CancelReason, s.GstPercent, s.TaxAmount, s.TotalAmount, s.FreeMonths
     FROM dbo.Sales s
     JOIN dbo.Customers cu ON cu.Id = s.CustomerId
     JOIN dbo.ProductCategories c ON c.Id = s.CategoryId

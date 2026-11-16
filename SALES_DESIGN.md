@@ -60,6 +60,7 @@ Writes with rules (sale creation and totals, manager assignment, plan price chan
 | 9 | User | Customers + sale page + My sales / Team sales — done |
 | 9+ | Admin | Customers (add / edit) and Sales (all sales by sales person or manager-wise, summary) — done; HR and Accounts modules removed |
 | 10 | Admin | Audit log screen (filters, before/after), Settings screen (maximum discount, sale number prefix, backdating limit) — done |
+| 12 | User + Admin | New order form (separate page; the simple New sale page is unchanged): GST and order total, free months, billing / payment terms and currency from master lists (`dbo.MasterValues`, managed in Admin > Settings > Order form lists), primary contact from the customer, billing contact with "Same as primary", bill-to address, live order summary — done |
 | 11 | Admin | My Profile (own details, name and mobile, password, permissions, recent activity), CSV export of the sales list and the summary (audited), password-reset emails over SMTP — done |
 
 `sage-user/bakend` was renamed to `sage-user/backend` (Sprint 8). The User Panel frontend is Angular.

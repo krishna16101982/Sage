@@ -213,6 +213,7 @@ namespace SageAdminApi
             services.AddScoped<ISalesReportFunctions, SalesReportFunctions>();
             services.AddScoped<IAuditLogFunctions, AuditLogFunctions>();
             services.AddScoped<ISettingFunctions, SettingFunctions>();
+            services.AddScoped<IMasterValueFunctions, MasterValueFunctions>();
         }
 
         /// <summary>

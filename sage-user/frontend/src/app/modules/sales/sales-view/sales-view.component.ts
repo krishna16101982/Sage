@@ -5,6 +5,8 @@ import { AuthService } from '../../../services/auth/auth.service';
 import { MessageService } from '../../../services/message/message.service';
 import { errorText } from '../../../services/rest/global-rest-service';
 import { SalesService } from '../../../services/sales/sales.service';
+import { OrderFormService } from '../../../services/order-form/order-form.service';
+import type { OrderDetails } from '../../../shared/interfaces/order-form.interface';
 import type { CancelRequest, Sale } from '../../../shared/interfaces/sale.interface';
 import { formatDate } from '../../../shared/utils/dates';
 import { formatDateTime, formatDuration, formatInr } from '../../../shared/utils/format';
@@ -32,6 +34,9 @@ export class SalesView implements OnInit {
   protected readonly durationText = formatDuration;
 
   readonly sale = signal<Sale | null>(null);
+  /** Order-form details (GST, terms, contacts); hasOrderForm is false for a sale from the simple page. */
+  readonly order = signal<OrderDetails | null>(null);
+  private readonly orderFormService = inject(OrderFormService);
   readonly error = signal<string | null>(null);
   readonly notice = signal<string | null>(inject(MessageService).take());
   /** Which dialog is open. */
@@ -60,6 +65,7 @@ export class SalesView implements OnInit {
   private async load(): Promise<void> {
     try {
       this.sale.set(await this.service.get(this.id()));
+      this.orderFormService.details(this.id()).then((d) => this.order.set(d), () => this.order.set(null));
     } catch (err) {
       this.error.set(errorText(err, 'Sale not found.'));
     }

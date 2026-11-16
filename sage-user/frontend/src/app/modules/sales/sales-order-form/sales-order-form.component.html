@@ -1,0 +1,252 @@
+<div class="stack">
+  <div class="stack-xs">
+    <a class="link-button text-sm" routerLink="/sales/list">← Back to sales</a>
+    <div class="row">
+      <h1 class="page-title">New order form</h1>
+      <span class="spacer"></span>
+      <span class="badge badge-warning">Draft</span>
+    </div>
+    <p class="hint">Fill in the sections; the order summary on the right updates as you go. Prices come from the price list.</p>
+  </div>
+
+  @if (loadError()) { <app-alert kind="error">{{ loadError() }}</app-alert> }
+  @if ((!catalog() || !options()) && !loadError()) { <p class="text-sm text-muted">Loading...</p> }
+
+  @if (catalog(); as categories) {
+    @if (options(); as opt) {
+      <form class="order-layout" (ngSubmit)="save()">
+        <div class="stack">
+          <!-- 1. Customer -->
+          <section class="card">
+            <header class="card-header">
+              <div class="step-head"><span class="step-badge">1</span>
+                <div><h2 class="section-title">Customer</h2><p class="hint">Choosing the customer fills the primary contact and the bill-to address.</p></div>
+              </div>
+            </header>
+            <div class="card-body stack-sm">
+              <app-customer-picker [(customer)]="customer" />
+              @if (customer(); as c) {
+                <div class="form-grid-3">
+                  <label class="field-label">Company
+                    <input class="field" name="company" [value]="c.name" disabled />
+                  </label>
+                  <label class="field-label">GST number
+                    <input class="field" name="gstin" [value]="c.gstin ?? '-'" disabled />
+                  </label>
+                  <label class="field-label">Order date
+                    <input class="field" name="orderDate" type="date" [value]="orderDate" disabled />
+                  </label>
+                </div>
+              }
+            </div>
+          </section>
+
+          <!-- 2. Product and pricing -->
+          <section class="card">
+            <header class="card-header">
+              <div class="step-head"><span class="step-badge">2</span>
+                <div><h2 class="section-title">Product and pricing</h2><p class="hint">Unit price comes from the price list; the discount is a percentage of the list amount.</p></div>
+              </div>
+            </header>
+            <div class="card-body stack-sm">
+              <div class="form-grid-3">
+                <label class="field-label">Category
+                  <select class="field" name="categoryId" [ngModel]="categoryId()" (ngModelChange)="chooseCategory($event)">
+                    <option [ngValue]="null">Choose...</option>
+                    @for (c of categories; track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
+                  </select>
+                </label>
+                <label class="field-label">Product
+                  <select class="field" name="productId" [disabled]="!category()" [ngModel]="productId()" (ngModelChange)="chooseProduct($event)">
+                    <option [ngValue]="null">Choose...</option>
+                    @for (p of category()?.products ?? []; track p.id) { <option [ngValue]="p.id">{{ p.name }}</option> }
+                  </select>
+                </label>
+                <label class="field-label">Plan
+                  <select class="field" name="planId" [disabled]="!product()" [ngModel]="planId()" (ngModelChange)="choosePlan($event)">
+                    <option [ngValue]="null">Choose...</option>
+                    @for (pl of product()?.plans ?? []; track pl.id) {
+                      <option [ngValue]="pl.id">{{ pl.name }} · {{ durationText(pl.durationCount, pl.durationUnit) }}</option>
+                    }
+                  </select>
+                </label>
+              </div>
+              <div class="form-grid-4">
+                <label class="field-label">Seats
+                  <input class="field" name="quantity" type="number" min="1" max="100000" step="1" [ngModel]="quantity()" (ngModelChange)="quantity.set($event)" />
+                </label>
+                <div class="field-label">Unit price (per seat)
+                  <div class="field amount">{{ plan() ? inr(plan()!.price) : '-' }}</div>
+                </div>
+                <label class="field-label">Discount %
+                  <input class="field" name="discountPercent" type="number" min="0" max="100" step="0.01" [ngModel]="discountPercent()" (ngModelChange)="discountPercent.set($event)" />
+                </label>
+                <label class="field-label">GST %
+                  <input class="field" name="gstPercent" type="number" min="0" max="28" step="0.01" [ngModel]="gstPercent()" (ngModelChange)="gstPercent.set($event)" />
+                </label>
+              </div>
+              @if (opt.maxDiscountPercent < 100) { <p class="hint">The largest discount allowed is <strong>{{ opt.maxDiscountPercent }}%</strong>.</p> }
+            </div>
+          </section>
+
+          <!-- 3. Contacts and billing address -->
+          <section class="card">
+            <header class="card-header">
+              <div class="step-head"><span class="step-badge">3</span>
+                <div><h2 class="section-title">Contacts and billing address</h2></div>
+              </div>
+            </header>
+            <div class="card-body stack-sm">
+              <div class="form-grid-2">
+                <div class="subcard stack-sm">
+                  <span class="font-semibold text-sm">Primary contact</span>
+                  <div class="form-grid-2">
+                    <label class="field-label">Name *
+                      <input class="field" name="pName" maxlength="150" [ngModel]="primary().name" (ngModelChange)="setPrimary('name', $event)" />
+                    </label>
+                    <label class="field-label">Designation
+                      <input class="field" name="pDesignation" maxlength="100" [ngModel]="primary().designation" (ngModelChange)="setPrimary('designation', $event)" />
+                    </label>
+                    <label class="field-label">Email
+                      <input class="field" name="pEmail" type="email" maxlength="256" [ngModel]="primary().email" (ngModelChange)="setPrimary('email', $event)" />
+                    </label>
+                    <label class="field-label">Contact number
+                      <input class="field" name="pPhone" type="tel" maxlength="20" [ngModel]="primary().phone" (ngModelChange)="setPrimary('phone', $event)" />
+                    </label>
+                  </div>
+                </div>
+                <div class="subcard stack-sm">
+                  <div class="row">
+                    <span class="font-semibold text-sm">Billing contact</span>
+                    <span class="spacer"></span>
+                    <button type="button" class="link-button text-sm" (click)="copyPrimaryToBilling()">Same as primary</button>
+                  </div>
+                  <div class="form-grid-2">
+                    <label class="field-label">Name
+                      <input class="field" name="bName" maxlength="150" [ngModel]="billing().name" (ngModelChange)="setBilling('name', $event)" />
+                    </label>
+                    <label class="field-label">Designation
+                      <input class="field" name="bDesignation" maxlength="100" [ngModel]="billing().designation" (ngModelChange)="setBilling('designation', $event)" />
+                    </label>
+                    <label class="field-label">Email
+                      <input class="field" name="bEmail" type="email" maxlength="256" [ngModel]="billing().email" (ngModelChange)="setBilling('email', $event)" />
+                    </label>
+                    <label class="field-label">Contact number
+                      <input class="field" name="bPhone" type="tel" maxlength="20" [ngModel]="billing().phone" (ngModelChange)="setBilling('phone', $event)" />
+                    </label>
+                  </div>
+                  <p class="hint">Left empty, the order bills the primary contact.</p>
+                </div>
+              </div>
+              <label class="field-label">Bill to (address)
+                <textarea class="field" name="billToAddress" rows="3" maxlength="500" [(ngModel)]="billToAddress"></textarea>
+              </label>
+            </div>
+          </section>
+
+          <!-- 4. Order terms -->
+          <section class="card">
+            <header class="card-header">
+              <div class="step-head"><span class="step-badge">4</span>
+                <div><h2 class="section-title">Order terms</h2><p class="hint">Free months add to the term at the same price (12 + 1, 12 + 2 ...).</p></div>
+              </div>
+            </header>
+            <div class="card-body stack-sm">
+              <div class="form-grid-5">
+                <label class="field-label">Start date
+                  <input class="field" name="startDate" type="date" [min]="earliestStart()" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" />
+                </label>
+                <label class="field-label">Paid duration
+                  <input class="field" name="durationCount" type="number" min="1" max="120" step="1" [ngModel]="durationCount()" (ngModelChange)="durationCount.set($event)" />
+                </label>
+                <label class="field-label">Unit
+                  <select class="field" name="durationUnit" [ngModel]="durationUnit()" (ngModelChange)="durationUnit.set($event)">
+                    @for (u of units; track u) { <option [value]="u">{{ u }}</option> }
+                  </select>
+                </label>
+                <label class="field-label">Free months (same price)
+                  <select class="field" name="freeMonths" [ngModel]="freeMonths()" (ngModelChange)="freeMonths.set($event)">
+                    @for (m of freeMonthChoices(); track m) { <option [ngValue]="m">{{ m === 0 ? 'None' : '+' + m }}</option> }
+                  </select>
+                </label>
+                <div class="field-label">Term (automatic)
+                  <div class="field field-muted">{{ termText() }}</div>
+                </div>
+              </div>
+              <div class="form-grid-5">
+                <div class="field-label">End date (automatic)
+                  <div class="field field-muted">{{ endDate() ? date(endDate()) : '-' }}</div>
+                </div>
+                <label class="field-label">Billing frequency
+                  <select class="field" name="billingFrequencyId" [ngModel]="billingFrequencyId()" (ngModelChange)="billingFrequencyId.set($event)">
+                    @for (o of opt.billingFrequencies; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }
+                  </select>
+                </label>
+                <label class="field-label">Billing method
+                  <select class="field" name="billingMethodId" [ngModel]="billingMethodId()" (ngModelChange)="billingMethodId.set($event)">
+                    @for (o of opt.billingMethods; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }
+                  </select>
+                </label>
+                <label class="field-label">Payment method
+                  <select class="field" name="paymentMethodId" [ngModel]="paymentMethodId()" (ngModelChange)="paymentMethodId.set($event)">
+                    @for (o of opt.paymentMethods; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }
+                  </select>
+                </label>
+                <label class="field-label">Payment term
+                  <select class="field" name="paymentTermId" [ngModel]="paymentTermId()" (ngModelChange)="paymentTermId.set($event)">
+                    @for (o of opt.paymentTerms; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }
+                  </select>
+                </label>
+              </div>
+              <div class="form-grid-5">
+                <label class="field-label">Currency
+                  <select class="field" name="currencyId" [ngModel]="currencyId()" (ngModelChange)="currencyId.set($event)">
+                    @for (o of opt.currencies; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }
+                  </select>
+                </label>
+              </div>
+              <label class="field-label">Notes (optional)
+                <textarea class="field" name="notes" rows="2" maxlength="1000" [(ngModel)]="notes"></textarea>
+              </label>
+            </div>
+          </section>
+        </div>
+
+        <!-- Order summary and actions -->
+        <aside class="order-aside">
+          <section class="card">
+            <div class="card-body stack-sm">
+              <div class="stack-xs">
+                <span class="page-eyebrow">Order summary</span>
+                <span class="font-semibold">{{ customer()?.name ?? 'No customer yet' }}</span>
+                <span class="text-sm text-muted">{{ plan() ? product()!.name + ' · ' + plan()!.name : 'No product yet' }}</span>
+              </div>
+              <div class="stack-xs text-sm">
+                <div class="summary-row"><span class="text-muted">Term</span><span>{{ termText() }}</span></div>
+                <div class="summary-row"><span class="text-muted">Period</span>
+                  <span class="text-right">{{ startDate() ? date(startDate()) : '-' }} to {{ endDate() ? date(endDate()) : '-' }}</span></div>
+                <div class="summary-row"><span class="text-muted">Billing</span><span class="text-right">{{ billingText() }}</span></div>
+                <div class="summary-row"><span class="text-muted">Currency</span><span>{{ currencyText() }}</span></div>
+              </div>
+              <div class="subcard stack-xs text-sm">
+                <div class="summary-row"><span>Subtotal ({{ quantity() ?? 0 }} × {{ inr(plan()?.price ?? 0) }})</span><span>{{ inr(listAmount()) }}</span></div>
+                <div class="summary-row"><span>After {{ discountPercent() ?? 0 }}% discount</span><span>{{ inr(saleAmount()) }}</span></div>
+                <div class="summary-row"><span>Tax ({{ gstPercent() ?? 0 }}% GST)</span><span>{{ inr(taxAmount()) }}</span></div>
+                <div class="summary-row summary-total"><span>Order total</span><span>{{ inr(totalAmount()) }}</span></div>
+              </div>
+            </div>
+          </section>
+
+          @if (saveError()) { <app-alert kind="error">{{ saveError() }}</app-alert> }
+          @if (problems().length > 0) {
+            <ul class="hint stack-xs" aria-label="Still needed">
+              @for (p of problems(); track p) { <li>• {{ p }}</li> }
+            </ul>
+          }
+          <button type="submit" class="btn btn-primary btn-block" [disabled]="busy() || problems().length > 0">{{ busy() ? 'Saving...' : 'Save order' }}</button>
+          <a class="btn btn-secondary btn-block" routerLink="/sales/list">Cancel</a>
+        </aside>
+      </form>
+    }
+  }
+</div>

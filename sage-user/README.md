@@ -17,6 +17,7 @@ Status: **Sprint 8 (foundation) and Sprint 9 (sales) done** — sign-in, session
 | Forgot password (emailed link), Reset password | `/forgot-password`, `/reset-password?token=` | anyone (signed out) |
 | Home (this month's sales, team figures for a manager) | `/home` | everyone |
 | New sale | `/sales/add` | everyone |
+| New order form (GST, free months, billing / payment terms, contacts, bill-to address, live order summary) | `/sales/order-form` | everyone |
 | My sales | `/sales/list` | everyone |
 | Team sales (filter by sales person) | `/sales/team` | sales managers |
 | Sale details, Cancel sale (with a reason) | `/sales/{id}` | the seller and their manager |
@@ -69,6 +70,9 @@ New screens go in `modules/<feature>/` with their own `<feature>.routes.ts` and 
 | `POST /api/user/auth/forgot-password` | anonymous | `{email}`; emails a one-time link (30 min) to an active sales user; the same answer for every email; rate limited |
 | `POST /api/user/auth/reset-password` | reset link | `{token, newPassword, confirmPassword}`; single use; ends every session, clears "must change password" and any lockout |
 | `GET /api/user/auth/me` | bearer | user, role (`SalesPerson`/`SalesManager`), `isManager`, `managerName` |
+| `GET /api/user/order-form/options` | bearer | the order-form lists from `dbo.MasterValues` (billing frequency, billing method, payment method, payment term, currency; defaults marked), default GST and most free months (Settings), discount and backdating limits |
+| `POST /api/user/order-form` | bearer | saves an order: a normal sale (`usp_Sale_Create` rules, run inside `usp_SaleOrder_Create`) plus GST, tax, free months (extend the renewal date at the same price), the five list values, primary / billing contact and bill-to address; 201 with the sale |
+| `GET /api/user/order-form/{saleId}` | bearer | the order details of a sale the user may see; `hasOrderForm` is false for a sale from the simple page |
 | `GET /api/user/status` | anonymous | API and database health |
 | `GET /api/user/catalog` | bearer | active categories > products > plans (price, cost, duration); products without an active plan are left out |
 | `GET /api/user/customers` | bearer | `search`, `page`, `pageSize`, `sortBy` (name/city/createdAtUtc); each with its active sale count |

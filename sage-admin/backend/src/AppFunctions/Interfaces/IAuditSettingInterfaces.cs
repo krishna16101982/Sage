@@ -17,6 +17,14 @@ namespace SageAdminApi.AppFunctions.Interfaces
         Task<(AuditLogOptions options, IFunctionReturn functionReturn)> GetOptionsAsync(CancellationToken _ct = default);
     }
 
+    /// <summary>Order form lists (dbo.MasterValues).</summary>
+    public interface IMasterValueFunctions
+    {
+        Task<(List<MasterList> lists, IFunctionReturn functionReturn)> GetListsAsync(CancellationToken _ct = default);
+        /// <summary>Adds (_id null) or changes one value.</summary>
+        Task<(MasterValueDto value, IFunctionReturn functionReturn)> SaveAsync(int? _id, HttpMasterValuePostParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
+    }
+
     public interface ISettingFunctions
     {
         Task<(List<SettingDto> settings, IFunctionReturn functionReturn)> GetSettingsAsync(CancellationToken _ct = default);

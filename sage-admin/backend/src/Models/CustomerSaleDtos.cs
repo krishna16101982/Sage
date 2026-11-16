@@ -58,6 +58,13 @@ namespace SageAdminApi.Models
         public DateTime? CancelledAtUtc { get; set; }
         public string CancelledByName { get; set; }
         public string CancelReason { get; set; }
+        /// <summary>GST on the sale amount (0 for a sale from the simple page) and the total the customer pays.</summary>
+        public decimal GstPercent { get; set; }
+        public decimal TaxAmount { get; set; }
+        public decimal TotalAmount { get; set; }
+        public int FreeMonths { get; set; }
+        /// <summary>Order-form details (single-sale view only; null when the sale was not made with the order form).</summary>
+        public AdminOrderDetails OrderDetails { get; set; }
     }
 
     /// <summary>A page of sales plus totals of every matching ACTIVE sale.</summary>
