@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,6 +12,7 @@ using SageAdminApi.Globals;
 using SageAdminApi.Models;
 using SageAdminApi.Models.Filter;
 using SageAdminApi.Models.HttpPost;
+using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.AppValidations;
 using SageCommonLib.Globals;
@@ -29,13 +31,6 @@ namespace SageAdminApi.AppFunctions
     public partial class CustomerFunctions : ICustomerFunctions
     {
         private static readonly string[] SortKeys = { "name", "city", "createdAtUtc" };
-
-        /// <summary>Same columns, in the same order, as dbo.usp_Customer_GetPaged.</summary>
-        private const string CustomerSelect = @"SELECT c.PublicId, c.Name, c.ContactPerson, c.Email, c.Phone, c.GSTIN, c.Address, c.City, c.State, c.Country, c.CreatedAtUtc,
-    CASE WHEN u.Id IS NOT NULL THEN CONCAT(u.FirstName, N' ', u.LastName) WHEN a.Id IS NOT NULL THEN CONCAT(a.FirstName, N' ', a.LastName, N' (Admin)') END,
-    (SELECT COUNT(*) FROM dbo.Sales s WHERE s.CustomerId = c.Id AND s.Status = 'Active')
-FROM dbo.Customers c LEFT JOIN dbo.SalesUsers u ON u.Id = c.CreatedBySalesUserId LEFT JOIN dbo.AdminUsers a ON a.Id = c.CreatedByAdminUserId
-WHERE c.PublicId = @id AND c.IsActive = 1";
 
         internal static class Messages
         {
@@ -65,25 +60,43 @@ WHERE c.PublicId = @id AND c.IsActive = 1";
 
         #region Helpers
 
-        private static CustomerDto MapCustomer(SqlDataReader r) => new CustomerDto
+        /// <summary>One customer row (from GetRowAsync or dbo.usp_Customer_GetPaged; both use these column names).</summary>
+        private static CustomerDto MapCustomer(DataRow _row) => new CustomerDto
         {
-            Id = r.GetGuid(0),
-            Name = r.GetString(1),
-            ContactPerson = S(r, 2),
-            Email = S(r, 3),
-            Phone = S(r, 4),
-            Gstin = S(r, 5),
-            Address = S(r, 6),
-            City = S(r, 7),
-            State = S(r, 8),
-            Country = r.GetString(9),
-            CreatedAtUtc = DateTime.SpecifyKind(r.GetDateTime(10), DateTimeKind.Utc),
-            CreatedByName = S(r, 11),
-            SaleCount = r.GetInt32(12)
+            Id = _row.GetGuid("PublicId"),
+            Name = _row.GetText("Name"),
+            ContactPerson = _row.GetText("ContactPerson"),
+            Email = _row.GetText("Email"),
+            Phone = _row.GetText("Phone"),
+            Gstin = _row.GetText("GSTIN"),
+            Address = _row.GetText("Address"),
+            City = _row.GetText("City"),
+            State = _row.GetText("State"),
+            Country = _row.GetText("Country"),
+            CreatedAtUtc = _row.GetUtc("CreatedAtUtc"),
+            CreatedByName = _row.GetText("CreatedByName"),
+            SaleCount = _row.GetInt("SaleCount")
         };
 
-        private Task<CustomerDto> GetRowAsync(Guid _id, CancellationToken _ct)
-            => _databaseFunctions.QuerySingleOrDefaultAsync(CustomerSelect, MapCustomer, new[] { P("@id", _id) }, _ct);
+        /// <summary>One active customer by PublicId, or null.</summary>
+        private async Task<CustomerDto> GetRowAsync(Guid _id, CancellationToken _ct)
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT c.PublicId, c.Name, c.ContactPerson, c.Email, c.Phone, c.GSTIN, c.Address, c.City, c.State, c.Country, c.CreatedAtUtc, ");
+            _sqlQuery.Append("        CASE WHEN u.Id IS NOT NULL THEN CONCAT(u.FirstName, N' ', u.LastName) ");
+            _sqlQuery.Append("             WHEN a.Id IS NOT NULL THEN CONCAT(a.FirstName, N' ', a.LastName, N' (Admin)') END AS CreatedByName, ");
+            _sqlQuery.Append("        (SELECT COUNT(*) FROM dbo.Sales s WHERE s.CustomerId = c.Id AND s.Status = 'Active') AS SaleCount ");
+            _sqlQuery.Append(" FROM dbo.Customers c ");
+            _sqlQuery.Append(" LEFT JOIN dbo.SalesUsers u ON u.Id = c.CreatedBySalesUserId ");
+            _sqlQuery.Append(" LEFT JOIN dbo.AdminUsers a ON a.Id = c.CreatedByAdminUserId ");
+            _sqlQuery.Append(" WHERE c.PublicId = @id AND c.IsActive = 1 ");
+
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                _sqlQuery.ToString(), new[] { P("@id", _id) }, "F:Customer:GetRow", _ct);
+            EnsureRead(_functionReturn);
+            DataRow _row = _dataTable.FirstRow();
+            return _row == null ? null : MapCustomer(_row);
+        }
 
         private static object Snapshot(CustomerDto c) => c == null ? null : new { c.Name, c.ContactPerson, c.Email, c.Phone, c.Gstin, c.Address, c.City, c.State, c.Country };
 
@@ -129,13 +142,20 @@ WHERE c.PublicId = @id AND c.IsActive = 1";
                 string _search = string.IsNullOrWhiteSpace(_filter.Search) ? null : "%" + _filter.Search.Trim().EscapeLike() + "%";
                 var _totalCount = IntOut("@TotalCount");
 
-                IReadOnlyList<CustomerDto> _items = await _databaseFunctions.QueryProcedureAsync(SP.CustomerGetPaged, MapCustomer, new List<SqlParameter>
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteProcedureDataTableAsync(SP.CustomerGetPaged, new[]
                 {
                     P("@Search", _search), P("@SortBy", _paging.SortBy), P("@SortDirection", _paging.SortDirection),
                     P("@Offset", _paging.Offset), P("@PageSize", _paging.PageSize), _totalCount
-                }, _ct);
-                int _total = OutInt(_totalCount);
-                return (new PagedResult<CustomerDto> { Items = _items, Page = _paging.Page, PageSize = _paging.PageSize, TotalCount = _total }, new FunctionReturn { MethodName = _methodName });
+                }, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+
+                return (new PagedResult<CustomerDto>
+                {
+                    Items = _dataTable.MapRows(MapCustomer),
+                    Page = _paging.Page,
+                    PageSize = _paging.PageSize,
+                    TotalCount = OutInt(_totalCount)
+                }, _functionReturn);
             }
             catch (Exception ex)
             {

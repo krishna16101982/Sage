@@ -1,9 +1,13 @@
 using System;
+using System.Data;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
+using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
+using SageCommonLib.Models.Interfaces;
 using SageUserApi.AppFunctions.Interfaces;
 using SageUserApi.Models;
 using static SageCommonLib.AppFunctions.Sql;
@@ -20,11 +24,28 @@ namespace SageUserApi.AppFunctions
             _databaseFunctions = __databaseFunctions;
         }
 
-        public Task<SalesUserContext> GetAsync(Guid _publicId, CancellationToken _ct = default)
-            => _databaseFunctions.QuerySingleOrDefaultAsync(
-                "SELECT Id, PublicId, Role, CONCAT(FirstName, N' ', LastName), CanRequestCancellation FROM dbo.SalesUsers WHERE PublicId = @p AND IsDeleted = 0 AND Status = 'Active'",
-                r => new SalesUserContext { Id = r.GetInt64(0), PublicId = r.GetGuid(1), Role = r.GetString(2), Name = r.GetString(3), CanRequestCancellation = r.GetBoolean(4) },
-                new[] { new SqlParameter("@p", _publicId) }, _ct);
+        /// <summary>The active sales user behind the token, or null.</summary>
+        public async Task<SalesUserContext> GetAsync(Guid _publicId, CancellationToken _ct = default)
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT Id, PublicId, Role, CONCAT(FirstName, N' ', LastName) AS Name, CanRequestCancellation ");
+            _sqlQuery.Append(" FROM dbo.SalesUsers ");
+            _sqlQuery.Append(" WHERE PublicId = @p AND IsDeleted = 0 AND Status = 'Active' ");
+
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                _sqlQuery.ToString(), new[] { P("@p", _publicId) }, "F:SalesUserContext:Get", _ct);
+            EnsureRead(_functionReturn);
+            DataRow _row = _dataTable.FirstRow();
+            if (_row == null) return null;
+            return new SalesUserContext
+            {
+                Id = _row.GetLong("Id"),
+                PublicId = _row.GetGuid("PublicId"),
+                Role = _row.GetText("Role"),
+                Name = _row.GetText("Name"),
+                CanRequestCancellation = _row.GetBool("CanRequestCancellation")
+            };
+        }
     }
 
     /// <summary>Audit rows for sales users' own actions. ActorUserId stays NULL (it points at admin users); the seller is in NewValues.</summary>

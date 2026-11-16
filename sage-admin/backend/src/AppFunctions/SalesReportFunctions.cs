@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -10,6 +11,7 @@ using SageAdminApi.AppValidations;
 using SageAdminApi.Globals;
 using SageAdminApi.Models;
 using SageAdminApi.Models.Filter;
+using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.AppValidations;
 using SageCommonLib.Models;
@@ -28,29 +30,6 @@ namespace SageAdminApi.AppFunctions
     {
         private static readonly string[] SortKeys = { "soldAt", "saleNumber", "customer", "product", "seller", "saleAmount", "renewalDate" };
 
-        /// <summary>Same columns, in the same order, as dbo.usp_Sale_AdminGetPaged.</summary>
-        private const string SaleSelect = @"SELECT s.PublicId, s.SaleNumber, cu.PublicId, cu.Name, c.Name, p.Name, pl.Name,
-    su.PublicId, CONCAT(su.FirstName, N' ', su.LastName), su.Role,
-    CASE WHEN mg.Id IS NULL THEN NULL ELSE CONCAT(mg.FirstName, N' ', mg.LastName) END,
-    s.Quantity, s.UnitPrice, s.UnitCost, s.ListAmount, s.SaleAmount, s.DiscountAmount, s.CostAmount,
-    s.DurationUnit, s.DurationCount, s.StartDate, s.RenewalDate, s.Status, s.Notes, s.CreatedAtUtc,
-    s.CancelledAtUtc, CASE WHEN cb.Id IS NULL THEN NULL ELSE CONCAT(cb.FirstName, N' ', cb.LastName) END, s.CancelReason
-FROM dbo.Sales s
-JOIN dbo.Customers cu ON cu.Id = s.CustomerId
-JOIN dbo.ProductCategories c ON c.Id = s.CategoryId
-JOIN dbo.Products p ON p.Id = s.ProductId
-JOIN dbo.ProductPlans pl ON pl.Id = s.PlanId
-JOIN dbo.SalesUsers su ON su.Id = s.SalesUserId
-LEFT JOIN dbo.SalesUsers mg ON mg.Id = s.ManagerId
-LEFT JOIN dbo.SalesUsers cb ON cb.Id = s.CancelledBySalesUserId
-WHERE s.PublicId = @id";
-
-        private const string SellersSelect = @"SELECT u.PublicId, CONCAT(u.FirstName, N' ', u.LastName), u.Role, u.Status,
-    CASE WHEN m.Id IS NULL THEN NULL ELSE CONCAT(m.FirstName, N' ', m.LastName) END
-FROM dbo.SalesUsers u LEFT JOIN dbo.SalesUsers m ON m.Id = u.ManagerId
-WHERE u.IsDeleted = 0 OR EXISTS (SELECT 1 FROM dbo.Sales s WHERE s.SalesUserId = u.Id)
-ORDER BY u.FirstName, u.LastName";
-
         private readonly ILoggerFunctions _loggerFunctions;
         private readonly IDatabaseFunctions _databaseFunctions;
         private readonly IAuditFunctions _auditFunctions;
@@ -67,46 +46,48 @@ ORDER BY u.FirstName, u.LastName";
 
         #region Helpers
 
-        private static AdminSaleDto MapSale(SqlDataReader r)
+        /// <summary>One sale row (from GetSaleAsync or dbo.usp_Sale_AdminGetPaged; both use these column names).</summary>
+        private static AdminSaleDto MapSale(DataRow _row)
         {
-            decimal _list = r.GetDecimal(14), _sale = r.GetDecimal(15), _discount = r.GetDecimal(16), _cost = r.GetDecimal(17);
+            decimal _list = _row.GetDecimal("ListAmount"), _sale = _row.GetDecimal("SaleAmount");
+            decimal _discount = _row.GetDecimal("DiscountAmount"), _cost = _row.GetDecimal("CostAmount");
             return new AdminSaleDto
             {
-                Id = r.GetGuid(0),
-                SaleNumber = r.GetString(1),
-                CustomerId = r.GetGuid(2),
-                CustomerName = r.GetString(3),
-                CategoryName = r.GetString(4),
-                ProductName = r.GetString(5),
-                PlanName = r.GetString(6),
-                SellerId = r.GetGuid(7),
-                SellerName = r.GetString(8),
-                SellerRole = r.GetString(9),
-                ManagerName = S(r, 10),
-                Quantity = r.GetInt32(11),
-                UnitPrice = r.GetDecimal(12),
-                UnitCost = r.GetDecimal(13),
+                Id = _row.GetGuid("PublicId"),
+                SaleNumber = _row.GetText("SaleNumber"),
+                CustomerId = _row.GetGuid("CustomerPublicId"),
+                CustomerName = _row.GetText("CustomerName"),
+                CategoryName = _row.GetText("CategoryName"),
+                ProductName = _row.GetText("ProductName"),
+                PlanName = _row.GetText("PlanName"),
+                SellerId = _row.GetGuid("SellerPublicId"),
+                SellerName = _row.GetText("SellerName"),
+                SellerRole = _row.GetText("SellerRole"),
+                ManagerName = _row.GetText("ManagerName"),
+                Quantity = _row.GetInt("Quantity"),
+                UnitPrice = _row.GetDecimal("UnitPrice"),
+                UnitCost = _row.GetDecimal("UnitCost"),
                 ListAmount = _list,
                 SaleAmount = _sale,
                 DiscountAmount = _discount,
                 DiscountPercent = _list > 0 ? decimal.Round(_discount * 100m / _list, 2) : 0m,
                 CostAmount = _cost,
                 Margin = _sale - _cost,
-                DurationUnit = r.GetString(18),
-                DurationCount = r.GetInt32(19),
-                StartDate = DateOnly.FromDateTime(r.GetDateTime(20)),
-                RenewalDate = DateOnly.FromDateTime(r.GetDateTime(21)),
-                Status = r.GetString(22),
-                Notes = S(r, 23),
-                CreatedAtUtc = Utc(r, 24).Value,
-                CancelledAtUtc = Utc(r, 25),
-                CancelledByName = S(r, 26),
-                CancelReason = S(r, 27)
+                DurationUnit = _row.GetText("DurationUnit"),
+                DurationCount = _row.GetInt("DurationCount"),
+                StartDate = _row.GetDate("StartDate"),
+                RenewalDate = _row.GetDate("RenewalDate"),
+                Status = _row.GetText("Status"),
+                Notes = _row.GetText("Notes"),
+                CreatedAtUtc = _row.GetUtc("CreatedAtUtc"),
+                CancelledAtUtc = _row.GetNullableUtc("CancelledAtUtc"),
+                CancelledByName = _row.GetText("CancelledByName"),
+                CancelReason = _row.GetText("CancelReason")
             };
         }
 
         /// <summary>One page of sales (or, with _exportAll, every matching sale up to MaxExportRows) plus the totals.</summary>
-        private async Task<(IReadOnlyList<AdminSaleDto> items, PaginationParams paging, int totalCount, decimal totalSale, decimal totalMargin)> QuerySalesAsync(
+        private async Task<(List<AdminSaleDto> items, PaginationParams paging, int totalCount, decimal totalSale, decimal totalMargin)> QuerySalesAsync(
             AdminSaleFilter _filter, bool _exportAll, CancellationToken _ct)
         {
             _filter ??= new AdminSaleFilter();
@@ -117,15 +98,16 @@ ORDER BY u.FirstName, u.LastName";
             var _totalSale = MoneyOut("@TotalSaleAmount");
             var _totalMargin = MoneyOut("@TotalMargin");
 
-            IReadOnlyList<AdminSaleDto> _items = await _databaseFunctions.QueryProcedureAsync(SP.SaleAdminGetPaged, MapSale, new List<SqlParameter>
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteProcedureDataTableAsync(SP.SaleAdminGetPaged, new[]
             {
                 P("@SellerPublicId", _filter.SellerId), P("@ManagerPublicId", _filter.ManagerId), P("@CustomerPublicId", _filter.CustomerId),
                 P("@Search", _search), P("@Status", _status), Date("@SoldFrom", _filter.SoldFrom), Date("@SoldTo", _filter.SoldTo),
                 P("@SortBy", _paging.SortBy), P("@SortDirection", _paging.SortDirection),
                 P("@Offset", _exportAll ? 0 : _paging.Offset), P("@PageSize", _exportAll ? MaxExportRows + 1 : _paging.PageSize),
                 _totalCount, _totalSale, _totalMargin
-            }, _ct);
-            return (_items, _paging, OutInt(_totalCount), OutMoney(_totalSale), OutMoney(_totalMargin));
+            }, "F:SalesReport:QuerySales", _ct);
+            EnsureRead(_functionReturn);
+            return (_dataTable.MapRows(MapSale), _paging, OutInt(_totalCount), OutMoney(_totalSale), OutMoney(_totalMargin));
         }
 
         private Task AuditExportAsync(long? _actorUserId, object _details, string _ipAddress, CancellationToken _ct)
@@ -138,7 +120,7 @@ ORDER BY u.FirstName, u.LastName";
             string _methodName = "F:SalesReport:GetSales";
             try
             {
-                (IReadOnlyList<AdminSaleDto> _items, PaginationParams _paging, int _count, decimal _sum, decimal _margin) = await QuerySalesAsync(_filter, false, _ct);
+                (List<AdminSaleDto> _items, PaginationParams _paging, int _count, decimal _sum, decimal _margin) = await QuerySalesAsync(_filter, false, _ct);
                 return (new AdminSalesPage
                 {
                     Items = _items,
@@ -161,8 +143,32 @@ ORDER BY u.FirstName, u.LastName";
             string _methodName = "F:SalesReport:GetSale";
             try
             {
-                AdminSaleDto _sale = await _databaseFunctions.QuerySingleOrDefaultAsync(SaleSelect, MapSale, new[] { P("@id", _id) }, _ct);
-                return _sale == null ? (null, ApplicationCommonFunctions.NotFound("Sale not found.", _methodName)) : (_sale, new FunctionReturn { MethodName = _methodName });
+                // Same column names as dbo.usp_Sale_AdminGetPaged, so MapSale reads both.
+                StringBuilder _sqlQuery = new StringBuilder();
+                _sqlQuery.Append(" SELECT s.PublicId, s.SaleNumber, cu.PublicId AS CustomerPublicId, cu.Name AS CustomerName, c.Name AS CategoryName, ");
+                _sqlQuery.Append("        p.Name AS ProductName, pl.Name AS PlanName, ");
+                _sqlQuery.Append("        su.PublicId AS SellerPublicId, CONCAT(su.FirstName, N' ', su.LastName) AS SellerName, su.Role AS SellerRole, ");
+                _sqlQuery.Append("        CASE WHEN mg.Id IS NULL THEN NULL ELSE CONCAT(mg.FirstName, N' ', mg.LastName) END AS ManagerName, ");
+                _sqlQuery.Append("        s.Quantity, s.UnitPrice, s.UnitCost, s.ListAmount, s.SaleAmount, s.DiscountAmount, s.CostAmount, ");
+                _sqlQuery.Append("        s.DurationUnit, s.DurationCount, s.StartDate, s.RenewalDate, s.Status, s.Notes, s.CreatedAtUtc, s.CancelledAtUtc, ");
+                _sqlQuery.Append("        CASE WHEN cb.Id IS NULL THEN NULL ELSE CONCAT(cb.FirstName, N' ', cb.LastName) END AS CancelledByName, s.CancelReason ");
+                _sqlQuery.Append(" FROM dbo.Sales s ");
+                _sqlQuery.Append(" JOIN dbo.Customers cu ON cu.Id = s.CustomerId ");
+                _sqlQuery.Append(" JOIN dbo.ProductCategories c ON c.Id = s.CategoryId ");
+                _sqlQuery.Append(" JOIN dbo.Products p ON p.Id = s.ProductId ");
+                _sqlQuery.Append(" JOIN dbo.ProductPlans pl ON pl.Id = s.PlanId ");
+                _sqlQuery.Append(" JOIN dbo.SalesUsers su ON su.Id = s.SalesUserId ");
+                _sqlQuery.Append(" LEFT JOIN dbo.SalesUsers mg ON mg.Id = s.ManagerId ");
+                _sqlQuery.Append(" LEFT JOIN dbo.SalesUsers cb ON cb.Id = s.CancelledBySalesUserId ");
+                _sqlQuery.Append(" WHERE s.PublicId = @id ");
+
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                    _sqlQuery.ToString(), new[] { P("@id", _id) }, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+
+                DataRow _row = _dataTable.FirstRow();
+                if (_row == null) return (null, ApplicationCommonFunctions.NotFound("Sale not found.", _methodName));
+                return (MapSale(_row), _functionReturn);
             }
             catch (Exception ex)
             {
@@ -177,24 +183,28 @@ ORDER BY u.FirstName, u.LastName";
             try
             {
                 string _groupBy = string.Equals(_filter?.GroupBy, "manager", StringComparison.OrdinalIgnoreCase) ? "manager" : "seller";
-                var _rows = await _databaseFunctions.QueryProcedureAsync(SP.SaleSummary, r => new SalesSummaryRow
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteProcedureDataTableAsync(SP.SaleSummary,
+                    new[] { P("@GroupBy", _groupBy), Date("@SoldFrom", _filter?.SoldFrom), Date("@SoldTo", _filter?.SoldTo) }, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+
+                List<SalesSummaryRow> _rows = _dataTable.MapRows(_row => new SalesSummaryRow
                 {
-                    Id = r.GetGuid(0),
-                    Name = r.GetString(1),
-                    Username = r.GetString(2),
-                    Role = r.GetString(3),
-                    ManagerName = S(r, 4),
-                    TeamSize = r.GetInt32(5),
-                    SaleCount = r.GetInt32(6),
-                    CancelledCount = r.GetInt32(7),
-                    Quantity = r.GetInt32(8),
-                    ListAmount = r.GetDecimal(9),
-                    DiscountAmount = r.GetDecimal(10),
-                    SaleAmount = r.GetDecimal(11),
-                    CostAmount = r.GetDecimal(12),
-                    Margin = r.GetDecimal(13)
-                }, new[] { P("@GroupBy", _groupBy), Date("@SoldFrom", _filter?.SoldFrom), Date("@SoldTo", _filter?.SoldTo) }, _ct);
-                return (_rows.ToList(), new FunctionReturn { MethodName = _methodName });
+                    Id = _row.GetGuid("PublicId"),
+                    Name = _row.GetText("Name"),
+                    Username = _row.GetText("Username"),
+                    Role = _row.GetText("Role"),
+                    ManagerName = _row.GetText("ManagerName"),
+                    TeamSize = _row.GetInt("TeamSize"),
+                    SaleCount = _row.GetInt("SaleCount"),
+                    CancelledCount = _row.GetInt("CancelledCount"),
+                    Quantity = _row.GetInt("Quantity"),
+                    ListAmount = _row.GetDecimal("ListAmount"),
+                    DiscountAmount = _row.GetDecimal("DiscountAmount"),
+                    SaleAmount = _row.GetDecimal("SaleAmount"),
+                    CostAmount = _row.GetDecimal("CostAmount"),
+                    Margin = _row.GetDecimal("Margin")
+                });
+                return (_rows, _functionReturn);
             }
             catch (Exception ex)
             {
@@ -208,9 +218,27 @@ ORDER BY u.FirstName, u.LastName";
             string _methodName = "F:SalesReport:GetSellers";
             try
             {
-                var _sellers = await _databaseFunctions.QueryAsync(SellersSelect,
-                    r => new SellerOption { Id = r.GetGuid(0), Name = r.GetString(1), Role = r.GetString(2), Status = r.GetString(3), ManagerName = S(r, 4) }, null, _ct);
-                return (_sellers.ToList(), new FunctionReturn { MethodName = _methodName });
+                // Everyone who can sell, plus deleted users who still have sales (their old sales stay filterable).
+                StringBuilder _sqlQuery = new StringBuilder();
+                _sqlQuery.Append(" SELECT u.PublicId, CONCAT(u.FirstName, N' ', u.LastName) AS Name, u.Role, u.Status, ");
+                _sqlQuery.Append("        CASE WHEN m.Id IS NULL THEN NULL ELSE CONCAT(m.FirstName, N' ', m.LastName) END AS ManagerName ");
+                _sqlQuery.Append(" FROM dbo.SalesUsers u ");
+                _sqlQuery.Append(" LEFT JOIN dbo.SalesUsers m ON m.Id = u.ManagerId ");
+                _sqlQuery.Append(" WHERE u.IsDeleted = 0 OR EXISTS (SELECT 1 FROM dbo.Sales s WHERE s.SalesUserId = u.Id) ");
+                _sqlQuery.Append(" ORDER BY u.FirstName, u.LastName ");
+
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(_sqlQuery.ToString(), null, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+
+                List<SellerOption> _sellers = _dataTable.MapRows(_row => new SellerOption
+                {
+                    Id = _row.GetGuid("PublicId"),
+                    Name = _row.GetText("Name"),
+                    Role = _row.GetText("Role"),
+                    Status = _row.GetText("Status"),
+                    ManagerName = _row.GetText("ManagerName")
+                });
+                return (_sellers, _functionReturn);
             }
             catch (Exception ex)
             {
@@ -226,7 +254,7 @@ ORDER BY u.FirstName, u.LastName";
             try
             {
                 _filter ??= new AdminSaleFilter();
-                (IReadOnlyList<AdminSaleDto> _items, _, int _count, decimal _sum, decimal _margin) = await QuerySalesAsync(_filter, true, _ct);
+                (List<AdminSaleDto> _items, _, int _count, decimal _sum, decimal _margin) = await QuerySalesAsync(_filter, true, _ct);
                 if (_count > MaxExportRows)
                     return (null, ApplicationCommonFunctions.BadRequest(
                         $"{_count:N0} sales match. An export can hold up to {MaxExportRows:N0}: choose a shorter date range or more filters, then export again.", _methodName));

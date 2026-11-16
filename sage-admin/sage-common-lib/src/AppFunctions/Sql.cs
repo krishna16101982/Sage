@@ -47,6 +47,15 @@ namespace SageCommonLib.AppFunctions
         /// <summary>A nullable DATETIME2 column holding UTC, marked as UTC.</summary>
         public static DateTime? Utc(SqlDataReader r, int i) => r.IsDBNull(i) ? null : DateTime.SpecifyKind(r.GetDateTime(i), DateTimeKind.Utc);
 
+        /// <summary>
+        /// For helpers that return a row (or null for "not found"): a failed read must not look like "not found", so it is
+        /// thrown and the caller's catch answers with a system error, as before.
+        /// </summary>
+        public static void EnsureRead(SageCommonLib.Models.Interfaces.IFunctionReturn _functionReturn)
+        {
+            if (!_functionReturn.Status) throw new InvalidOperationException(string.Join("; ", _functionReturn.Message));
+        }
+
         // ---- Text ----
 
         /// <summary>Trims, strips HTML tags and turns empty text into null (free text such as names and notes).</summary>

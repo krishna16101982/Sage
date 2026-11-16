@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -12,6 +13,7 @@ using SageAdminApi.Globals;
 using SageAdminApi.Models;
 using SageAdminApi.Models.Filter;
 using SageAdminApi.Models.HttpPost;
+using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.AppValidations;
 using SageCommonLib.Globals;
@@ -33,20 +35,6 @@ namespace SageAdminApi.AppFunctions
     {
         private static readonly string[] SortKeys = { "name", "username", "email", "role", "status", "manager", "createdAtUtc", "lastLoginAtUtc" };
 
-        /// <summary>Same columns, in the same order, as dbo.usp_SalesUser_GetPaged.</summary>
-        private const string SalesUserSelect = @"SELECT u.PublicId, u.FirstName, u.LastName, u.Username, u.Email, u.MobileNumber, u.Role, u.Status,
-    m.PublicId, CASE WHEN m.Id IS NULL THEN NULL ELSE CONCAT(m.FirstName, N' ', m.LastName) END,
-    (SELECT COUNT(*) FROM dbo.SalesUsers x WHERE x.ManagerId = u.Id AND x.IsDeleted = 0),
-    u.MustChangePassword, u.LockoutEndUtc, u.LastLoginAtUtc, u.CreatedAtUtc
-FROM dbo.SalesUsers u LEFT JOIN dbo.SalesUsers m ON m.Id = u.ManagerId
-WHERE u.PublicId = @id AND u.IsDeleted = 0";
-
-        private const string ManagersSelect = @"SELECT u.PublicId, CONCAT(u.FirstName, N' ', u.LastName), u.Username,
-    (SELECT COUNT(*) FROM dbo.SalesUsers x WHERE x.ManagerId = u.Id AND x.IsDeleted = 0)
-FROM dbo.SalesUsers u
-WHERE u.Role = 'SalesManager' AND u.Status = 'Active' AND u.IsDeleted = 0
-ORDER BY u.FirstName, u.LastName";
-
         private readonly ILoggerFunctions _loggerFunctions;
         private readonly IDatabaseFunctions _databaseFunctions;
         private readonly IAuditFunctions _auditFunctions;
@@ -62,31 +50,48 @@ ORDER BY u.FirstName, u.LastName";
 
         #region Helpers
 
-        private static SalesUserDto MapSalesUser(SqlDataReader r)
+        /// <summary>One sales user row (from GetRowAsync or dbo.usp_SalesUser_GetPaged; both use these column names).</summary>
+        private static SalesUserDto MapSalesUser(DataRow _row)
         {
-            DateTime? _lockoutEnd = Utc(r, 12);
+            DateTime? _lockoutEnd = _row.GetNullableUtc("LockoutEndUtc");
             return new SalesUserDto
             {
-                Id = r.GetGuid(0),
-                FirstName = r.GetString(1),
-                LastName = r.GetString(2),
-                Username = r.GetString(3),
-                Email = r.GetString(4),
-                MobileNumber = r.IsDBNull(5) ? null : r.GetString(5),
-                Role = r.GetString(6),
-                Status = r.GetString(7),
-                ManagerId = r.IsDBNull(8) ? null : r.GetGuid(8),
-                ManagerName = r.IsDBNull(9) ? null : r.GetString(9),
-                TeamSize = r.GetInt32(10),
-                MustChangePassword = r.GetBoolean(11),
+                Id = _row.GetGuid("PublicId"),
+                FirstName = _row.GetText("FirstName"),
+                LastName = _row.GetText("LastName"),
+                Username = _row.GetText("Username"),
+                Email = _row.GetText("Email"),
+                MobileNumber = _row.GetText("MobileNumber"),
+                Role = _row.GetText("Role"),
+                Status = _row.GetText("Status"),
+                ManagerId = _row.GetNullableGuid("ManagerPublicId"),
+                ManagerName = _row.GetText("ManagerName"),
+                TeamSize = _row.GetInt("TeamSize"),
+                MustChangePassword = _row.GetBool("MustChangePassword"),
                 IsLockedOut = _lockoutEnd.HasValue && _lockoutEnd.Value > DateTime.UtcNow,
-                LastLoginAtUtc = Utc(r, 13),
-                CreatedAtUtc = Utc(r, 14).Value
+                LastLoginAtUtc = _row.GetNullableUtc("LastLoginAtUtc"),
+                CreatedAtUtc = _row.GetUtc("CreatedAtUtc")
             };
         }
 
-        private Task<SalesUserDto> GetRowAsync(Guid _id, CancellationToken _ct)
-            => _databaseFunctions.QuerySingleOrDefaultAsync(SalesUserSelect, MapSalesUser, new[] { P("@id", _id) }, _ct);
+        /// <summary>One sales user (not deleted) by PublicId, with their manager and team size, or null.</summary>
+        private async Task<SalesUserDto> GetRowAsync(Guid _id, CancellationToken _ct)
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT u.PublicId, u.FirstName, u.LastName, u.Username, u.Email, u.MobileNumber, u.Role, u.Status, ");
+            _sqlQuery.Append("        m.PublicId AS ManagerPublicId, CASE WHEN m.Id IS NULL THEN NULL ELSE CONCAT(m.FirstName, N' ', m.LastName) END AS ManagerName, ");
+            _sqlQuery.Append("        (SELECT COUNT(*) FROM dbo.SalesUsers x WHERE x.ManagerId = u.Id AND x.IsDeleted = 0) AS TeamSize, ");
+            _sqlQuery.Append("        u.MustChangePassword, u.LockoutEndUtc, u.LastLoginAtUtc, u.CreatedAtUtc ");
+            _sqlQuery.Append(" FROM dbo.SalesUsers u ");
+            _sqlQuery.Append(" LEFT JOIN dbo.SalesUsers m ON m.Id = u.ManagerId ");
+            _sqlQuery.Append(" WHERE u.PublicId = @id AND u.IsDeleted = 0 ");
+
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                _sqlQuery.ToString(), new[] { P("@id", _id) }, "F:SalesUser:GetRow", _ct);
+            EnsureRead(_functionReturn);
+            DataRow _row = _dataTable.FirstRow();
+            return _row == null ? null : MapSalesUser(_row);
+        }
 
         /// <summary>Audit snapshot: profile and role fields only, never password data.</summary>
         private static object Snapshot(SalesUserDto u) => u == null ? null : new { u.FirstName, u.LastName, u.Username, u.Email, u.MobileNumber, u.Role, u.ManagerId, u.ManagerName, u.Status };
@@ -113,15 +118,20 @@ ORDER BY u.FirstName, u.LastName";
                     || _filter.Status == ApplicationDatabaseConstants.Status.Locked ? _filter.Status : null;
                 string _search = string.IsNullOrWhiteSpace(_filter.Search) ? null : "%" + _filter.Search.Trim().EscapeLike() + "%";
                 var _totalCount = IntOut("@TotalCount");
-                var _parameters = new List<SqlParameter>
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteProcedureDataTableAsync(SP.SalesUserGetPaged, new[]
                 {
                     P("@Search", _search), P("@Role", _role), P("@Status", _status), P("@ManagerPublicId", _filter.ManagerId),
                     P("@SortBy", _paging.SortBy), P("@SortDirection", _paging.SortDirection), P("@Offset", _paging.Offset), P("@PageSize", _paging.PageSize), _totalCount
-                };
-                IReadOnlyList<SalesUserDto> _items = await _databaseFunctions.QueryProcedureAsync(SP.SalesUserGetPaged, MapSalesUser, _parameters, _ct);
-                int _total = OutInt(_totalCount);
+                }, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
 
-                return (new PagedResult<SalesUserDto> { Items = _items, Page = _paging.Page, PageSize = _paging.PageSize, TotalCount = _total }, new FunctionReturn { MethodName = _methodName });
+                return (new PagedResult<SalesUserDto>
+                {
+                    Items = _dataTable.MapRows(MapSalesUser),
+                    Page = _paging.Page,
+                    PageSize = _paging.PageSize,
+                    TotalCount = OutInt(_totalCount)
+                }, _functionReturn);
             }
             catch (Exception ex)
             {
@@ -151,9 +161,23 @@ ORDER BY u.FirstName, u.LastName";
             string _methodName = "F:SalesUser:GetManagers";
             try
             {
-                var _managers = await _databaseFunctions.QueryAsync(ManagersSelect,
-                    r => new SalesManagerOption { Id = r.GetGuid(0), Name = r.GetString(1), Username = r.GetString(2), TeamSize = r.GetInt32(3) }, null, _ct);
-                return (_managers.ToList(), new FunctionReturn { MethodName = _methodName });
+                // Active sales managers, for the "Manager" drop-down.
+                StringBuilder _sqlQuery = new StringBuilder();
+                _sqlQuery.Append(" SELECT u.PublicId, CONCAT(u.FirstName, N' ', u.LastName) AS Name, u.Username, ");
+                _sqlQuery.Append("        (SELECT COUNT(*) FROM dbo.SalesUsers x WHERE x.ManagerId = u.Id AND x.IsDeleted = 0) AS TeamSize ");
+                _sqlQuery.Append(" FROM dbo.SalesUsers u ");
+                _sqlQuery.Append(" WHERE u.Role = 'SalesManager' AND u.Status = 'Active' AND u.IsDeleted = 0 ");
+                _sqlQuery.Append(" ORDER BY u.FirstName, u.LastName ");
+
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(_sqlQuery.ToString(), null, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+                return (_dataTable.MapRows(_row => new SalesManagerOption
+                {
+                    Id = _row.GetGuid("PublicId"),
+                    Name = _row.GetText("Name"),
+                    Username = _row.GetText("Username"),
+                    TeamSize = _row.GetInt("TeamSize")
+                }), _functionReturn);
             }
             catch (Exception ex)
             {

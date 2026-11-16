@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
+using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.AppValidations;
 using SageCommonLib.Globals;
@@ -28,11 +30,6 @@ namespace SageUserApi.AppFunctions
     /// </summary>
     public class AuthFunctions : IAuthFunctions
     {
-        private const string UserSelect = @"SELECT TOP 1 u.Id, u.PublicId, u.FirstName, u.LastName, u.Username, u.Email, u.PasswordHash, u.MustChangePassword,
-    u.Role, u.Status, u.LockoutEndUtc, u.PermissionVersion, CASE WHEN m.Id IS NULL THEN NULL ELSE CONCAT(m.FirstName, N' ', m.LastName) END,
-    u.CanRequestCancellation
-FROM dbo.SalesUsers u LEFT JOIN dbo.SalesUsers m ON m.Id = u.ManagerId
-WHERE u.IsDeleted = 0 AND ";
         private const int SqlErrorTokenAlreadyUsed = 50001;
         private static string _dummyHash;
         private static readonly object _dummyHashLock = new object();
@@ -66,22 +63,22 @@ WHERE u.IsDeleted = 0 AND ";
         private static IFunctionReturn Unauthorized(string _message, string _methodName)
             => FunctionReturn.Fail(Constants.ReturnMessageTypes.TokenError, _message, Constants.HttpStatusCodes.Unauthorized, _methodName);
 
-        private static SalesUser MapUser(SqlDataReader r) => new SalesUser
+        private static SalesUser MapUser(DataRow _row) => new SalesUser
         {
-            Id = r.GetInt64(0),
-            PublicId = r.GetGuid(1),
-            FirstName = r.GetString(2),
-            LastName = r.GetString(3),
-            Username = r.GetString(4),
-            Email = r.GetString(5),
-            PasswordHash = r.GetString(6),
-            MustChangePassword = r.GetBoolean(7),
-            Role = r.GetString(8),
-            Status = r.GetString(9),
-            LockoutEndUtc = r.IsDBNull(10) ? null : DateTime.SpecifyKind(r.GetDateTime(10), DateTimeKind.Utc),
-            PermissionVersion = r.GetInt32(11),
-            ManagerName = r.IsDBNull(12) ? null : r.GetString(12),
-            CanRequestCancellation = r.GetBoolean(13)
+            Id = _row.GetLong("Id"),
+            PublicId = _row.GetGuid("PublicId"),
+            FirstName = _row.GetText("FirstName"),
+            LastName = _row.GetText("LastName"),
+            Username = _row.GetText("Username"),
+            Email = _row.GetText("Email"),
+            PasswordHash = _row.GetText("PasswordHash"),
+            MustChangePassword = _row.GetBool("MustChangePassword"),
+            Role = _row.GetText("Role"),
+            Status = _row.GetText("Status"),
+            LockoutEndUtc = _row.GetNullableUtc("LockoutEndUtc"),
+            PermissionVersion = _row.GetInt("PermissionVersion"),
+            ManagerName = _row.GetText("ManagerName"),
+            CanRequestCancellation = _row.GetBool("CanRequestCancellation")
         };
 
         /// <summary>Hash verified against unknown usernames so response time does not reveal whether the account exists.</summary>
@@ -98,8 +95,23 @@ WHERE u.IsDeleted = 0 AND ";
         }
 
         // The where clause is always one of the fixed strings below, never user input.
-        private Task<SalesUser> QueryUserAsync(string _where, SqlParameter _parameter, CancellationToken _ct)
-            => _databaseFunctions.QuerySingleOrDefaultAsync(UserSelect + _where, MapUser, new[] { _parameter }, _ct);
+        /// <summary>One sales user (not deleted) for sign-in, with their manager's name, or null.</summary>
+        private async Task<SalesUser> QueryUserAsync(string _where, SqlParameter _parameter, CancellationToken _ct)
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT TOP 1 u.Id, u.PublicId, u.FirstName, u.LastName, u.Username, u.Email, u.PasswordHash, u.MustChangePassword, ");
+            _sqlQuery.Append("        u.Role, u.Status, u.LockoutEndUtc, u.PermissionVersion, ");
+            _sqlQuery.Append("        CASE WHEN m.Id IS NULL THEN NULL ELSE CONCAT(m.FirstName, N' ', m.LastName) END AS ManagerName, ");
+            _sqlQuery.Append("        u.CanRequestCancellation ");
+            _sqlQuery.Append(" FROM dbo.SalesUsers u ");
+            _sqlQuery.Append(" LEFT JOIN dbo.SalesUsers m ON m.Id = u.ManagerId ");
+            _sqlQuery.Append(" WHERE u.IsDeleted = 0 AND " + _where);
+
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(_sqlQuery.ToString(), new[] { _parameter }, "F:Auth:QueryUser", _ct);
+            EnsureRead(_functionReturn);
+            DataRow _row = _dataTable.FirstRow();
+            return _row == null ? null : MapUser(_row);
+        }
 
         private Task<SalesUser> GetUserByLoginAsync(string _identifier, CancellationToken _ct) => QueryUserAsync("(u.Username = @i OR u.Email = @i)", P("@i", _identifier), _ct);
         private Task<SalesUser> GetUserByPublicIdAsync(Guid _publicId, CancellationToken _ct) => QueryUserAsync("u.PublicId = @p", P("@p", _publicId), _ct);
@@ -249,10 +261,15 @@ WHERE u.IsDeleted = 0 AND ";
             {
                 if (string.IsNullOrWhiteSpace(_rawRefreshToken)) return (null, Unauthorized(ApplicationConstants.Auth.InvalidRefreshToken, _methodName));
 
-                var _token = await _databaseFunctions.QuerySingleOrDefaultAsync(
-                    "SELECT Id, SalesUserId, FamilyId, ExpiresAtUtc, RevokedAtUtc FROM dbo.SalesUserRefreshTokens WHERE TokenHash = @h",
-                    r => (Id: r.GetInt64(0), UserId: r.GetInt64(1), FamilyId: r.GetGuid(2), Expires: DateTime.SpecifyKind(r.GetDateTime(3), DateTimeKind.Utc), Revoked: !r.IsDBNull(4)),
-                    new[] { P("@h", TokenGenerator.Hash(_rawRefreshToken)) }, _ct);
+                (IFunctionReturn _tokenRead, DataTable _tokenTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                    " SELECT Id, SalesUserId, FamilyId, ExpiresAtUtc, RevokedAtUtc FROM dbo.SalesUserRefreshTokens WHERE TokenHash = @h ",
+                    new[] { P("@h", TokenGenerator.Hash(_rawRefreshToken)) }, _methodName, _ct);
+                EnsureRead(_tokenRead);
+                DataRow _tokenRow = _tokenTable.FirstRow();
+                var _token = _tokenRow == null
+                    ? (Id: 0L, UserId: 0L, FamilyId: Guid.Empty, Expires: DateTime.MinValue, Revoked: false)
+                    : (Id: _tokenRow.GetLong("Id"), UserId: _tokenRow.GetLong("SalesUserId"), FamilyId: _tokenRow.GetGuid("FamilyId"),
+                       Expires: _tokenRow.GetUtc("ExpiresAtUtc"), Revoked: _tokenRow.GetNullableUtc("RevokedAtUtc").HasValue);
 
                 if (_token.Id == 0) return (null, Unauthorized(ApplicationConstants.Auth.InvalidRefreshToken, _methodName));
                 if (_token.Revoked)

@@ -12,6 +12,7 @@ using SageAdminApi.AppValidations;
 using SageAdminApi.Globals;
 using SageAdminApi.Models;
 using SageAdminApi.Models.HttpPost;
+using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.AppValidations;
 using SageCommonLib.Globals;
@@ -25,8 +26,6 @@ namespace SageAdminApi.AppFunctions
 {
     public class AuthFunctions : IAuthFunctions
     {
-        private const string MenuSelect = "SELECT Code, Name, Category, MenuPath FROM dbo.Modules WHERE IsActive = 1 AND MenuPath IS NOT NULL ORDER BY SortOrder, Name";
-        private const string UserColumns = "Id, PublicId, FirstName, LastName, Username, Email, PasswordHash, MustChangePassword, IsSuperAdmin, Status, FailedLoginCount, LockoutEndUtc, PermissionVersion";
         private const int SqlErrorTokenAlreadyUsed = 50001;
         private static string _dummyHash;
         private static readonly object _dummyHashLock = new object();
@@ -65,21 +64,21 @@ namespace SageAdminApi.AppFunctions
         private static IFunctionReturn Unauthorized(string _message, string _methodName)
             => FunctionReturn.Fail(Constants.ReturnMessageTypes.TokenError, _message, Constants.HttpStatusCodes.Unauthorized, _methodName);
 
-        private static AdminUser MapUser(Microsoft.Data.SqlClient.SqlDataReader r) => new AdminUser
+        private static AdminUser MapUser(DataRow _row) => new AdminUser
         {
-            Id = r.GetInt64(0),
-            PublicId = r.GetGuid(1),
-            FirstName = r.GetString(2),
-            LastName = r.GetString(3),
-            Username = r.GetString(4),
-            Email = r.GetString(5),
-            PasswordHash = r.GetString(6),
-            MustChangePassword = r.GetBoolean(7),
-            IsSuperAdmin = r.GetBoolean(8),
-            Status = r.GetString(9),
-            FailedLoginCount = r.GetInt32(10),
-            LockoutEndUtc = r.IsDBNull(11) ? (DateTime?)null : DateTime.SpecifyKind(r.GetDateTime(11), DateTimeKind.Utc),
-            PermissionVersion = r.GetInt32(12)
+            Id = _row.GetLong("Id"),
+            PublicId = _row.GetGuid("PublicId"),
+            FirstName = _row.GetText("FirstName"),
+            LastName = _row.GetText("LastName"),
+            Username = _row.GetText("Username"),
+            Email = _row.GetText("Email"),
+            PasswordHash = _row.GetText("PasswordHash"),
+            MustChangePassword = _row.GetBool("MustChangePassword"),
+            IsSuperAdmin = _row.GetBool("IsSuperAdmin"),
+            Status = _row.GetText("Status"),
+            FailedLoginCount = _row.GetInt("FailedLoginCount"),
+            LockoutEndUtc = _row.GetNullableUtc("LockoutEndUtc"),
+            PermissionVersion = _row.GetInt("PermissionVersion")
         };
 
         /// <summary>Hash verified against unknown usernames so response time does not reveal whether the account exists.</summary>
@@ -98,9 +97,20 @@ namespace SageAdminApi.AppFunctions
             return _dummyHash;
         }
 
-        // 'where' is always one of the fixed clauses below, never user input.
-        private Task<AdminUser> QueryUserAsync(string _where, IEnumerable<SqlParameter> _parameters, CancellationToken _ct)
-            => _databaseFunctions.QuerySingleOrDefaultAsync($"SELECT TOP 1 {UserColumns} FROM dbo.AdminUsers WHERE IsDeleted = 0 AND {_where}", MapUser, _parameters, _ct);
+        /// <summary>One admin user (not deleted) for sign-in, or null. '_where' is always one of the fixed clauses below, never user input.</summary>
+        private async Task<AdminUser> QueryUserAsync(string _where, IEnumerable<SqlParameter> _parameters, CancellationToken _ct)
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT TOP 1 Id, PublicId, FirstName, LastName, Username, Email, PasswordHash, MustChangePassword, IsSuperAdmin, ");
+            _sqlQuery.Append("        Status, FailedLoginCount, LockoutEndUtc, PermissionVersion ");
+            _sqlQuery.Append(" FROM dbo.AdminUsers ");
+            _sqlQuery.Append(" WHERE IsDeleted = 0 AND " + _where);
+
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(_sqlQuery.ToString(), _parameters, "F:Auth:QueryUser", _ct);
+            EnsureRead(_functionReturn);
+            DataRow _row = _dataTable.FirstRow();
+            return _row == null ? null : MapUser(_row);
+        }
 
         private Task<AdminUser> GetUserByLoginAsync(string _identifier, CancellationToken _ct) => QueryUserAsync("(Username = @i OR Email = @i)", new[] { P("@i", _identifier) }, _ct);
         private Task<AdminUser> GetUserByEmailAsync(string _email, CancellationToken _ct) => QueryUserAsync("Email = @e", new[] { P("@e", _email) }, _ct);
@@ -155,14 +165,28 @@ namespace SageAdminApi.AppFunctions
         private async Task<CurrentUserResponse> BuildCurrentUserAsync(AdminUser _user, CancellationToken _ct)
         {
             // The procedure applies the Super Admin rule (all active permissions) itself.
-            var _rows = await _databaseFunctions.QueryProcedureAsync(SP.AdminUserGetEffectivePermissions,
-                r => (Permission: r.GetString(0), ModuleCode: r.GetString(1), ModuleName: r.GetString(2)),
-                new[] { P("@UserId", _user.Id) }, _ct);
+            (IFunctionReturn _functionReturn, DataTable _permissionTable) = await _databaseFunctions.ExecuteProcedureDataTableAsync(
+                SP.AdminUserGetEffectivePermissions, new[] { P("@UserId", _user.Id) }, "F:Auth:BuildCurrentUser", _ct);
+            EnsureRead(_functionReturn);
+            var _rows = _permissionTable.MapRows(_row => (Permission: _row.GetText("PermissionCode"), ModuleCode: _row.GetText("ModuleCode"), ModuleName: _row.GetText("ModuleName")));
 
             var _permissions = _rows.Select(x => x.Permission).Distinct().ToList();
             var _granted = new HashSet<string>(_permissions, StringComparer.OrdinalIgnoreCase);
-            var _menuModules = await _databaseFunctions.QueryAsync(MenuSelect,
-                r => new MenuItem { Code = r.GetString(0), Name = r.GetString(1), Category = r.IsDBNull(2) ? null : r.GetString(2), Path = r.GetString(3) }, null, _ct);
+
+            // Sidebar: active modules with a menu link.
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT Code, Name, Category, MenuPath FROM dbo.Modules ");
+            _sqlQuery.Append(" WHERE IsActive = 1 AND MenuPath IS NOT NULL ");
+            _sqlQuery.Append(" ORDER BY SortOrder, Name ");
+            (_functionReturn, DataTable _menuTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(_sqlQuery.ToString(), null, "F:Auth:BuildCurrentUser", _ct);
+            EnsureRead(_functionReturn);
+            var _menuModules = _menuTable.MapRows(_row => new MenuItem
+            {
+                Code = _row.GetText("Code"),
+                Name = _row.GetText("Name"),
+                Category = _row.GetText("Category"),
+                Path = _row.GetText("MenuPath")
+            });
 
             return new CurrentUserResponse
             {
@@ -283,10 +307,15 @@ namespace SageAdminApi.AppFunctions
                     return (null, Unauthorized(ApplicationConstants.Auth.InvalidRefreshToken, _methodName));
                 }
 
-                var _token = await _databaseFunctions.QuerySingleOrDefaultAsync(
-                    "SELECT Id, UserId, FamilyId, ExpiresAtUtc, RevokedAtUtc FROM dbo.RefreshTokens WHERE TokenHash = @h",
-                    r => (Id: r.GetInt64(0), UserId: r.GetInt64(1), FamilyId: r.GetGuid(2), Expires: DateTime.SpecifyKind(r.GetDateTime(3), DateTimeKind.Utc), Revoked: !r.IsDBNull(4)),
-                    new[] { P("@h", TokenGenerator.Hash(_rawRefreshToken)) }, _ct);
+                (IFunctionReturn _tokenRead, DataTable _tokenTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                    " SELECT Id, UserId, FamilyId, ExpiresAtUtc, RevokedAtUtc FROM dbo.RefreshTokens WHERE TokenHash = @h ",
+                    new[] { P("@h", TokenGenerator.Hash(_rawRefreshToken)) }, _methodName, _ct);
+                EnsureRead(_tokenRead);
+                DataRow _tokenRow = _tokenTable.FirstRow();
+                var _token = _tokenRow == null
+                    ? (Id: 0L, UserId: 0L, FamilyId: Guid.Empty, Expires: DateTime.MinValue, Revoked: false)
+                    : (Id: _tokenRow.GetLong("Id"), UserId: _tokenRow.GetLong("UserId"), FamilyId: _tokenRow.GetGuid("FamilyId"),
+                       Expires: _tokenRow.GetUtc("ExpiresAtUtc"), Revoked: _tokenRow.GetNullableUtc("RevokedAtUtc").HasValue);
 
                 if (_token.Id == 0)
                 {
@@ -344,10 +373,12 @@ namespace SageAdminApi.AppFunctions
             {
                 if (!string.IsNullOrWhiteSpace(_rawRefreshToken))
                 {
-                    var _token = await _databaseFunctions.QuerySingleOrDefaultAsync(
-                        "SELECT UserId, FamilyId FROM dbo.RefreshTokens WHERE TokenHash = @h",
-                        r => (UserId: r.GetInt64(0), FamilyId: r.GetGuid(1)),
-                        new[] { P("@h", TokenGenerator.Hash(_rawRefreshToken)) }, _ct);
+                    (IFunctionReturn _tokenRead, DataTable _tokenTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                        " SELECT UserId, FamilyId FROM dbo.RefreshTokens WHERE TokenHash = @h ",
+                        new[] { P("@h", TokenGenerator.Hash(_rawRefreshToken)) }, _methodName, _ct);
+                    EnsureRead(_tokenRead);
+                    DataRow _tokenRow = _tokenTable.FirstRow();
+                    var _token = _tokenRow == null ? (UserId: 0L, FamilyId: Guid.Empty) : (UserId: _tokenRow.GetLong("UserId"), FamilyId: _tokenRow.GetGuid("FamilyId"));
                     if (_token.UserId != 0)
                     {
                         await RevokeFamilyAsync(_token.FamilyId, "logout", _ct);

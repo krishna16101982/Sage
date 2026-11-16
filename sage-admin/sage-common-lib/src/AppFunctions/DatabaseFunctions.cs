@@ -77,6 +77,47 @@ public class DatabaseFunctions : IDatabaseFunctions
         return rows.Count == 0 ? default : rows[0];
     }
 
+    #region DataTable reads (ixcheck style)
+
+    private Task<DataTable> DataTableCoreAsync(string commandText, CommandType commandType, IEnumerable<SqlParameter>? parameters, CancellationToken ct)
+        => WithRetryAsync(async () =>
+        {
+            await using var conn = await _connectionFactory.OpenConnectionAsync(ct).ConfigureAwait(false);
+            await using var cmd = CreateCommand(conn, null, commandText, parameters, commandType);
+            var table = new DataTable();
+            try
+            {
+                // OUTPUT parameters are filled in only once the reader is closed, so it is disposed before the parameters are released.
+                await using (var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false))
+                {
+                    table.Load(reader);
+                }
+            }
+            finally { cmd.Parameters.Clear(); }
+            return table;
+        });
+
+    private async Task<(IFunctionReturn functionReturn, DataTable dataTable)> SelectDataTableAsync(string commandText, CommandType commandType, IEnumerable<SqlParameter>? parameters, string methodName, CancellationToken ct)
+    {
+        try
+        {
+            DataTable table = await DataTableCoreAsync(commandText, commandType, parameters, ct).ConfigureAwait(false);
+            return (new FunctionReturn { MethodName = methodName }, table);
+        }
+        catch (AppException ex)
+        {
+            return (FunctionReturn.Fail(ex.MessageType, ex.Message, ex.HttpStatusCode, methodName), new DataTable());
+        }
+    }
+
+    public Task<(IFunctionReturn functionReturn, DataTable dataTable)> ExecuteSelectDataTableAsync(string sql, IEnumerable<SqlParameter>? parameters, string methodName, CancellationToken ct = default)
+        => SelectDataTableAsync(sql, CommandType.Text, parameters, methodName, ct);
+
+    public Task<(IFunctionReturn functionReturn, DataTable dataTable)> ExecuteProcedureDataTableAsync(string procedureName, IEnumerable<SqlParameter>? parameters, string methodName, CancellationToken ct = default)
+        => SelectDataTableAsync(procedureName, CommandType.StoredProcedure, parameters, methodName, ct);
+
+    #endregion
+
     #region Stored procedures
 
     public Task<int> ExecuteProcedureAsync(string procedureName, IEnumerable<SqlParameter>? parameters = null, CancellationToken ct = default)

@@ -1,18 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Data.SqlClient;
 using SageAdminApi.AppFunctions.Interfaces;
 using SageAdminApi.AppValidations;
 using SageAdminApi.Models;
 using SageAdminApi.Models.Filter;
+using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.AppValidations;
-using SageCommonLib.Models;
 using SageCommonLib.Models.Interfaces;
 using SageCommonLib.Models.Paging;
 using SP = SageAdminApi.Globals.ApplicationDatabaseConstants.StoredProcedures;
@@ -26,15 +25,6 @@ namespace SageAdminApi.AppFunctions
     /// </summary>
     public class AuditLogFunctions : IAuditLogFunctions
     {
-        private const string DetailSelect = @"SELECT a.Id, a.CreatedAtUtc,
-    CASE WHEN a.ActorUserId IS NOT NULL THEN 'admin' WHEN ISJSON(a.NewValues) = 1 AND JSON_VALUE(a.NewValues, '$.By') = 'SalesUser' THEN 'sales' ELSE 'system' END,
-    CASE WHEN u.Id IS NOT NULL THEN CONCAT(u.FirstName, N' ', u.LastName) WHEN ISJSON(a.NewValues) = 1 THEN JSON_VALUE(a.NewValues, '$.SalesUserName') END,
-    u.Username, a.Action, a.EntityType, a.EntityId, a.IpAddress,
-    CASE WHEN a.OldValues IS NULL THEN 0 ELSE 1 END, CASE WHEN a.NewValues IS NULL THEN 0 ELSE 1 END,
-    a.OldValues, a.NewValues
-FROM dbo.AuditLogs a LEFT JOIN dbo.AdminUsers u ON u.Id = a.ActorUserId
-WHERE a.Id = @id";
-
         private readonly ILoggerFunctions _loggerFunctions;
         private readonly IDatabaseFunctions _databaseFunctions;
 
@@ -46,29 +36,31 @@ WHERE a.Id = @id";
 
         #region Helpers
 
-        private static T Fill<T>(SqlDataReader r, T _item) where T : AuditLogItem
+        /// <summary>One audit row (from dbo.usp_AuditLog_GetPaged or GetAuditLogAsync; both use these column names).</summary>
+        private static T Fill<T>(DataRow _row, T _item) where T : AuditLogItem
         {
-            _item.Id = r.GetInt64(0);
-            _item.CreatedAtUtc = DateTime.SpecifyKind(r.GetDateTime(1), DateTimeKind.Utc);
-            _item.ActorType = r.GetString(2);
-            _item.ActorName = S(r, 3);
-            _item.ActorUsername = S(r, 4);
-            _item.Action = r.GetString(5);
-            _item.EntityType = r.GetString(6);
-            _item.EntityId = S(r, 7);
-            _item.IpAddress = S(r, 8);
-            _item.HasOldValues = r.GetInt32(9) == 1;
-            _item.HasNewValues = r.GetInt32(10) == 1;
+            _item.Id = _row.GetLong("Id");
+            _item.CreatedAtUtc = _row.GetUtc("CreatedAtUtc");
+            _item.ActorType = _row.GetText("ActorType");
+            _item.ActorName = _row.GetText("ActorName");
+            _item.ActorUsername = _row.GetText("ActorUsername");
+            _item.Action = _row.GetText("Action");
+            _item.EntityType = _row.GetText("EntityType");
+            _item.EntityId = _row.GetText("EntityId");
+            _item.IpAddress = _row.GetText("IpAddress");
+            _item.HasOldValues = _row.GetInt("HasOld") == 1;
+            _item.HasNewValues = _row.GetInt("HasNew") == 1;
             return _item;
         }
 
         /// <summary>Stored JSON as a JSON value (null when empty or not valid JSON).</summary>
-        private static JsonElement? Json(SqlDataReader r, int i)
+        private static JsonElement? Json(DataRow _row, string _column)
         {
-            if (r.IsDBNull(i)) return null;
+            string _text = _row.GetText(_column);
+            if (_text == null) return null;
             try
             {
-                using JsonDocument _doc = JsonDocument.Parse(r.GetString(i));
+                using JsonDocument _doc = JsonDocument.Parse(_text);
                 return _doc.RootElement.Clone();
             }
             catch (JsonException)
@@ -91,15 +83,21 @@ WHERE a.Id = @id";
                 string _search = string.IsNullOrWhiteSpace(_filter.Search) ? null : "%" + _filter.Search.Trim().EscapeLike() + "%";
                 var _totalCount = IntOut("@TotalCount");
 
-                IReadOnlyList<AuditLogItem> _items = await _databaseFunctions.QueryProcedureAsync(SP.AuditLogGetPaged, r => Fill(r, new AuditLogItem()), new List<SqlParameter>
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteProcedureDataTableAsync(SP.AuditLogGetPaged, new[]
                 {
                     P("@Search", _search), P("@EntityType", _filter.EntityType.NullIfWhiteSpace()), P("@Action", _filter.Action.NullIfWhiteSpace()),
                     P("@ActorType", _actorType), P("@ActorPublicId", _filter.ActorId), Date("@From", _filter.From), Date("@To", _filter.To),
                     P("@SortDirection", _paging.SortDirection), P("@Offset", _paging.Offset), P("@PageSize", _paging.PageSize), _totalCount
-                }, _ct);
+                }, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
 
-                int _total = OutInt(_totalCount);
-                return (new PagedResult<AuditLogItem> { Items = _items, Page = _paging.Page, PageSize = _paging.PageSize, TotalCount = _total }, new FunctionReturn { MethodName = _methodName });
+                return (new PagedResult<AuditLogItem>
+                {
+                    Items = _dataTable.MapRows(_row => Fill(_row, new AuditLogItem())),
+                    Page = _paging.Page,
+                    PageSize = _paging.PageSize,
+                    TotalCount = OutInt(_totalCount)
+                }, _functionReturn);
             }
             catch (Exception ex)
             {
@@ -113,16 +111,33 @@ WHERE a.Id = @id";
             string _methodName = "F:AuditLog:GetAuditLog";
             try
             {
-                AuditLogDetail _entry = await _databaseFunctions.QuerySingleOrDefaultAsync(DetailSelect, r =>
-                {
-                    AuditLogDetail _d = Fill(r, new AuditLogDetail());
-                    _d.OldValues = Json(r, 11);
-                    _d.NewValues = Json(r, 12);
-                    return _d;
-                }, new[] { P("@id", _id) }, _ct);
-                return _entry == null
-                    ? (null, ApplicationCommonFunctions.NotFound("Audit entry not found.", _methodName))
-                    : (_entry, new FunctionReturn { MethodName = _methodName });
+                // Same column names as dbo.usp_AuditLog_GetPaged, plus the before / after values.
+                StringBuilder _sqlQuery = new StringBuilder();
+                _sqlQuery.Append(" SELECT a.Id, a.CreatedAtUtc, ");
+                _sqlQuery.Append("        CASE WHEN a.ActorUserId IS NOT NULL THEN 'admin' ");
+                _sqlQuery.Append("             WHEN ISJSON(a.NewValues) = 1 AND JSON_VALUE(a.NewValues, '$.By') = 'SalesUser' THEN 'sales' ");
+                _sqlQuery.Append("             ELSE 'system' END AS ActorType, ");
+                _sqlQuery.Append("        CASE WHEN u.Id IS NOT NULL THEN CONCAT(u.FirstName, N' ', u.LastName) ");
+                _sqlQuery.Append("             WHEN ISJSON(a.NewValues) = 1 THEN JSON_VALUE(a.NewValues, '$.SalesUserName') END AS ActorName, ");
+                _sqlQuery.Append("        u.Username AS ActorUsername, a.Action, a.EntityType, a.EntityId, a.IpAddress, ");
+                _sqlQuery.Append("        CASE WHEN a.OldValues IS NULL THEN 0 ELSE 1 END AS HasOld, ");
+                _sqlQuery.Append("        CASE WHEN a.NewValues IS NULL THEN 0 ELSE 1 END AS HasNew, ");
+                _sqlQuery.Append("        a.OldValues, a.NewValues ");
+                _sqlQuery.Append(" FROM dbo.AuditLogs a ");
+                _sqlQuery.Append(" LEFT JOIN dbo.AdminUsers u ON u.Id = a.ActorUserId ");
+                _sqlQuery.Append(" WHERE a.Id = @id ");
+
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                    _sqlQuery.ToString(), new[] { P("@id", _id) }, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+
+                DataRow _row = _dataTable.FirstRow();
+                if (_row == null) return (null, ApplicationCommonFunctions.NotFound("Audit entry not found.", _methodName));
+
+                AuditLogDetail _entry = Fill(_row, new AuditLogDetail());
+                _entry.OldValues = Json(_row, "OldValues");
+                _entry.NewValues = Json(_row, "NewValues");
+                return (_entry, _functionReturn);
             }
             catch (Exception ex)
             {
@@ -136,13 +151,29 @@ WHERE a.Id = @id";
             string _methodName = "F:AuditLog:GetOptions";
             try
             {
-                var _types = await _databaseFunctions.QueryAsync("SELECT DISTINCT EntityType FROM dbo.AuditLogs ORDER BY EntityType", r => r.GetString(0), null, _ct);
-                var _actions = await _databaseFunctions.QueryAsync("SELECT DISTINCT Action FROM dbo.AuditLogs ORDER BY Action", r => r.GetString(0), null, _ct);
-                var _admins = await _databaseFunctions.QueryAsync(
-                    @"SELECT u.PublicId, CONCAT(u.FirstName, N' ', u.LastName) FROM dbo.AdminUsers u
-                      WHERE EXISTS (SELECT 1 FROM dbo.AuditLogs a WHERE a.ActorUserId = u.Id) ORDER BY u.FirstName, u.LastName",
-                    r => new AuditActorOption { Id = r.GetGuid(0), Name = r.GetString(1) }, null, _ct);
-                return (new AuditLogOptions { EntityTypes = _types.ToList(), Actions = _actions.ToList(), Admins = _admins.ToList() }, new FunctionReturn { MethodName = _methodName });
+                // Three small lists for the filters, in one round trip each.
+                (IFunctionReturn _typesReturn, DataTable _types) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                    " SELECT DISTINCT EntityType FROM dbo.AuditLogs ORDER BY EntityType ", null, _methodName, _ct);
+                if (!_typesReturn.Status) return (null, _typesReturn);
+
+                (IFunctionReturn _actionsReturn, DataTable _actions) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                    " SELECT DISTINCT Action FROM dbo.AuditLogs ORDER BY Action ", null, _methodName, _ct);
+                if (!_actionsReturn.Status) return (null, _actionsReturn);
+
+                StringBuilder _sqlQuery = new StringBuilder();
+                _sqlQuery.Append(" SELECT u.PublicId, CONCAT(u.FirstName, N' ', u.LastName) AS Name ");
+                _sqlQuery.Append(" FROM dbo.AdminUsers u ");
+                _sqlQuery.Append(" WHERE EXISTS (SELECT 1 FROM dbo.AuditLogs a WHERE a.ActorUserId = u.Id) ");
+                _sqlQuery.Append(" ORDER BY u.FirstName, u.LastName ");
+                (IFunctionReturn _functionReturn, DataTable _admins) = await _databaseFunctions.ExecuteSelectDataTableAsync(_sqlQuery.ToString(), null, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+
+                return (new AuditLogOptions
+                {
+                    EntityTypes = _types.MapRows(_row => _row.GetText("EntityType")),
+                    Actions = _actions.MapRows(_row => _row.GetText("Action")),
+                    Admins = _admins.MapRows(_row => new AuditActorOption { Id = _row.GetGuid("PublicId"), Name = _row.GetText("Name") })
+                }, _functionReturn);
             }
             catch (Exception ex)
             {

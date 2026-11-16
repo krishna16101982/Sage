@@ -47,12 +47,13 @@ BEGIN
       AND (@Search IS NULL OR s.SaleNumber LIKE @Search ESCAPE '\' OR cu.Name LIKE @Search ESCAPE '\' OR p.Name LIKE @Search ESCAPE '\')
     OPTION (RECOMPILE);
 
-    SELECT s.PublicId, s.SaleNumber, cu.PublicId, cu.Name, c.Name, p.Name, pl.Name,
-           su.PublicId, CONCAT(su.FirstName, N' ', su.LastName), su.Role,
-           CASE WHEN mg.Id IS NULL THEN NULL ELSE CONCAT(mg.FirstName, N' ', mg.LastName) END,
+    SELECT s.PublicId, s.SaleNumber, cu.PublicId AS CustomerPublicId, cu.Name AS CustomerName, c.Name AS CategoryName,
+           p.Name AS ProductName, pl.Name AS PlanName,
+           su.PublicId AS SellerPublicId, CONCAT(su.FirstName, N' ', su.LastName) AS SellerName, su.Role AS SellerRole,
+           CASE WHEN mg.Id IS NULL THEN NULL ELSE CONCAT(mg.FirstName, N' ', mg.LastName) END AS ManagerName,
            s.Quantity, s.UnitPrice, s.UnitCost, s.ListAmount, s.SaleAmount, s.DiscountAmount, s.CostAmount,
            s.DurationUnit, s.DurationCount, s.StartDate, s.RenewalDate, s.Status, s.Notes, s.CreatedAtUtc,
-           s.CancelledAtUtc, CASE WHEN cb.Id IS NULL THEN NULL ELSE CONCAT(cb.FirstName, N' ', cb.LastName) END, s.CancelReason
+           s.CancelledAtUtc, CASE WHEN cb.Id IS NULL THEN NULL ELSE CONCAT(cb.FirstName, N' ', cb.LastName) END AS CancelledByName, s.CancelReason
     FROM dbo.Sales s
     JOIN dbo.Customers cu ON cu.Id = s.CustomerId
     JOIN dbo.ProductCategories c ON c.Id = s.CategoryId

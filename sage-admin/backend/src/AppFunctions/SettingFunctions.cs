@@ -1,16 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
+using System.Data;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Data.SqlClient;
 using SageAdminApi.AppFunctions.Interfaces;
 using SageAdminApi.AppValidations;
 using SageAdminApi.Globals;
 using SageAdminApi.Models;
 using SageAdminApi.Models.HttpPost;
+using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.AppValidations;
 using SageCommonLib.Globals;
@@ -27,10 +28,6 @@ namespace SageAdminApi.AppFunctions
     /// </summary>
     public class SettingFunctions : ISettingFunctions
     {
-        private const string SettingSelect = @"SELECT s.SettingKey, s.SettingValue, s.ValueType, s.Category, ISNULL(s.Label, s.SettingKey), s.Description,
-    s.MinValue, s.MaxValue, s.MaxLength, s.Pattern, s.UpdatedAtUtc, CASE WHEN u.Id IS NULL THEN NULL ELSE CONCAT(u.FirstName, N' ', u.LastName) END
-FROM dbo.Settings s LEFT JOIN dbo.AdminUsers u ON u.Id = s.UpdatedBy";
-
         private readonly ILoggerFunctions _loggerFunctions;
         private readonly IDatabaseFunctions _databaseFunctions;
         private readonly IAuditFunctions _auditFunctions;
@@ -44,23 +41,38 @@ FROM dbo.Settings s LEFT JOIN dbo.AdminUsers u ON u.Id = s.UpdatedBy";
 
         #region Helpers
 
-        private static int? I(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetInt32(i);
-
-        private static SettingDto Map(SqlDataReader r) => new SettingDto
+        private static SettingDto Map(DataRow _row) => new SettingDto
         {
-            Key = r.GetString(0),
-            Value = S(r, 1),
-            ValueType = r.GetString(2),
-            Category = r.GetString(3),
-            Label = r.GetString(4),
-            Description = S(r, 5),
-            MinValue = I(r, 6),
-            MaxValue = I(r, 7),
-            MaxLength = I(r, 8),
-            Pattern = S(r, 9),
-            UpdatedAtUtc = r.IsDBNull(10) ? null : DateTime.SpecifyKind(r.GetDateTime(10), DateTimeKind.Utc),
-            UpdatedByName = S(r, 11)
+            Key = _row.GetText("SettingKey"),
+            Value = _row.GetText("SettingValue"),
+            ValueType = _row.GetText("ValueType"),
+            Category = _row.GetText("Category"),
+            Label = _row.GetText("Label"),
+            Description = _row.GetText("Description"),
+            MinValue = _row.GetNullableInt("MinValue"),
+            MaxValue = _row.GetNullableInt("MaxValue"),
+            MaxLength = _row.GetNullableInt("MaxLength"),
+            Pattern = _row.GetText("Pattern"),
+            UpdatedAtUtc = _row.GetNullableUtc("UpdatedAtUtc"),
+            UpdatedByName = _row.GetText("UpdatedByName")
         };
+
+        /// <summary>Every setting (key = null) or one setting, with who changed it last.</summary>
+        private async Task<(IFunctionReturn functionReturn, List<SettingDto> settings)> ReadSettingsAsync(string _key, string _methodName, CancellationToken _ct)
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT s.SettingKey, s.SettingValue, s.ValueType, s.Category, ISNULL(s.Label, s.SettingKey) AS Label, s.Description, ");
+            _sqlQuery.Append("        s.MinValue, s.MaxValue, s.MaxLength, s.Pattern, s.UpdatedAtUtc, ");
+            _sqlQuery.Append("        CASE WHEN u.Id IS NULL THEN NULL ELSE CONCAT(u.FirstName, N' ', u.LastName) END AS UpdatedByName ");
+            _sqlQuery.Append(" FROM dbo.Settings s ");
+            _sqlQuery.Append(" LEFT JOIN dbo.AdminUsers u ON u.Id = s.UpdatedBy ");
+            if (_key != null) _sqlQuery.Append(" WHERE s.SettingKey = @k ");
+            _sqlQuery.Append(" ORDER BY s.Category, s.SortOrder, s.SettingKey ");
+
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                _sqlQuery.ToString(), _key == null ? null : new[] { P("@k", _key) }, _methodName, _ct);
+            return (_functionReturn, _dataTable.MapRows(Map));
+        }
 
         private static IFunctionReturn Invalid(string _message, string _methodName)
             => ApplicationCommonFunctions.BadRequest(_message, _methodName);
@@ -101,8 +113,8 @@ FROM dbo.Settings s LEFT JOIN dbo.AdminUsers u ON u.Id = s.UpdatedBy";
             string _methodName = "F:Setting:GetSettings";
             try
             {
-                var _settings = await _databaseFunctions.QueryAsync(SettingSelect + " ORDER BY s.Category, s.SortOrder, s.SettingKey", Map, null, _ct);
-                return (_settings.ToList(), new FunctionReturn { MethodName = _methodName });
+                (IFunctionReturn _functionReturn, List<SettingDto> _settings) = await ReadSettingsAsync(null, _methodName, _ct);
+                return _functionReturn.Status ? (_settings, _functionReturn) : (null, _functionReturn);
             }
             catch (Exception ex)
             {
@@ -116,7 +128,9 @@ FROM dbo.Settings s LEFT JOIN dbo.AdminUsers u ON u.Id = s.UpdatedBy";
             string _methodName = "F:Setting:UpdateSetting";
             try
             {
-                SettingDto _existing = await _databaseFunctions.QuerySingleOrDefaultAsync(SettingSelect + " WHERE s.SettingKey = @k", Map, new[] { P("@k", _key) }, _ct);
+                (IFunctionReturn _readReturn, List<SettingDto> _found) = await ReadSettingsAsync(_key ?? string.Empty, _methodName, _ct);
+                if (!_readReturn.Status) return (null, _readReturn);
+                SettingDto _existing = _found.Count > 0 ? _found[0] : null;
                 if (_existing == null) return (null, ApplicationCommonFunctions.NotFound("Setting not found.", _methodName));
 
                 (string _value, string _error) = Check(_existing, _params?.Value);
@@ -128,7 +142,9 @@ FROM dbo.Settings s LEFT JOIN dbo.AdminUsers u ON u.Id = s.UpdatedBy";
                 }, _methodName, "Setting saved.", _ct);
                 if (!_functionReturn.Status) return (null, _functionReturn);
 
-                SettingDto _updated = await _databaseFunctions.QuerySingleOrDefaultAsync(SettingSelect + " WHERE s.SettingKey = @k", Map, new[] { P("@k", _key) }, _ct);
+                (IFunctionReturn _reread, List<SettingDto> _after) = await ReadSettingsAsync(_existing.Key, _methodName, _ct);
+                EnsureRead(_reread);
+                SettingDto _updated = _after[0];
                 await _auditFunctions.LogAsync(_actorUserId, ApplicationEnumeration.AuditAction.Update.ToString(), ApplicationEnumeration.ObjectType.Setting.ToString(),
                     _existing.Key, new { _existing.Label, Value = _existing.Value }, new { _updated.Label, Value = _updated.Value }, _ipAddress, _ct);
                 return (_updated, _functionReturn);

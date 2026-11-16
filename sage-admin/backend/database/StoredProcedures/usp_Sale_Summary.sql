@@ -33,14 +33,16 @@ BEGIN
     SELECT u.PublicId, CONCAT(u.FirstName, N' ', u.LastName) AS Name, u.Username, u.Role,
            CASE WHEN m.Id IS NULL THEN NULL ELSE CONCAT(m.FirstName, N' ', m.LastName) END AS ManagerName,
            (SELECT COUNT(*) FROM dbo.SalesUsers t WHERE t.ManagerId = u.Id AND t.IsDeleted = 0) AS TeamSize,
-           ISNULL(a.SaleCount, 0), ISNULL(a.CancelledCount, 0), ISNULL(a.Quantity, 0),
-           ISNULL(a.ListAmount, 0), ISNULL(a.DiscountAmount, 0), ISNULL(a.SaleAmount, 0), ISNULL(a.CostAmount, 0),
+           ISNULL(a.SaleCount, 0) AS SaleCount, ISNULL(a.CancelledCount, 0) AS CancelledCount, ISNULL(a.Quantity, 0) AS Quantity,
+           ISNULL(a.ListAmount, 0) AS ListAmount, ISNULL(a.DiscountAmount, 0) AS DiscountAmount, ISNULL(a.SaleAmount, 0) AS SaleAmount,
+           ISNULL(a.CostAmount, 0) AS CostAmount,
            ISNULL(a.SaleAmount, 0) - ISNULL(a.CostAmount, 0) AS Margin
     FROM dbo.SalesUsers u
     LEFT JOIN dbo.SalesUsers m ON m.Id = u.ManagerId
     LEFT JOIN agg a ON a.UserId = u.Id
     WHERE (a.UserId IS NOT NULL OR u.IsDeleted = 0)
       AND (@manager = 0 OR u.Role = 'SalesManager' OR a.UserId IS NOT NULL)
-    ORDER BY ISNULL(a.SaleAmount, 0) DESC, u.FirstName, u.LastName;
+    ORDER BY ISNULL(a.SaleAmount, 0) DESC, u.FirstName, u.LastName
+    OPTION (RECOMPILE);   -- the date filter is optional: plan each call for the dates given (IX_Sales_CreatedAtUtc, DDL 027)
 END
 GO

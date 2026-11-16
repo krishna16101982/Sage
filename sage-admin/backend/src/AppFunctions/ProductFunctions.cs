@@ -10,6 +10,7 @@ using SageAdminApi.AppValidations;
 using SageAdminApi.Globals;
 using SageAdminApi.Models;
 using SageAdminApi.Models.HttpPost;
+using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.AppValidations;
 using SageCommonLib.Globals;
@@ -26,9 +27,10 @@ namespace SageAdminApi.AppFunctions
     /// </summary>
     public class ProductFunctions : IProductFunctions
     {
-        private const string CategorySelect = "SELECT Id, Code, Name, Description, SortOrder, IsActive FROM dbo.ProductCategories";
-        private const string ProductSelect = "SELECT Id, CategoryId, Code, Name, Description, SortOrder, IsActive FROM dbo.Products";
-        private const string PlanSelect = "SELECT Id, ProductId, Name, Description, DurationUnit, DurationCount, Price, Cost, SortOrder, IsActive FROM dbo.ProductPlans";
+        // The three catalog tables are read whole (tens of rows) or by Id; the caller adds WHERE / ORDER BY.
+        private const string CategoryColumns = " SELECT Id, Code, Name, Description, SortOrder, IsActive FROM dbo.ProductCategories ";
+        private const string ProductColumns = " SELECT Id, CategoryId, Code, Name, Description, SortOrder, IsActive FROM dbo.Products ";
+        private const string PlanColumns = " SELECT Id, ProductId, Name, Description, DurationUnit, DurationCount, Price, Cost, SortOrder, IsActive FROM dbo.ProductPlans ";
 
         private readonly ILoggerFunctions _loggerFunctions;
         private readonly IDatabaseFunctions _databaseFunctions;
@@ -44,33 +46,58 @@ namespace SageAdminApi.AppFunctions
         #region Helpers
 
 
-        private static ProductCategoryDto MapCategory(SqlDataReader r) => new ProductCategoryDto
+        private static ProductCategoryDto MapCategory(DataRow _row) => new ProductCategoryDto
         {
-            Id = r.GetInt64(0), Code = r.GetString(1), Name = r.GetString(2), Description = r.IsDBNull(3) ? null : r.GetString(3),
-            SortOrder = r.GetInt32(4), IsActive = r.GetBoolean(5)
+            Id = _row.GetLong("Id"),
+            Code = _row.GetText("Code"),
+            Name = _row.GetText("Name"),
+            Description = _row.GetText("Description"),
+            SortOrder = _row.GetInt("SortOrder"),
+            IsActive = _row.GetBool("IsActive")
         };
 
-        private static ProductDto MapProduct(SqlDataReader r) => new ProductDto
+        private static ProductDto MapProduct(DataRow _row) => new ProductDto
         {
-            Id = r.GetInt64(0), CategoryId = r.GetInt64(1), Code = r.GetString(2), Name = r.GetString(3), Description = r.IsDBNull(4) ? null : r.GetString(4),
-            SortOrder = r.GetInt32(5), IsActive = r.GetBoolean(6)
+            Id = _row.GetLong("Id"),
+            CategoryId = _row.GetLong("CategoryId"),
+            Code = _row.GetText("Code"),
+            Name = _row.GetText("Name"),
+            Description = _row.GetText("Description"),
+            SortOrder = _row.GetInt("SortOrder"),
+            IsActive = _row.GetBool("IsActive")
         };
 
-        private static ProductPlanDto MapPlan(SqlDataReader r) => new ProductPlanDto
+        private static ProductPlanDto MapPlan(DataRow _row) => new ProductPlanDto
         {
-            Id = r.GetInt64(0), ProductId = r.GetInt64(1), Name = r.GetString(2), Description = r.IsDBNull(3) ? null : r.GetString(3),
-            DurationUnit = r.GetString(4), DurationCount = r.GetInt32(5), Price = r.GetDecimal(6), Cost = r.GetDecimal(7),
-            SortOrder = r.GetInt32(8), IsActive = r.GetBoolean(9)
+            Id = _row.GetLong("Id"),
+            ProductId = _row.GetLong("ProductId"),
+            Name = _row.GetText("Name"),
+            Description = _row.GetText("Description"),
+            DurationUnit = _row.GetText("DurationUnit"),
+            DurationCount = _row.GetInt("DurationCount"),
+            Price = _row.GetDecimal("Price"),
+            Cost = _row.GetDecimal("Cost"),
+            SortOrder = _row.GetInt("SortOrder"),
+            IsActive = _row.GetBool("IsActive")
         };
 
-        private Task<ProductCategoryDto> GetCategoryByIdAsync(long _id, CancellationToken _ct)
-            => _databaseFunctions.QuerySingleOrDefaultAsync(CategorySelect + " WHERE Id = @id", MapCategory, new[] { P("@id", _id) }, _ct);
+        /// <summary>Runs one catalog SELECT and maps its rows.</summary>
+        private async Task<List<T>> ReadAsync<T>(string _sql, long? _id, Func<DataRow, T> _map, CancellationToken _ct)
+        {
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                _sql, _id.HasValue ? new[] { P("@id", _id.Value) } : null, "F:Product:Read", _ct);
+            EnsureRead(_functionReturn);
+            return _dataTable.MapRows(_map);
+        }
 
-        private Task<ProductDto> GetProductByIdAsync(long _id, CancellationToken _ct)
-            => _databaseFunctions.QuerySingleOrDefaultAsync(ProductSelect + " WHERE Id = @id", MapProduct, new[] { P("@id", _id) }, _ct);
+        private async Task<ProductCategoryDto> GetCategoryByIdAsync(long _id, CancellationToken _ct)
+            => (await ReadAsync(CategoryColumns + " WHERE Id = @id ", _id, MapCategory, _ct)).FirstOrDefault();
 
-        private Task<ProductPlanDto> GetPlanByIdAsync(long _id, CancellationToken _ct)
-            => _databaseFunctions.QuerySingleOrDefaultAsync(PlanSelect + " WHERE Id = @id", MapPlan, new[] { P("@id", _id) }, _ct);
+        private async Task<ProductDto> GetProductByIdAsync(long _id, CancellationToken _ct)
+            => (await ReadAsync(ProductColumns + " WHERE Id = @id ", _id, MapProduct, _ct)).FirstOrDefault();
+
+        private async Task<ProductPlanDto> GetPlanByIdAsync(long _id, CancellationToken _ct)
+            => (await ReadAsync(PlanColumns + " WHERE Id = @id ", _id, MapPlan, _ct)).FirstOrDefault();
 
         // Audit snapshots: business fields only.
         private static object Snapshot(ProductCategoryDto c) => c == null ? null : new { c.Code, c.Name, c.Description, c.SortOrder, c.IsActive };
@@ -91,9 +118,9 @@ namespace SageAdminApi.AppFunctions
             try
             {
                 // The catalog is small (tens of products): read the three tables and build the tree here.
-                var _categories = (await _databaseFunctions.QueryAsync(CategorySelect + " ORDER BY SortOrder, Name", MapCategory, null, _ct)).ToList();
-                var _products = await _databaseFunctions.QueryAsync(ProductSelect + " ORDER BY SortOrder, Name", MapProduct, null, _ct);
-                var _plans = await _databaseFunctions.QueryAsync(PlanSelect + " ORDER BY SortOrder, Price, Name", MapPlan, null, _ct);
+                List<ProductCategoryDto> _categories = await ReadAsync(CategoryColumns + " ORDER BY SortOrder, Name ", null, MapCategory, _ct);
+                List<ProductDto> _products = await ReadAsync(ProductColumns + " ORDER BY SortOrder, Name ", null, MapProduct, _ct);
+                List<ProductPlanDto> _plans = await ReadAsync(PlanColumns + " ORDER BY SortOrder, Price, Name ", null, MapPlan, _ct);
 
                 ILookup<long, ProductPlanDto> _plansByProduct = _plans.Where(p => _includeInactive || p.IsActive).ToLookup(p => p.ProductId);
                 foreach (ProductDto _product in _products) _product.Plans = _plansByProduct[_product.Id].ToList();

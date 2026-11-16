@@ -4,6 +4,9 @@
 --   @ActorType: 'admin', 'sales', 'system' or NULL (all).   @ActorPublicId: one admin user.
 --   @Search: a ready LIKE pattern ('\' escape) on entity id, action, entity type and the actor's name / username.
 --   @From / @To: days (UTC), inclusive.
+-- The count and the page are two queries over the same filter (no temp table), so the page reads only the rows it
+-- returns through IX_AuditLogs_CreatedAtUtc / _Action_ / _ActorUserId (DDL 027). OPTION (RECOMPILE) lets each call use
+-- the index that fits the filters actually given.
 CREATE OR ALTER PROCEDURE dbo.usp_AuditLog_GetPaged
     @Search         NVARCHAR(210)    = NULL,
     @EntityType     VARCHAR(100)     = NULL,
@@ -25,9 +28,34 @@ BEGIN
     DECLARE @actorId BIGINT = NULL;
     IF @ActorPublicId IS NOT NULL SET @actorId = ISNULL((SELECT Id FROM dbo.AdminUsers WHERE PublicId = @ActorPublicId), -1);
 
+    -- Count
     ;WITH src AS
     (
-        SELECT a.Id, a.CreatedAtUtc, a.Action, a.EntityType, a.EntityId, a.IpAddress, a.ActorUserId,
+        SELECT a.Action, a.EntityType, a.EntityId, a.IpAddress,
+               CASE WHEN a.ActorUserId IS NOT NULL THEN 'admin'
+                    WHEN ISJSON(a.NewValues) = 1 AND JSON_VALUE(a.NewValues, '$.By') = 'SalesUser' THEN 'sales'
+                    ELSE 'system' END AS ActorType,
+               CASE WHEN u.Id IS NOT NULL THEN CONCAT(u.FirstName, N' ', u.LastName)
+                    WHEN ISJSON(a.NewValues) = 1 THEN JSON_VALUE(a.NewValues, '$.SalesUserName') END AS ActorName,
+               u.Username AS ActorUsername
+        FROM dbo.AuditLogs a
+        LEFT JOIN dbo.AdminUsers u ON u.Id = a.ActorUserId
+        WHERE (@EntityType IS NULL OR a.EntityType = @EntityType)
+          AND (@Action IS NULL OR a.Action = @Action)
+          AND (@actorId IS NULL OR a.ActorUserId = @actorId)
+          AND (@fromUtc IS NULL OR a.CreatedAtUtc >= @fromUtc)
+          AND (@toUtc IS NULL OR a.CreatedAtUtc < @toUtc)
+    )
+    SELECT @TotalCount = COUNT(*) FROM src
+    WHERE (@ActorType IS NULL OR ActorType = @ActorType)
+      AND (@Search IS NULL OR EntityId LIKE @Search ESCAPE '\' OR Action LIKE @Search ESCAPE '\' OR EntityType LIKE @Search ESCAPE '\'
+           OR ActorName LIKE @Search ESCAPE '\' OR ActorUsername LIKE @Search ESCAPE '\' OR IpAddress LIKE @Search ESCAPE '\')
+    OPTION (RECOMPILE);
+
+    -- Page
+    ;WITH src AS
+    (
+        SELECT a.Id, a.CreatedAtUtc, a.Action, a.EntityType, a.EntityId, a.IpAddress,
                CASE WHEN a.ActorUserId IS NOT NULL THEN 'admin'
                     WHEN ISJSON(a.NewValues) = 1 AND JSON_VALUE(a.NewValues, '$.By') = 'SalesUser' THEN 'sales'
                     ELSE 'system' END AS ActorType,
@@ -44,18 +72,15 @@ BEGIN
           AND (@fromUtc IS NULL OR a.CreatedAtUtc >= @fromUtc)
           AND (@toUtc IS NULL OR a.CreatedAtUtc < @toUtc)
     )
-    SELECT * INTO #filtered FROM src
+    SELECT Id, CreatedAtUtc, ActorType, ActorName, ActorUsername, Action, EntityType, EntityId, IpAddress, HasOld, HasNew
+    FROM src
     WHERE (@ActorType IS NULL OR ActorType = @ActorType)
       AND (@Search IS NULL OR EntityId LIKE @Search ESCAPE '\' OR Action LIKE @Search ESCAPE '\' OR EntityType LIKE @Search ESCAPE '\'
-           OR ActorName LIKE @Search ESCAPE '\' OR ActorUsername LIKE @Search ESCAPE '\' OR IpAddress LIKE @Search ESCAPE '\');
-
-    SELECT @TotalCount = COUNT(*) FROM #filtered;
-
-    SELECT Id, CreatedAtUtc, ActorType, ActorName, ActorUsername, Action, EntityType, EntityId, IpAddress, HasOld, HasNew
-    FROM #filtered
+           OR ActorName LIKE @Search ESCAPE '\' OR ActorUsername LIKE @Search ESCAPE '\' OR IpAddress LIKE @Search ESCAPE '\')
     ORDER BY CASE WHEN @SortDirection = 'ASC' THEN CreatedAtUtc END ASC,
              CASE WHEN @SortDirection <> 'ASC' THEN CreatedAtUtc END DESC,
              Id DESC
-    OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
+    OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY
+    OPTION (RECOMPILE);
 END
 GO

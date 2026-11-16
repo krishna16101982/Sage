@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Text.Json;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -12,6 +13,7 @@ using SageAdminApi.Globals;
 using SageAdminApi.Models;
 using SageAdminApi.Models.Filter;
 using SageAdminApi.Models.HttpPost;
+using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.AppValidations;
 using SageCommonLib.Globals;
@@ -32,27 +34,6 @@ namespace SageAdminApi.AppFunctions
         /// <summary>Sort keys the client may request. dbo.usp_Group_GetPaged maps each to a fixed ORDER BY.</summary>
         private static readonly string[] SortKeys = { "name", "code", "status", "userCount", "createdAtUtc" };
 
-        private const string GroupSelect = @"SELECT g.PublicId, g.Code, g.Name, g.Description, g.Status, g.IsSystem,
-    (SELECT COUNT(*) FROM dbo.AdminUserGroups ug JOIN dbo.AdminUsers au ON au.Id = ug.UserId AND au.IsDeleted = 0 WHERE ug.GroupId = g.Id),
-    (SELECT COUNT(*) FROM dbo.GroupPermissions gp WHERE gp.GroupId = g.Id),
-    g.CreatedAtUtc, g.UpdatedAtUtc
-FROM dbo.PermissionGroups g WHERE g.PublicId = @id";
-
-        /// <summary>Every active permission in an active module, plus anything the group still holds that has since been deactivated.</summary>
-        private const string MatrixSelect = @"SELECT m.Id, m.Code, m.Name, m.Category, m.IsActive,
-    p.Id, p.Code, p.Action, p.Name, p.Description, CAST(CASE WHEN p.IsActive = 1 AND m.IsActive = 1 THEN 1 ELSE 0 END AS BIT),
-    CAST(CASE WHEN gp.PermissionId IS NULL THEN 0 ELSE 1 END AS BIT)
-FROM dbo.Permissions p
-JOIN dbo.Modules m ON m.Id = p.ModuleId
-LEFT JOIN dbo.GroupPermissions gp ON gp.PermissionId = p.Id AND gp.GroupId = (SELECT Id FROM dbo.PermissionGroups WHERE PublicId = @id)
-WHERE (p.IsActive = 1 AND m.IsActive = 1) OR gp.PermissionId IS NOT NULL
-ORDER BY m.SortOrder, m.Name, p.Id";
-
-        private const string AssignedCodesSelect = @"SELECT p.Code FROM dbo.GroupPermissions gp
-JOIN dbo.Permissions p ON p.Id = gp.PermissionId
-JOIN dbo.PermissionGroups g ON g.Id = gp.GroupId
-WHERE g.PublicId = @id ORDER BY p.Code";
-
         private readonly ILoggerFunctions _loggerFunctions;
         private readonly IDatabaseFunctions _databaseFunctions;
         private readonly IAuditFunctions _auditFunctions;
@@ -66,50 +47,107 @@ WHERE g.PublicId = @id ORDER BY p.Code";
 
         #region Helpers
 
-        private static DateTime UtcValue(SqlDataReader r, int i) => DateTime.SpecifyKind(r.GetDateTime(i), DateTimeKind.Utc);
-
-        private static GroupDto MapGroup(SqlDataReader r) => new GroupDto
+        /// <summary>One group row (from GetGroupRowAsync or dbo.usp_Group_GetPaged; both use these column names).</summary>
+        private static GroupDto MapGroup(DataRow _row) => new GroupDto
         {
-            Id = r.GetGuid(0),
-            Code = r.GetString(1),
-            Name = r.GetString(2),
-            Description = r.IsDBNull(3) ? null : r.GetString(3),
-            Status = r.GetString(4),
-            IsSystem = r.GetBoolean(5),
-            UserCount = r.GetInt32(6),
-            PermissionCount = r.GetInt32(7),
-            CreatedAtUtc = UtcValue(r, 8),
-            UpdatedAtUtc = r.IsDBNull(9) ? (DateTime?)null : UtcValue(r, 9)
+            Id = _row.GetGuid("PublicId"),
+            Code = _row.GetText("Code"),
+            Name = _row.GetText("Name"),
+            Description = _row.GetText("Description"),
+            Status = _row.GetText("Status"),
+            IsSystem = _row.GetBool("IsSystem"),
+            UserCount = _row.GetInt("UserCount"),
+            PermissionCount = _row.GetInt("PermissionCount"),
+            CreatedAtUtc = _row.GetUtc("CreatedAtUtc"),
+            UpdatedAtUtc = _row.GetNullableUtc("UpdatedAtUtc")
         };
 
-        private Task<GroupDto> GetGroupRowAsync(Guid _id, CancellationToken _ct)
-            => _databaseFunctions.QuerySingleOrDefaultAsync(GroupSelect, MapGroup, new[] { P("@id", _id) }, _ct);
+        /// <summary>One group by PublicId with its member and permission counts, or null.</summary>
+        private async Task<GroupDto> GetGroupRowAsync(Guid _id, CancellationToken _ct)
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT g.PublicId, g.Code, g.Name, g.Description, g.Status, g.IsSystem, ");
+            _sqlQuery.Append("        (SELECT COUNT(*) FROM dbo.AdminUserGroups ug JOIN dbo.AdminUsers au ON au.Id = ug.UserId AND au.IsDeleted = 0 ");
+            _sqlQuery.Append("         WHERE ug.GroupId = g.Id) AS UserCount, ");
+            _sqlQuery.Append("        (SELECT COUNT(*) FROM dbo.GroupPermissions gp WHERE gp.GroupId = g.Id) AS PermissionCount, ");
+            _sqlQuery.Append("        g.CreatedAtUtc, g.UpdatedAtUtc ");
+            _sqlQuery.Append(" FROM dbo.PermissionGroups g ");
+            _sqlQuery.Append(" WHERE g.PublicId = @id ");
 
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                _sqlQuery.ToString(), new[] { P("@id", _id) }, "F:Group:GetGroupRow", _ct);
+            EnsureRead(_functionReturn);
+            DataRow _row = _dataTable.FirstRow();
+            return _row == null ? null : MapGroup(_row);
+        }
+
+        /// <summary>The permission codes the group holds (for the audit trail).</summary>
         private async Task<List<string>> GetAssignedCodesAsync(Guid _id, CancellationToken _ct)
-            => (await _databaseFunctions.QueryAsync(AssignedCodesSelect, r => r.GetString(0), new[] { P("@id", _id) }, _ct)).ToList();
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT p.Code FROM dbo.GroupPermissions gp ");
+            _sqlQuery.Append(" JOIN dbo.Permissions p ON p.Id = gp.PermissionId ");
+            _sqlQuery.Append(" JOIN dbo.PermissionGroups g ON g.Id = gp.GroupId ");
+            _sqlQuery.Append(" WHERE g.PublicId = @id ORDER BY p.Code ");
 
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                _sqlQuery.ToString(), new[] { P("@id", _id) }, "F:Group:GetAssignedCodes", _ct);
+            EnsureRead(_functionReturn);
+            return _dataTable.MapRows(_row => _row.GetText("Code"));
+        }
+
+        /// <summary>
+        /// The group with its permission matrix: every active permission in an active module, plus anything the group still
+        /// holds that has since been deactivated, grouped by module.
+        /// </summary>
         private async Task<GroupDetailDto> LoadDetailAsync(Guid _id, CancellationToken _ct)
         {
             GroupDto _group = await GetGroupRowAsync(_id, _ct);
             if (_group == null) return null;
 
-            var _rows = await _databaseFunctions.QueryAsync(MatrixSelect, r => (
-                Module: new GroupMatrixModule
-                {
-                    Id = r.GetInt64(0), Code = r.GetString(1), Name = r.GetString(2), Category = r.IsDBNull(3) ? null : r.GetString(3), IsActive = r.GetBoolean(4)
-                },
-                Permission: new GroupMatrixPermission
-                {
-                    Id = r.GetInt64(5), Code = r.GetString(6), Action = r.GetString(7), Name = r.GetString(8),
-                    Description = r.IsDBNull(9) ? null : r.GetString(9), IsActive = r.GetBoolean(10), Assigned = r.GetBoolean(11)
-                }), new[] { P("@id", _id) }, _ct);
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT m.Id AS ModuleId, m.Code AS ModuleCode, m.Name AS ModuleName, m.Category, m.IsActive AS ModuleIsActive, ");
+            _sqlQuery.Append("        p.Id AS PermissionId, p.Code AS PermissionCode, p.Action, p.Name AS PermissionName, p.Description, ");
+            _sqlQuery.Append("        CAST(CASE WHEN p.IsActive = 1 AND m.IsActive = 1 THEN 1 ELSE 0 END AS BIT) AS PermissionIsActive, ");
+            _sqlQuery.Append("        CAST(CASE WHEN gp.PermissionId IS NULL THEN 0 ELSE 1 END AS BIT) AS Assigned ");
+            _sqlQuery.Append(" FROM dbo.Permissions p ");
+            _sqlQuery.Append(" JOIN dbo.Modules m ON m.Id = p.ModuleId ");
+            _sqlQuery.Append(" LEFT JOIN dbo.GroupPermissions gp ON gp.PermissionId = p.Id ");
+            _sqlQuery.Append("      AND gp.GroupId = (SELECT Id FROM dbo.PermissionGroups WHERE PublicId = @id) ");
+            _sqlQuery.Append(" WHERE (p.IsActive = 1 AND m.IsActive = 1) OR gp.PermissionId IS NOT NULL ");
+            _sqlQuery.Append(" ORDER BY m.SortOrder, m.Name, p.Id ");
+
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                _sqlQuery.ToString(), new[] { P("@id", _id) }, "F:Group:LoadDetail", _ct);
+            EnsureRead(_functionReturn);
 
             var _modules = new List<GroupMatrixModule>();
-            foreach (var _row in _rows)
+            foreach (DataRow _row in _dataTable.Rows)
             {
-                GroupMatrixModule _module = _modules.Count > 0 && _modules[^1].Id == _row.Module.Id ? _modules[^1] : null;
-                if (_module == null) { _module = _row.Module; _modules.Add(_module); }
-                _module.Permissions.Add(_row.Permission);
+                long _moduleId = _row.GetLong("ModuleId");
+                GroupMatrixModule _module = _modules.Count > 0 && _modules[^1].Id == _moduleId ? _modules[^1] : null;
+                if (_module == null)
+                {
+                    _module = new GroupMatrixModule
+                    {
+                        Id = _moduleId,
+                        Code = _row.GetText("ModuleCode"),
+                        Name = _row.GetText("ModuleName"),
+                        Category = _row.GetText("Category"),
+                        IsActive = _row.GetBool("ModuleIsActive")
+                    };
+                    _modules.Add(_module);
+                }
+                _module.Permissions.Add(new GroupMatrixPermission
+                {
+                    Id = _row.GetLong("PermissionId"),
+                    Code = _row.GetText("PermissionCode"),
+                    Action = _row.GetText("Action"),
+                    Name = _row.GetText("PermissionName"),
+                    Description = _row.GetText("Description"),
+                    IsActive = _row.GetBool("PermissionIsActive"),
+                    Assigned = _row.GetBool("Assigned")
+                });
             }
 
             return new GroupDetailDto
@@ -139,15 +177,20 @@ WHERE g.PublicId = @id ORDER BY p.Code";
                 string _status = _filter.Status == ApplicationDatabaseConstants.Status.Active || _filter.Status == ApplicationDatabaseConstants.Status.Inactive ? _filter.Status : null;
                 string _search = string.IsNullOrWhiteSpace(_filter.Search) ? null : "%" + _filter.Search.Trim().EscapeLike() + "%";
                 var _totalCount = IntOut("@TotalCount");
-                var _parameters = new List<SqlParameter>
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteProcedureDataTableAsync(SP.GroupGetPaged, new[]
                 {
                     P("@Search", _search), P("@Status", _status), P("@SortBy", _paging.SortBy), P("@SortDirection", _paging.SortDirection),
                     P("@Offset", _paging.Offset), P("@PageSize", _paging.PageSize), _totalCount
-                };
-                IReadOnlyList<GroupDto> _items = await _databaseFunctions.QueryProcedureAsync(SP.GroupGetPaged, MapGroup, _parameters, _ct);
-                int _total = OutInt(_totalCount);
+                }, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
 
-                return (new PagedResult<GroupDto> { Items = _items, Page = _paging.Page, PageSize = _paging.PageSize, TotalCount = _total }, new FunctionReturn { MethodName = _methodName });
+                return (new PagedResult<GroupDto>
+                {
+                    Items = _dataTable.MapRows(MapGroup),
+                    Page = _paging.Page,
+                    PageSize = _paging.PageSize,
+                    TotalCount = OutInt(_totalCount)
+                }, _functionReturn);
             }
             catch (Exception ex)
             {

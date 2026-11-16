@@ -205,6 +205,27 @@ Build the statement with `StringBuilder _sqlQuery`, then call the shared wrapper
 
 Stored procedures: `ExecuteProcedureWriteAsync` (same `(IFunctionReturn, long)` shape; `long` = the procedure's `SELECT`ed value, by convention the new id or rows affected), `ExecuteProcedureScalarAsync`, `QueryProcedureAsync` (OUTPUT parameters are filled when it returns), `ExecuteProcedureAsync`. A procedure reports expected errors with `THROW 50400` (-> 400), `THROW 50404` (-> 404) or `THROW 50409` (-> 409), and the THROW message is returned to the client, so write it for the user. Other `THROW` numbers reach C# as `DatabaseException.SqlErrorNumber` (e.g. `50001` for an already-used refresh token).
 
+**Reading rows (both APIs):** build the SELECT with `StringBuilder`, run it with `ExecuteSelectDataTableAsync` (or a list procedure with `ExecuteProcedureDataTableAsync`), and read each row by column name. Every column a query returns has a name (use `AS` for CONCAT / CASE), and a procedure and the inline query that share a mapper use the same names.
+
+```csharp
+StringBuilder _sqlQuery = new StringBuilder();
+_sqlQuery.Append(" SELECT PublicId, IsSuperAdmin FROM dbo.AdminUsers ");
+_sqlQuery.Append(" WHERE Id = @id AND IsDeleted = 0 ");
+
+(IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+    _sqlQuery.ToString(), new[] { P("@id", _actorUserId) }, _methodName, _ct);
+if (!_functionReturn.Status) return (null, _functionReturn);
+
+DataRow _row = _dataTable.FirstRow();                  // null when there is no row
+Guid _id = _row.GetGuid("PublicId");                    // also GetText, GetInt, GetLong, GetDecimal, GetBool, GetUtc, GetDate,
+                                                        // and GetNullable... for NULL-able columns
+List<CustomerDto> _items = _dataTable.MapRows(MapCustomer);   // every row
+```
+
+A failed read comes back as a failed `IFunctionReturn` and an empty table. In a private helper that returns a row (or null for "not found"), call `EnsureRead(_functionReturn)` first so a database error is answered as an error, not as "not found".
+
+Indexes: `database/DDL/027_Create_Performance_Indexes.sql` lists each index with the query it serves. Searches with a leading wildcard (`LIKE '%text%'`) cannot use an index; with large tables, add full-text search for those.
+
 Shared helpers (both APIs), with `using static SageCommonLib.AppFunctions.Sql;` at the top of a functions class:
 
 | Helper | Use |

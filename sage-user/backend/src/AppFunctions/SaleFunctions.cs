@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
+using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.AppValidations;
 using SageCommonLib.Globals;
@@ -31,38 +33,6 @@ namespace SageUserApi.AppFunctions
     {
         private static readonly string[] SortKeys = { "soldAt", "saleNumber", "customer", "product", "saleAmount", "renewalDate" };
 
-        /// <summary>Same columns, in the same order, as dbo.usp_Sale_GetPaged.</summary>
-        private const string SaleSelect = @"SELECT s.PublicId, s.SaleNumber, cu.PublicId, cu.Name, c.Name, p.Name, pl.Name,
-    su.PublicId, CONCAT(su.FirstName, N' ', su.LastName),
-    s.Quantity, s.UnitPrice, s.UnitCost, s.ListAmount, s.SaleAmount, s.DiscountAmount, s.CostAmount,
-    s.DurationUnit, s.DurationCount, s.StartDate, s.RenewalDate, s.Status, s.Notes, s.CreatedAtUtc,
-    s.CancelledAtUtc, CASE WHEN cb.Id IS NULL THEN NULL ELSE CONCAT(cb.FirstName, N' ', cb.LastName) END, s.CancelReason,
-    CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.SaleCancelRequests r WHERE r.SaleId = s.Id AND r.Status = 'Pending') THEN 1 ELSE 0 END AS BIT)
-FROM dbo.Sales s
-JOIN dbo.Customers cu ON cu.Id = s.CustomerId
-JOIN dbo.ProductCategories c ON c.Id = s.CategoryId
-JOIN dbo.Products p ON p.Id = s.ProductId
-JOIN dbo.ProductPlans pl ON pl.Id = s.PlanId
-JOIN dbo.SalesUsers su ON su.Id = s.SalesUserId
-LEFT JOIN dbo.SalesUsers cb ON cb.Id = s.CancelledBySalesUserId
-WHERE s.PublicId = @id AND (s.SalesUserId = @u OR s.ManagerId = @u)";
-
-        private const string TeamSelect = @"SELECT u.PublicId, CONCAT(u.FirstName, N' ', u.LastName), u.Username, u.Status, u.CanRequestCancellation,
-    (SELECT COUNT(*) FROM dbo.SaleCancelRequests r JOIN dbo.Sales s ON s.Id = r.SaleId
-     WHERE r.RequestedBySalesUserId = u.Id AND r.Status = 'Pending' AND s.ManagerId = @u)
-FROM dbo.SalesUsers u WHERE u.ManagerId = @u AND u.IsDeleted = 0 ORDER BY u.FirstName, u.LastName";
-
-        /// <summary>Cancellation requests. The WHERE clause is added by the caller from fixed strings only.</summary>
-        private const string RequestSelect = @"SELECT TOP 200 r.PublicId, s.PublicId, s.SaleNumber, cu.Name, p.Name, s.SaleAmount,
-    rb.PublicId, CONCAT(rb.FirstName, N' ', rb.LastName), r.Reason, r.Status, r.RequestedAtUtc,
-    CASE WHEN db.Id IS NULL THEN NULL ELSE CONCAT(db.FirstName, N' ', db.LastName) END, r.DecidedAtUtc, r.DecisionNote
-FROM dbo.SaleCancelRequests r
-JOIN dbo.Sales s ON s.Id = r.SaleId
-JOIN dbo.Customers cu ON cu.Id = s.CustomerId
-JOIN dbo.Products p ON p.Id = s.ProductId
-JOIN dbo.SalesUsers rb ON rb.Id = r.RequestedBySalesUserId
-LEFT JOIN dbo.SalesUsers db ON db.Id = r.DecidedBySalesUserId
-WHERE (@status IS NULL OR r.Status = @status) AND ";
 
         private readonly ILoggerFunctions _loggerFunctions;
         private readonly IDatabaseFunctions _databaseFunctions;
@@ -79,45 +49,125 @@ WHERE (@status IS NULL OR r.Status = @status) AND ";
 
         private static bool HasMoreThanTwoDecimals(decimal? _value) => _value.HasValue && decimal.Round(_value.Value, 2) != _value.Value;
 
-        private static SaleDto MapSale(SqlDataReader r)
+        /// <summary>One sale row (from GetRowAsync or dbo.usp_Sale_GetPaged; both use these column names).</summary>
+        private static SaleDto MapSale(DataRow _row)
         {
-            decimal _list = r.GetDecimal(12), _sale = r.GetDecimal(13), _discount = r.GetDecimal(14), _cost = r.GetDecimal(15);
+            decimal _list = _row.GetDecimal("ListAmount"), _sale = _row.GetDecimal("SaleAmount");
+            decimal _discount = _row.GetDecimal("DiscountAmount"), _cost = _row.GetDecimal("CostAmount");
             return new SaleDto
             {
-                Id = r.GetGuid(0),
-                SaleNumber = r.GetString(1),
-                CustomerId = r.GetGuid(2),
-                CustomerName = r.GetString(3),
-                CategoryName = r.GetString(4),
-                ProductName = r.GetString(5),
-                PlanName = r.GetString(6),
-                SellerId = r.GetGuid(7),
-                SellerName = r.GetString(8),
-                Quantity = r.GetInt32(9),
-                UnitPrice = r.GetDecimal(10),
-                UnitCost = r.GetDecimal(11),
+                Id = _row.GetGuid("PublicId"),
+                SaleNumber = _row.GetText("SaleNumber"),
+                CustomerId = _row.GetGuid("CustomerPublicId"),
+                CustomerName = _row.GetText("CustomerName"),
+                CategoryName = _row.GetText("CategoryName"),
+                ProductName = _row.GetText("ProductName"),
+                PlanName = _row.GetText("PlanName"),
+                SellerId = _row.GetGuid("SellerPublicId"),
+                SellerName = _row.GetText("SellerName"),
+                Quantity = _row.GetInt("Quantity"),
+                UnitPrice = _row.GetDecimal("UnitPrice"),
+                UnitCost = _row.GetDecimal("UnitCost"),
                 ListAmount = _list,
                 SaleAmount = _sale,
                 DiscountAmount = _discount,
                 DiscountPercent = _list > 0 ? decimal.Round(_discount * 100m / _list, 2) : 0m,
                 CostAmount = _cost,
                 Margin = _sale - _cost,
-                DurationUnit = r.GetString(16),
-                DurationCount = r.GetInt32(17),
-                StartDate = DateOnly.FromDateTime(r.GetDateTime(18)),
-                RenewalDate = DateOnly.FromDateTime(r.GetDateTime(19)),
-                Status = r.GetString(20),
-                Notes = S(r, 21),
-                CreatedAtUtc = Utc(r, 22).Value,
-                CancelledAtUtc = Utc(r, 23),
-                CancelledByName = S(r, 24),
-                CancelReason = S(r, 25),
-                HasPendingCancelRequest = r.GetBoolean(26)
+                DurationUnit = _row.GetText("DurationUnit"),
+                DurationCount = _row.GetInt("DurationCount"),
+                StartDate = _row.GetDate("StartDate"),
+                RenewalDate = _row.GetDate("RenewalDate"),
+                Status = _row.GetText("Status"),
+                Notes = _row.GetText("Notes"),
+                CreatedAtUtc = _row.GetUtc("CreatedAtUtc"),
+                CancelledAtUtc = _row.GetNullableUtc("CancelledAtUtc"),
+                CancelledByName = _row.GetText("CancelledByName"),
+                CancelReason = _row.GetText("CancelReason"),
+                HasPendingCancelRequest = _row.GetBool("HasPendingCancelRequest")
             };
         }
 
-        private Task<SaleDto> GetRowAsync(Guid _id, long _userId, CancellationToken _ct)
-            => _databaseFunctions.QuerySingleOrDefaultAsync(SaleSelect, MapSale, new[] { P("@id", _id), P("@u", _userId) }, _ct);
+        /// <summary>One sale the user may see (their own, or their team's for a manager), or null.</summary>
+        private async Task<SaleDto> GetRowAsync(Guid _id, long _userId, CancellationToken _ct)
+        {
+            // Same column names as dbo.usp_Sale_GetPaged, so MapSale reads both.
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT s.PublicId, s.SaleNumber, cu.PublicId AS CustomerPublicId, cu.Name AS CustomerName, c.Name AS CategoryName, ");
+            _sqlQuery.Append("        p.Name AS ProductName, pl.Name AS PlanName, ");
+            _sqlQuery.Append("        su.PublicId AS SellerPublicId, CONCAT(su.FirstName, N' ', su.LastName) AS SellerName, ");
+            _sqlQuery.Append("        s.Quantity, s.UnitPrice, s.UnitCost, s.ListAmount, s.SaleAmount, s.DiscountAmount, s.CostAmount, ");
+            _sqlQuery.Append("        s.DurationUnit, s.DurationCount, s.StartDate, s.RenewalDate, s.Status, s.Notes, s.CreatedAtUtc, s.CancelledAtUtc, ");
+            _sqlQuery.Append("        CASE WHEN cb.Id IS NULL THEN NULL ELSE CONCAT(cb.FirstName, N' ', cb.LastName) END AS CancelledByName, s.CancelReason, ");
+            _sqlQuery.Append("        CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.SaleCancelRequests r WHERE r.SaleId = s.Id AND r.Status = 'Pending') ");
+            _sqlQuery.Append("             THEN 1 ELSE 0 END AS BIT) AS HasPendingCancelRequest ");
+            _sqlQuery.Append(" FROM dbo.Sales s ");
+            _sqlQuery.Append(" JOIN dbo.Customers cu ON cu.Id = s.CustomerId ");
+            _sqlQuery.Append(" JOIN dbo.ProductCategories c ON c.Id = s.CategoryId ");
+            _sqlQuery.Append(" JOIN dbo.Products p ON p.Id = s.ProductId ");
+            _sqlQuery.Append(" JOIN dbo.ProductPlans pl ON pl.Id = s.PlanId ");
+            _sqlQuery.Append(" JOIN dbo.SalesUsers su ON su.Id = s.SalesUserId ");
+            _sqlQuery.Append(" LEFT JOIN dbo.SalesUsers cb ON cb.Id = s.CancelledBySalesUserId ");
+            _sqlQuery.Append(" WHERE s.PublicId = @id AND (s.SalesUserId = @u OR s.ManagerId = @u) ");
+
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                _sqlQuery.ToString(), new[] { P("@id", _id), P("@u", _userId) }, "F:Sale:GetRow", _ct);
+            EnsureRead(_functionReturn);
+            DataRow _row = _dataTable.FirstRow();
+            return _row == null ? null : MapSale(_row);
+        }
+
+        /// <summary>A manager's team: each member with their cancel permission and pending cancel requests.</summary>
+        private async Task<List<TeamMember>> ReadTeamAsync(long _managerId, CancellationToken _ct)
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT u.PublicId, CONCAT(u.FirstName, N' ', u.LastName) AS Name, u.Username, u.Status, u.CanRequestCancellation, ");
+            _sqlQuery.Append("        (SELECT COUNT(*) FROM dbo.SaleCancelRequests r JOIN dbo.Sales s ON s.Id = r.SaleId ");
+            _sqlQuery.Append("         WHERE r.RequestedBySalesUserId = u.Id AND r.Status = 'Pending' AND s.ManagerId = @u) AS PendingRequests ");
+            _sqlQuery.Append(" FROM dbo.SalesUsers u ");
+            _sqlQuery.Append(" WHERE u.ManagerId = @u AND u.IsDeleted = 0 ");
+            _sqlQuery.Append(" ORDER BY u.FirstName, u.LastName ");
+
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                _sqlQuery.ToString(), new[] { P("@u", _managerId) }, "F:Sale:ReadTeam", _ct);
+            EnsureRead(_functionReturn);
+            return _dataTable.MapRows(_row => new TeamMember
+            {
+                Id = _row.GetGuid("PublicId"),
+                Name = _row.GetText("Name"),
+                Username = _row.GetText("Username"),
+                Status = _row.GetText("Status"),
+                CanRequestCancellation = _row.GetBool("CanRequestCancellation"),
+                PendingRequests = _row.GetInt("PendingRequests")
+            });
+        }
+
+        /// <summary>
+        /// Cancellation requests (newest 200). '_where' and '_orderBy' are fixed strings from this class, never user input;
+        /// @status (optional) is always a parameter.
+        /// </summary>
+        private async Task<List<CancelRequestDto>> ReadRequestsAsync(string _where, string _orderBy, IEnumerable<SqlParameter> _parameters, CancellationToken _ct)
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT TOP 200 r.PublicId, s.PublicId AS SalePublicId, s.SaleNumber, cu.Name AS CustomerName, p.Name AS ProductName, s.SaleAmount, ");
+            _sqlQuery.Append("        rb.PublicId AS RequestedByPublicId, CONCAT(rb.FirstName, N' ', rb.LastName) AS RequestedByName, ");
+            _sqlQuery.Append("        r.Reason, r.Status, r.RequestedAtUtc, ");
+            _sqlQuery.Append("        CASE WHEN db.Id IS NULL THEN NULL ELSE CONCAT(db.FirstName, N' ', db.LastName) END AS DecidedByName, ");
+            _sqlQuery.Append("        r.DecidedAtUtc, r.DecisionNote ");
+            _sqlQuery.Append(" FROM dbo.SaleCancelRequests r ");
+            _sqlQuery.Append(" JOIN dbo.Sales s ON s.Id = r.SaleId ");
+            _sqlQuery.Append(" JOIN dbo.Customers cu ON cu.Id = s.CustomerId ");
+            _sqlQuery.Append(" JOIN dbo.Products p ON p.Id = s.ProductId ");
+            _sqlQuery.Append(" JOIN dbo.SalesUsers rb ON rb.Id = r.RequestedBySalesUserId ");
+            _sqlQuery.Append(" LEFT JOIN dbo.SalesUsers db ON db.Id = r.DecidedBySalesUserId ");
+            _sqlQuery.Append(" WHERE (@status IS NULL OR r.Status = @status) AND " + _where);
+            _sqlQuery.Append(" ORDER BY " + _orderBy);
+
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                _sqlQuery.ToString(), _parameters, "F:Sale:ReadRequests", _ct);
+            EnsureRead(_functionReturn);
+            return _dataTable.MapRows(MapRequest);
+        }
 
         private static IFunctionReturn Invalid(List<string> _errors, string _methodName)
             => new FunctionReturn { Status = false, MessageType = Constants.ReturnMessageTypes.ValidationError, Message = _errors, HttpStatusCode = Constants.HttpStatusCodes.BadRequest, MethodName = _methodName };
@@ -125,11 +175,22 @@ WHERE (@status IS NULL OR r.Status = @status) AND ";
         private static IFunctionReturn ManagersOnly(string _methodName, string _message = Msg.ManagersOnly)
             => FunctionReturn.Fail(Constants.ReturnMessageTypes.PermissionDenied, _message, Constants.HttpStatusCodes.Forbidden, _methodName);
 
-        private static CancelRequestDto MapRequest(SqlDataReader r) => new CancelRequestDto
+        private static CancelRequestDto MapRequest(DataRow _row) => new CancelRequestDto
         {
-            Id = r.GetGuid(0), SaleId = r.GetGuid(1), SaleNumber = r.GetString(2), CustomerName = r.GetString(3), ProductName = r.GetString(4),
-            SaleAmount = r.GetDecimal(5), RequestedById = r.GetGuid(6), RequestedByName = r.GetString(7), Reason = r.GetString(8), Status = r.GetString(9),
-            RequestedAtUtc = Utc(r, 10).Value, DecidedByName = S(r, 11), DecidedAtUtc = Utc(r, 12), DecisionNote = S(r, 13)
+            Id = _row.GetGuid("PublicId"),
+            SaleId = _row.GetGuid("SalePublicId"),
+            SaleNumber = _row.GetText("SaleNumber"),
+            CustomerName = _row.GetText("CustomerName"),
+            ProductName = _row.GetText("ProductName"),
+            SaleAmount = _row.GetDecimal("SaleAmount"),
+            RequestedById = _row.GetGuid("RequestedByPublicId"),
+            RequestedByName = _row.GetText("RequestedByName"),
+            Reason = _row.GetText("Reason"),
+            Status = _row.GetText("Status"),
+            RequestedAtUtc = _row.GetUtc("RequestedAtUtc"),
+            DecidedByName = _row.GetText("DecidedByName"),
+            DecidedAtUtc = _row.GetNullableUtc("DecidedAtUtc"),
+            DecisionNote = _row.GetText("DecisionNote")
         };
 
         /// <summary>Reason / note text: trimmed, tags removed, at most 500 characters.</summary>
@@ -150,27 +211,28 @@ WHERE (@status IS NULL OR r.Status = @status) AND ";
                 string _status = _filter.Status == ApplicationDatabaseConstants.SaleStatus.Active || _filter.Status == ApplicationDatabaseConstants.SaleStatus.Cancelled ? _filter.Status : null;
                 string _search = string.IsNullOrWhiteSpace(_filter.Search) ? null : "%" + _filter.Search.Trim().EscapeLike() + "%";
                 var _totalCount = IntOut("@TotalCount");
-                var _totalSale = new SqlParameter("@TotalSaleAmount", SqlDbType.Decimal) { Precision = 18, Scale = 2, Direction = ParameterDirection.Output };
-                var _totalMargin = new SqlParameter("@TotalMargin", SqlDbType.Decimal) { Precision = 18, Scale = 2, Direction = ParameterDirection.Output };
+                var _totalSale = MoneyOut("@TotalSaleAmount");
+                var _totalMargin = MoneyOut("@TotalMargin");
 
-                IReadOnlyList<SaleDto> _items = await _databaseFunctions.QueryProcedureAsync(SP.SaleGetPaged, MapSale, new List<SqlParameter>
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteProcedureDataTableAsync(SP.SaleGetPaged, new[]
                 {
                     P("@SalesUserId", _user.Id), P("@Scope", _team ? ApplicationDatabaseConstants.SaleScope.Team : ApplicationDatabaseConstants.SaleScope.Mine),
                     P("@SellerPublicId", _team ? _filter.SellerId : null), P("@Search", _search), P("@Status", _status),
                     Date("@SoldFrom", _filter.SoldFrom), Date("@SoldTo", _filter.SoldTo),
                     P("@SortBy", _paging.SortBy), P("@SortDirection", _paging.SortDirection), P("@Offset", _paging.Offset), P("@PageSize", _paging.PageSize),
                     _totalCount, _totalSale, _totalMargin
-                }, _ct);
+                }, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
 
                 return (new SalesPage
                 {
-                    Items = _items,
+                    Items = _dataTable.MapRows(MapSale),
                     Page = _paging.Page,
                     PageSize = _paging.PageSize,
                     TotalCount = OutInt(_totalCount),
                     TotalSaleAmount = OutMoney(_totalSale),
                     TotalMargin = OutMoney(_totalMargin)
-                }, new FunctionReturn { MethodName = _methodName });
+                }, _functionReturn);
             }
             catch (Exception ex)
             {
@@ -186,8 +248,7 @@ WHERE (@status IS NULL OR r.Status = @status) AND ";
             {
                 SaleDto _sale = await GetRowAsync(_id, _user.Id, _ct);
                 if (_sale == null) return (null, ApplicationCommonFunctions.NotFound(Msg.SaleNotFound, _methodName));
-                _sale.CancelRequests = (await _databaseFunctions.QueryAsync(RequestSelect + "s.PublicId = @sale ORDER BY r.RequestedAtUtc DESC", MapRequest,
-                    new[] { P("@status", null), P("@sale", _id) }, _ct)).ToList();
+                _sale.CancelRequests = await ReadRequestsAsync(" s.PublicId = @sale ", " r.RequestedAtUtc DESC ", new[] { P("@status", null), P("@sale", _id) }, _ct);
                 return (_sale, new FunctionReturn { MethodName = _methodName });
             }
             catch (Exception ex)
@@ -288,10 +349,8 @@ WHERE (@status IS NULL OR r.Status = @status) AND ";
             try
             {
                 if (!_user.IsManager) return (null, ManagersOnly(_methodName));
-                var _members = await _databaseFunctions.QueryAsync(TeamSelect,
-                    r => new TeamMember { Id = r.GetGuid(0), Name = r.GetString(1), Username = r.GetString(2), Status = r.GetString(3), CanRequestCancellation = r.GetBoolean(4), PendingRequests = r.GetInt32(5) },
-                    new[] { P("@u", _user.Id) }, _ct);
-                return (_members.ToList(), new FunctionReturn { MethodName = _methodName });
+                List<TeamMember> _members = await ReadTeamAsync(_user.Id, _ct);
+                return (_members, new FunctionReturn { MethodName = _methodName });
             }
             catch (Exception ex)
             {
@@ -323,8 +382,8 @@ WHERE (@status IS NULL OR r.Status = @status) AND ";
                     return (null, FunctionReturn.Fail(ex.MessageType, ex.Message, ex.HttpStatusCode, _methodName));
                 }
 
-                CancelRequestDto _request = await _databaseFunctions.QuerySingleOrDefaultAsync(RequestSelect + "r.PublicId = @id", MapRequest,
-                    new[] { P("@status", null), P("@id", _requestId) }, _ct);
+                CancelRequestDto _request = (await ReadRequestsAsync(" r.PublicId = @id ", " r.RequestedAtUtc DESC ",
+                    new[] { P("@status", null), P("@id", _requestId) }, _ct)).FirstOrDefault();
                 await SalesAudit.LogAsync(_databaseFunctions, _loggerFunctions, "CancelRequest", "Sale", _saleId, _user, new { _request.SaleNumber, Reason = _reason }, _ipAddress, _ct);
                 return (_request, new FunctionReturn { MethodName = _methodName, HttpStatusCode = Constants.HttpStatusCodes.Created, Message = new List<string> { Msg.CancelRequested } });
             }
@@ -342,10 +401,10 @@ WHERE (@status IS NULL OR r.Status = @status) AND ";
             {
                 string _filter = _status == "Pending" || _status == "Approved" || _status == "Rejected" ? _status : null;
                 // A manager sees the requests on their team's sales; a sales person sees their own requests.
-                string _scope = _user.IsManager ? "s.ManagerId = @u" : "r.RequestedBySalesUserId = @u";
-                var _requests = await _databaseFunctions.QueryAsync(RequestSelect + _scope + " ORDER BY CASE WHEN r.Status = 'Pending' THEN 0 ELSE 1 END, r.RequestedAtUtc DESC",
-                    MapRequest, new[] { P("@status", _filter), P("@u", _user.Id) }, _ct);
-                return (_requests.ToList(), new FunctionReturn { MethodName = _methodName });
+                string _scope = _user.IsManager ? " s.ManagerId = @u " : " r.RequestedBySalesUserId = @u ";
+                List<CancelRequestDto> _requests = await ReadRequestsAsync(_scope, " CASE WHEN r.Status = 'Pending' THEN 0 ELSE 1 END, r.RequestedAtUtc DESC ",
+                    new[] { P("@status", _filter), P("@u", _user.Id) }, _ct);
+                return (_requests, new FunctionReturn { MethodName = _methodName });
             }
             catch (Exception ex)
             {
@@ -376,8 +435,8 @@ WHERE (@status IS NULL OR r.Status = @status) AND ";
                     return (null, FunctionReturn.Fail(ex.MessageType, ex.Message, ex.HttpStatusCode, _methodName));
                 }
 
-                CancelRequestDto _request = await _databaseFunctions.QuerySingleOrDefaultAsync(RequestSelect + "r.PublicId = @id", MapRequest,
-                    new[] { P("@status", null), P("@id", _requestId) }, _ct);
+                CancelRequestDto _request = (await ReadRequestsAsync(" r.PublicId = @id ", " r.RequestedAtUtc DESC ",
+                    new[] { P("@status", null), P("@id", _requestId) }, _ct)).FirstOrDefault();
                 await SalesAudit.LogAsync(_databaseFunctions, _loggerFunctions, _approve ? "CancelRequestApprove" : "CancelRequestReject", "Sale", _saleId, _user,
                     new { _request.SaleNumber, _request.RequestedByName, _request.Reason, Note = _note }, _ipAddress, _ct);
                 return (_request, new FunctionReturn { MethodName = _methodName, Message = new List<string> { _approve ? Msg.RequestApproved : Msg.RequestRejected } });
@@ -402,9 +461,7 @@ WHERE (@status IS NULL OR r.Status = @status) AND ";
                 }, _methodName, null, _ct);
                 if (!_functionReturn.Status) return (null, _functionReturn);
 
-                TeamMember _member = (await _databaseFunctions.QueryAsync(TeamSelect,
-                    r => new TeamMember { Id = r.GetGuid(0), Name = r.GetString(1), Username = r.GetString(2), Status = r.GetString(3), CanRequestCancellation = r.GetBoolean(4), PendingRequests = r.GetInt32(5) },
-                    new[] { P("@u", _user.Id) }, _ct)).FirstOrDefault(m => m.Id == _memberId);
+                TeamMember _member = (await ReadTeamAsync(_user.Id, _ct)).FirstOrDefault(m => m.Id == _memberId);
                 await SalesAudit.LogAsync(_databaseFunctions, _loggerFunctions, "CancelPermission", "SalesUser", _memberId, _user, new { CanRequestCancellation = _allowed }, _ipAddress, _ct);
                 return (_member, new FunctionReturn { MethodName = _methodName, Message = new List<string> { Msg.PermissionSaved } });
             }

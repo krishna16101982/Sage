@@ -11,6 +11,15 @@ public interface IDatabaseFunctions
     Task<IReadOnlyList<T>> QueryAsync<T>(string sql, Func<SqlDataReader, T> map, IEnumerable<SqlParameter>? parameters = null, CancellationToken ct = default);
     Task<T?> QuerySingleOrDefaultAsync<T>(string sql, Func<SqlDataReader, T> map, IEnumerable<SqlParameter>? parameters = null, CancellationToken ct = default);
 
+    // ---- DataTable reads (same shape as ixcheck ExecuteSelectDataTable) ----
+    // Read the rows by column name with the DataRow helpers (row.GetText("Name"), row.GetGuid("PublicId")...). Expected database
+    // errors (a procedure's THROW 50404, for example) come back as a failed IFunctionReturn and an empty table, never null.
+
+    /// <summary>Runs a SELECT (values as @parameters) and returns its rows.</summary>
+    Task<(IFunctionReturn functionReturn, System.Data.DataTable dataTable)> ExecuteSelectDataTableAsync(string sql, IEnumerable<SqlParameter>? parameters, string methodName, CancellationToken ct = default);
+    /// <summary>Runs a procedure and returns its first result set. OUTPUT parameters hold their values when this returns.</summary>
+    Task<(IFunctionReturn functionReturn, System.Data.DataTable dataTable)> ExecuteProcedureDataTableAsync(string procedureName, IEnumerable<SqlParameter>? parameters, string methodName, CancellationToken ct = default);
+
     /// <summary>Runs work in one transaction; rolls back on any exception.</summary>
     Task<T> ExecuteInTransactionAsync<T>(Func<SqlConnection, SqlTransaction, Task<T>> work, CancellationToken ct = default);
 

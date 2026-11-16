@@ -1,28 +1,23 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
-using SageCommonLib.Models;
 using SageCommonLib.Models.Interfaces;
 using SageUserApi.AppFunctions.Interfaces;
 using SageUserApi.AppValidations;
 using SageUserApi.Models;
+using static SageCommonLib.AppFunctions.Sql;
 
 namespace SageUserApi.AppFunctions
 {
     /// <summary>What a sales user can sell: active categories, products and plans with price and cost (read-only).</summary>
     public class CatalogFunctions : ICatalogFunctions
     {
-        private const string CatalogSelect = @"SELECT c.Id, c.Code, c.Name, p.Id, p.Code, p.Name, p.Description,
-    pl.Id, pl.Name, pl.Description, pl.DurationUnit, pl.DurationCount, pl.Price, pl.Cost
-FROM dbo.ProductCategories c
-JOIN dbo.Products p ON p.CategoryId = c.Id AND p.IsActive = 1
-JOIN dbo.ProductPlans pl ON pl.ProductId = p.Id AND pl.IsActive = 1
-WHERE c.IsActive = 1
-ORDER BY c.SortOrder, c.Name, p.SortOrder, p.Name, pl.SortOrder, pl.Name";
-
         private readonly ILoggerFunctions _loggerFunctions;
         private readonly IDatabaseFunctions _databaseFunctions;
 
@@ -36,11 +31,17 @@ ORDER BY c.SortOrder, c.Name, p.SortOrder, p.Name, pl.SortOrder, pl.Name";
         public async Task<SalesRules> GetSalesRulesAsync(CancellationToken _ct = default)
         {
             var _rules = new SalesRules();
-            var _rows = await _databaseFunctions.QueryAsync(
-                "SELECT SettingKey, SettingValue FROM dbo.Settings WHERE SettingKey IN ('Sales.MaxDiscountPercent', 'Sales.MaxBackdateDays', 'Sales.SaleNumberPrefix')",
-                r => (Key: r.GetString(0), Value: r.IsDBNull(1) ? null : r.GetString(1)), null, _ct);
-            foreach (var (_key, _value) in _rows)
+
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT SettingKey, SettingValue FROM dbo.Settings ");
+            _sqlQuery.Append(" WHERE SettingKey IN ('Sales.MaxDiscountPercent', 'Sales.MaxBackdateDays', 'Sales.SaleNumberPrefix') ");
+
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(_sqlQuery.ToString(), null, "F:Catalog:GetSalesRules", _ct);
+            EnsureRead(_functionReturn);
+            foreach (DataRow _row in _dataTable.Rows)
             {
+                string _key = _row.GetText("SettingKey");
+                string _value = _row.GetText("SettingValue");
                 if (_key == "Sales.MaxDiscountPercent" && decimal.TryParse(_value, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out decimal _d) && _d >= 0 && _d <= 100) _rules.MaxDiscountPercent = _d;
                 else if (_key == "Sales.MaxBackdateDays" && int.TryParse(_value, out int _days) && _days >= 0) _rules.MaxBackdateDays = _days;
                 else if (_key == "Sales.SaleNumberPrefix" && !string.IsNullOrWhiteSpace(_value)) _rules.SaleNumberPrefix = _value.Trim();
@@ -53,16 +54,41 @@ ORDER BY c.SortOrder, c.Name, p.SortOrder, p.Name, pl.SortOrder, pl.Name";
             string _methodName = "F:Catalog:GetCatalog";
             try
             {
-                var _rows = await _databaseFunctions.QueryAsync(CatalogSelect, r => new
+                // Active categories > active products > active plans (a product with no active plan is left out).
+                StringBuilder _sqlQuery = new StringBuilder();
+                _sqlQuery.Append(" SELECT c.Id AS CategoryId, c.Code AS CategoryCode, c.Name AS CategoryName, ");
+                _sqlQuery.Append("        p.Id AS ProductId, p.Code AS ProductCode, p.Name AS ProductName, p.Description AS ProductDescription, ");
+                _sqlQuery.Append("        pl.Id AS PlanId, pl.Name AS PlanName, pl.Description AS PlanDescription, ");
+                _sqlQuery.Append("        pl.DurationUnit, pl.DurationCount, pl.Price, pl.Cost ");
+                _sqlQuery.Append(" FROM dbo.ProductCategories c ");
+                _sqlQuery.Append(" JOIN dbo.Products p ON p.CategoryId = c.Id AND p.IsActive = 1 ");
+                _sqlQuery.Append(" JOIN dbo.ProductPlans pl ON pl.ProductId = p.Id AND pl.IsActive = 1 ");
+                _sqlQuery.Append(" WHERE c.IsActive = 1 ");
+                _sqlQuery.Append(" ORDER BY c.SortOrder, c.Name, p.SortOrder, p.Name, pl.SortOrder, pl.Name ");
+
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(_sqlQuery.ToString(), null, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+
+                var _rows = _dataTable.MapRows(_row => new
                 {
-                    CategoryId = r.GetInt64(0), CategoryCode = r.GetString(1), CategoryName = r.GetString(2),
-                    ProductId = r.GetInt64(3), ProductCode = r.GetString(4), ProductName = r.GetString(5), ProductDescription = r.IsDBNull(6) ? null : r.GetString(6),
+                    CategoryId = _row.GetLong("CategoryId"),
+                    CategoryCode = _row.GetText("CategoryCode"),
+                    CategoryName = _row.GetText("CategoryName"),
+                    ProductId = _row.GetLong("ProductId"),
+                    ProductCode = _row.GetText("ProductCode"),
+                    ProductName = _row.GetText("ProductName"),
+                    ProductDescription = _row.GetText("ProductDescription"),
                     Plan = new CatalogPlan
                     {
-                        Id = r.GetInt64(7), Name = r.GetString(8), Description = r.IsDBNull(9) ? null : r.GetString(9),
-                        DurationUnit = r.GetString(10), DurationCount = r.GetInt32(11), Price = r.GetDecimal(12), Cost = r.GetDecimal(13)
+                        Id = _row.GetLong("PlanId"),
+                        Name = _row.GetText("PlanName"),
+                        Description = _row.GetText("PlanDescription"),
+                        DurationUnit = _row.GetText("DurationUnit"),
+                        DurationCount = _row.GetInt("DurationCount"),
+                        Price = _row.GetDecimal("Price"),
+                        Cost = _row.GetDecimal("Cost")
                     }
-                }, null, _ct);
+                });
 
                 // Rows arrive sorted; group them while keeping that order.
                 var _catalog = _rows.GroupBy(x => x.CategoryId).Select(c => new CatalogCategory
@@ -80,7 +106,7 @@ ORDER BY c.SortOrder, c.Name, p.SortOrder, p.Name, pl.SortOrder, pl.Name";
                     }).ToList()
                 }).ToList();
 
-                return (_catalog, new FunctionReturn { MethodName = _methodName });
+                return (_catalog, _functionReturn);
             }
             catch (Exception ex)
             {

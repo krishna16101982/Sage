@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -12,6 +13,7 @@ using SageAdminApi.Globals;
 using SageAdminApi.Models;
 using SageAdminApi.Models.Filter;
 using SageAdminApi.Models.HttpPost;
+using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.AppValidations;
 using SageCommonLib.Globals;
@@ -32,14 +34,6 @@ namespace SageAdminApi.AppFunctions
     {
         private static readonly string[] SortKeys = { "name", "username", "email", "status", "group", "createdAtUtc", "lastLoginAtUtc" };
 
-        /// <summary>Same columns, in the same order, as dbo.usp_AdminUser_GetPaged.</summary>
-        private const string AdminUserSelect = @"SELECT u.PublicId, u.FirstName, u.LastName, u.Username, u.Email, u.MobileNumber, u.Status, u.IsSuperAdmin,
-    g.PublicId, g.Name, g.Status, u.MustChangePassword, u.LockoutEndUtc, u.LastLoginAtUtc, u.CreatedAtUtc
-FROM dbo.AdminUsers u
-LEFT JOIN dbo.AdminUserGroups ug ON ug.UserId = u.Id AND ug.IsPrimary = 1
-LEFT JOIN dbo.PermissionGroups g ON g.Id = ug.GroupId
-WHERE u.PublicId = @id AND u.IsDeleted = 0";
-
         private readonly ILoggerFunctions _loggerFunctions;
         private readonly IDatabaseFunctions _databaseFunctions;
         private readonly IAuditFunctions _auditFunctions;
@@ -55,36 +49,62 @@ WHERE u.PublicId = @id AND u.IsDeleted = 0";
 
         #region Helpers
 
-        private static AdminUserDto MapAdminUser(SqlDataReader r)
+        /// <summary>One admin user row (from GetRowAsync or dbo.usp_AdminUser_GetPaged; both use these column names).</summary>
+        private static AdminUserDto MapAdminUser(DataRow _row)
         {
-            DateTime? _lockoutEnd = Utc(r, 12);
+            DateTime? _lockoutEnd = _row.GetNullableUtc("LockoutEndUtc");
             return new AdminUserDto
             {
-                Id = r.GetGuid(0),
-                FirstName = r.GetString(1),
-                LastName = r.GetString(2),
-                Username = r.GetString(3),
-                Email = r.GetString(4),
-                MobileNumber = r.IsDBNull(5) ? null : r.GetString(5),
-                Status = r.GetString(6),
-                IsSuperAdmin = r.GetBoolean(7),
-                GroupId = r.IsDBNull(8) ? null : r.GetGuid(8),
-                GroupName = r.IsDBNull(9) ? null : r.GetString(9),
-                GroupIsActive = !r.IsDBNull(10) && r.GetString(10) == ApplicationDatabaseConstants.Status.Active,
-                MustChangePassword = r.GetBoolean(11),
+                Id = _row.GetGuid("PublicId"),
+                FirstName = _row.GetText("FirstName"),
+                LastName = _row.GetText("LastName"),
+                Username = _row.GetText("Username"),
+                Email = _row.GetText("Email"),
+                MobileNumber = _row.GetText("MobileNumber"),
+                Status = _row.GetText("Status"),
+                IsSuperAdmin = _row.GetBool("IsSuperAdmin"),
+                GroupId = _row.GetNullableGuid("GroupPublicId"),
+                GroupName = _row.GetText("GroupName"),
+                GroupIsActive = _row.GetText("GroupStatus") == ApplicationDatabaseConstants.Status.Active,
+                MustChangePassword = _row.GetBool("MustChangePassword"),
                 IsLockedOut = _lockoutEnd.HasValue && _lockoutEnd.Value > DateTime.UtcNow,
-                LastLoginAtUtc = Utc(r, 13),
-                CreatedAtUtc = Utc(r, 14).Value
+                LastLoginAtUtc = _row.GetNullableUtc("LastLoginAtUtc"),
+                CreatedAtUtc = _row.GetUtc("CreatedAtUtc")
             };
         }
 
-        private Task<AdminUserDto> GetRowAsync(Guid _id, CancellationToken _ct)
-            => _databaseFunctions.QuerySingleOrDefaultAsync(AdminUserSelect, MapAdminUser, new[] { P("@id", _id) }, _ct);
+        /// <summary>One admin user (not deleted) by PublicId, with their group, or null.</summary>
+        private async Task<AdminUserDto> GetRowAsync(Guid _id, CancellationToken _ct)
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT u.PublicId, u.FirstName, u.LastName, u.Username, u.Email, u.MobileNumber, u.Status, u.IsSuperAdmin, ");
+            _sqlQuery.Append("        g.PublicId AS GroupPublicId, g.Name AS GroupName, g.Status AS GroupStatus, ");
+            _sqlQuery.Append("        u.MustChangePassword, u.LockoutEndUtc, u.LastLoginAtUtc, u.CreatedAtUtc ");
+            _sqlQuery.Append(" FROM dbo.AdminUsers u ");
+            _sqlQuery.Append(" LEFT JOIN dbo.AdminUserGroups ug ON ug.UserId = u.Id AND ug.IsPrimary = 1 ");
+            _sqlQuery.Append(" LEFT JOIN dbo.PermissionGroups g ON g.Id = ug.GroupId ");
+            _sqlQuery.Append(" WHERE u.PublicId = @id AND u.IsDeleted = 0 ");
 
-        /// <summary>The acting admin's PublicId and Super Admin flag (null when unknown).</summary>
-        private Task<(Guid PublicId, bool IsSuperAdmin)> GetActorAsync(long? _actorUserId, CancellationToken _ct)
-            => _databaseFunctions.QuerySingleOrDefaultAsync("SELECT PublicId, IsSuperAdmin FROM dbo.AdminUsers WHERE Id = @id AND IsDeleted = 0",
-                r => (r.GetGuid(0), r.GetBoolean(1)), new[] { P("@id", _actorUserId ?? 0) }, _ct);
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                _sqlQuery.ToString(), new[] { P("@id", _id) }, "F:AdminUser:GetRow", _ct);
+            EnsureRead(_functionReturn);
+            DataRow _row = _dataTable.FirstRow();
+            return _row == null ? null : MapAdminUser(_row);
+        }
+
+        /// <summary>The acting admin's PublicId and Super Admin flag (empty when unknown).</summary>
+        private async Task<(Guid PublicId, bool IsSuperAdmin)> GetActorAsync(long? _actorUserId, CancellationToken _ct)
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT PublicId, IsSuperAdmin FROM dbo.AdminUsers ");
+            _sqlQuery.Append(" WHERE Id = @id AND IsDeleted = 0 ");
+
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                _sqlQuery.ToString(), new[] { P("@id", _actorUserId ?? 0) }, "F:AdminUser:GetActor", _ct);
+            EnsureRead(_functionReturn);
+            DataRow _row = _dataTable.FirstRow();
+            return _row == null ? (Guid.Empty, false) : (_row.GetGuid("PublicId"), _row.GetBool("IsSuperAdmin"));
+        }
 
         private static IFunctionReturn Forbidden(string _message, string _methodName)
             => FunctionReturn.Fail(Constants.ReturnMessageTypes.PermissionDenied, _message, Constants.HttpStatusCodes.Forbidden, _methodName);
@@ -123,15 +143,20 @@ WHERE u.PublicId = @id AND u.IsDeleted = 0";
                     || _filter.Status == ApplicationDatabaseConstants.Status.Locked ? _filter.Status : null;
                 string _search = string.IsNullOrWhiteSpace(_filter.Search) ? null : "%" + _filter.Search.Trim().EscapeLike() + "%";
                 var _totalCount = IntOut("@TotalCount");
-                var _parameters = new List<SqlParameter>
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteProcedureDataTableAsync(SP.AdminUserGetPaged, new[]
                 {
                     P("@Search", _search), P("@Status", _status), P("@GroupPublicId", _filter.GroupId),
                     P("@SortBy", _paging.SortBy), P("@SortDirection", _paging.SortDirection), P("@Offset", _paging.Offset), P("@PageSize", _paging.PageSize), _totalCount
-                };
-                IReadOnlyList<AdminUserDto> _items = await _databaseFunctions.QueryProcedureAsync(SP.AdminUserGetPaged, MapAdminUser, _parameters, _ct);
-                int _total = OutInt(_totalCount);
+                }, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
 
-                return (new PagedResult<AdminUserDto> { Items = _items, Page = _paging.Page, PageSize = _paging.PageSize, TotalCount = _total }, new FunctionReturn { MethodName = _methodName });
+                return (new PagedResult<AdminUserDto>
+                {
+                    Items = _dataTable.MapRows(MapAdminUser),
+                    Page = _paging.Page,
+                    PageSize = _paging.PageSize,
+                    TotalCount = OutInt(_totalCount)
+                }, _functionReturn);
             }
             catch (Exception ex)
             {
@@ -161,9 +186,13 @@ WHERE u.PublicId = @id AND u.IsDeleted = 0";
             string _methodName = "F:AdminUser:GetGroupOptions";
             try
             {
-                var _groups = await _databaseFunctions.QueryAsync("SELECT PublicId, Name, Code FROM dbo.PermissionGroups WHERE Status = 'Active' ORDER BY Name",
-                    r => new GroupOption { Id = r.GetGuid(0), Name = r.GetString(1), Code = r.GetString(2) }, null, _ct);
-                return (_groups.ToList(), new FunctionReturn { MethodName = _methodName });
+                StringBuilder _sqlQuery = new StringBuilder();
+                _sqlQuery.Append(" SELECT PublicId, Name, Code FROM dbo.PermissionGroups ");
+                _sqlQuery.Append(" WHERE Status = 'Active' ORDER BY Name ");
+
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(_sqlQuery.ToString(), null, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+                return (_dataTable.MapRows(_row => new GroupOption { Id = _row.GetGuid("PublicId"), Name = _row.GetText("Name"), Code = _row.GetText("Code") }), _functionReturn);
             }
             catch (Exception ex)
             {
@@ -322,19 +351,28 @@ WHERE u.PublicId = @id AND u.IsDeleted = 0";
                 AdminUserDto _user = await GetRowAsync(_id, _ct);
                 if (_user == null) return (null, ApplicationCommonFunctions.NotFound(ApplicationConstants.ValidationMessages.AdminUserNotFound, _methodName));
 
-                DateTime _passwordUpdated = await _databaseFunctions.QuerySingleOrDefaultAsync(
-                    "SELECT PasswordUpdatedAtUtc FROM dbo.AdminUsers WHERE PublicId = @id", r => DateTime.SpecifyKind(r.GetDateTime(0), DateTimeKind.Utc), new[] { P("@id", _id) }, _ct);
-                var _activity = await _databaseFunctions.QueryAsync(@"SELECT TOP (10) a.Id, a.Action, a.EntityType, a.EntityId, a.CreatedAtUtc
-FROM dbo.AuditLogs a JOIN dbo.AdminUsers u ON u.Id = a.ActorUserId
-WHERE u.PublicId = @id ORDER BY a.Id DESC",
-                    r => new ProfileActivity
-                    {
-                        Id = r.GetInt64(0),
-                        Action = r.GetString(1),
-                        EntityType = r.GetString(2),
-                        EntityId = r.IsDBNull(3) ? null : r.GetString(3),
-                        CreatedAtUtc = DateTime.SpecifyKind(r.GetDateTime(4), DateTimeKind.Utc)
-                    }, new[] { P("@id", _id) }, _ct);
+                DateTime _passwordUpdated = DateTime.SpecifyKind(await _databaseFunctions.ExecuteScalarAsync<DateTime>(
+                    " SELECT PasswordUpdatedAtUtc FROM dbo.AdminUsers WHERE PublicId = @id ", new[] { P("@id", _id) }, _ct), DateTimeKind.Utc);
+
+                // The last 10 changes this admin made (IX_AuditLogs_ActorUserId: ActorUserId, CreatedAtUtc DESC).
+                StringBuilder _sqlQuery = new StringBuilder();
+                _sqlQuery.Append(" SELECT TOP (10) a.Id, a.Action, a.EntityType, a.EntityId, a.CreatedAtUtc ");
+                _sqlQuery.Append(" FROM dbo.AuditLogs a ");
+                _sqlQuery.Append(" JOIN dbo.AdminUsers u ON u.Id = a.ActorUserId ");
+                _sqlQuery.Append(" WHERE u.PublicId = @id ");
+                _sqlQuery.Append(" ORDER BY a.CreatedAtUtc DESC, a.Id DESC ");
+
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                    _sqlQuery.ToString(), new[] { P("@id", _id) }, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+                List<ProfileActivity> _activity = _dataTable.MapRows(_row => new ProfileActivity
+                {
+                    Id = _row.GetLong("Id"),
+                    Action = _row.GetText("Action"),
+                    EntityType = _row.GetText("EntityType"),
+                    EntityId = _row.GetText("EntityId"),
+                    CreatedAtUtc = _row.GetUtc("CreatedAtUtc")
+                });
 
                 return (new ProfileDto
                 {
@@ -342,7 +380,7 @@ WHERE u.PublicId = @id ORDER BY a.Id DESC",
                     MobileNumber = _user.MobileNumber, Status = _user.Status, IsSuperAdmin = _user.IsSuperAdmin, GroupId = _user.GroupId,
                     GroupName = _user.GroupName, GroupIsActive = _user.GroupIsActive, MustChangePassword = _user.MustChangePassword,
                     IsLockedOut = _user.IsLockedOut, LastLoginAtUtc = _user.LastLoginAtUtc, CreatedAtUtc = _user.CreatedAtUtc,
-                    PasswordUpdatedAtUtc = _passwordUpdated, RecentActivity = _activity.ToList()
+                    PasswordUpdatedAtUtc = _passwordUpdated, RecentActivity = _activity
                 }, new FunctionReturn { MethodName = _methodName });
             }
             catch (Exception ex)

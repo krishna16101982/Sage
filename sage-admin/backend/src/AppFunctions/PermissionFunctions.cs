@@ -12,6 +12,7 @@ using SageAdminApi.Globals;
 using SageAdminApi.Models;
 using SageAdminApi.Models.Filter;
 using SageAdminApi.Models.HttpPost;
+using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.AppValidations;
 using SageCommonLib.Globals;
@@ -25,10 +26,6 @@ namespace SageAdminApi.AppFunctions
 {
     public class PermissionFunctions : IPermissionFunctions
     {
-        private const string PermissionColumns = "p.Id, p.ModuleId, m.Code, m.Name, p.Action, p.Code, p.Name, p.Description, p.IsActive, p.IsSystem";
-        private const string PermissionFrom = "FROM dbo.Permissions p JOIN dbo.Modules m ON m.Id = p.ModuleId";
-        private const string ModuleSelect = "SELECT m.Id, m.Code, m.Name, m.Category, m.SortOrder, m.IsActive, m.IsSystem, (SELECT COUNT(*) FROM dbo.Permissions px WHERE px.ModuleId = m.Id), m.MenuPath FROM dbo.Modules m";
-
         /// <summary>
         /// Sort keys the client may request. dbo.usp_Permission_GetPaged maps each key to a fixed ORDER BY; anything else falls back to "module".
         /// </summary>
@@ -47,32 +44,53 @@ namespace SageAdminApi.AppFunctions
 
         #region Helpers
 
-        private static ModuleDto MapModule(SqlDataReader r) => new ModuleDto
+        private static ModuleDto MapModule(DataRow _row) => new ModuleDto
         {
-            Id = r.GetInt64(0),
-            Code = r.GetString(1),
-            Name = r.GetString(2),
-            Category = r.IsDBNull(3) ? null : r.GetString(3),
-            SortOrder = r.GetInt32(4),
-            IsActive = r.GetBoolean(5),
-            IsSystem = r.GetBoolean(6),
-            PermissionCount = r.GetInt32(7),
-            MenuPath = r.IsDBNull(8) ? null : r.GetString(8)
+            Id = _row.GetLong("Id"),
+            Code = _row.GetText("Code"),
+            Name = _row.GetText("Name"),
+            Category = _row.GetText("Category"),
+            SortOrder = _row.GetInt("SortOrder"),
+            IsActive = _row.GetBool("IsActive"),
+            IsSystem = _row.GetBool("IsSystem"),
+            PermissionCount = _row.GetInt("PermissionCount"),
+            MenuPath = _row.GetText("MenuPath")
         };
 
-        private static PermissionDto MapPermission(SqlDataReader r) => new PermissionDto
+        /// <summary>One permission row (from the queries below or dbo.usp_Permission_GetPaged; both use these column names).</summary>
+        private static PermissionDto MapPermission(DataRow _row) => new PermissionDto
         {
-            Id = r.GetInt64(0),
-            ModuleId = r.GetInt64(1),
-            ModuleCode = r.GetString(2),
-            ModuleName = r.GetString(3),
-            Action = r.GetString(4),
-            Code = r.GetString(5),
-            Name = r.GetString(6),
-            Description = r.IsDBNull(7) ? null : r.GetString(7),
-            IsActive = r.GetBoolean(8),
-            IsSystem = r.GetBoolean(9)
+            Id = _row.GetLong("Id"),
+            ModuleId = _row.GetLong("ModuleId"),
+            ModuleCode = _row.GetText("ModuleCode"),
+            ModuleName = _row.GetText("ModuleName"),
+            Action = _row.GetText("Action"),
+            Code = _row.GetText("Code"),
+            Name = _row.GetText("Name"),
+            Description = _row.GetText("Description"),
+            IsActive = _row.GetBool("IsActive"),
+            IsSystem = _row.GetBool("IsSystem")
         };
+
+        /// <summary>SELECT ... FROM for modules (with their permission count); the caller adds WHERE / ORDER BY.</summary>
+        private static StringBuilder ModuleQuery()
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT m.Id, m.Code, m.Name, m.Category, m.SortOrder, m.IsActive, m.IsSystem, ");
+            _sqlQuery.Append("        (SELECT COUNT(*) FROM dbo.Permissions px WHERE px.ModuleId = m.Id) AS PermissionCount, m.MenuPath ");
+            _sqlQuery.Append(" FROM dbo.Modules m ");
+            return _sqlQuery;
+        }
+
+        /// <summary>SELECT ... FROM for permissions (with their module); the caller adds WHERE / ORDER BY.</summary>
+        private static StringBuilder PermissionQuery()
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT p.Id, p.ModuleId, m.Code AS ModuleCode, m.Name AS ModuleName, p.Action, p.Code, p.Name, p.Description, p.IsActive, p.IsSystem ");
+            _sqlQuery.Append(" FROM dbo.Permissions p ");
+            _sqlQuery.Append(" JOIN dbo.Modules m ON m.Id = p.ModuleId ");
+            return _sqlQuery;
+        }
 
         /// <summary>A 409 from a create procedure carries a generic message; replace it with the screen's own wording.</summary>
         private static IFunctionReturn WithConflictMessage(IFunctionReturn _functionReturn, string _message)
@@ -81,11 +99,27 @@ namespace SageAdminApi.AppFunctions
             return _functionReturn;
         }
 
-        private Task<ModuleDto> GetModuleByIdAsync(long _id, CancellationToken _ct)
-            => _databaseFunctions.QuerySingleOrDefaultAsync(ModuleSelect + " WHERE m.Id = @id", MapModule, new[] { P("@id", _id) }, _ct);
+        private async Task<ModuleDto> GetModuleByIdAsync(long _id, CancellationToken _ct)
+        {
+            StringBuilder _sqlQuery = ModuleQuery();
+            _sqlQuery.Append(" WHERE m.Id = @id ");
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                _sqlQuery.ToString(), new[] { P("@id", _id) }, "F:Permission:GetModuleById", _ct);
+            EnsureRead(_functionReturn);
+            DataRow _row = _dataTable.FirstRow();
+            return _row == null ? null : MapModule(_row);
+        }
 
-        private Task<PermissionDto> GetPermissionByIdAsync(long _id, CancellationToken _ct)
-            => _databaseFunctions.QuerySingleOrDefaultAsync($"SELECT {PermissionColumns} {PermissionFrom} WHERE p.Id = @id", MapPermission, new[] { P("@id", _id) }, _ct);
+        private async Task<PermissionDto> GetPermissionByIdAsync(long _id, CancellationToken _ct)
+        {
+            StringBuilder _sqlQuery = PermissionQuery();
+            _sqlQuery.Append(" WHERE p.Id = @id ");
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                _sqlQuery.ToString(), new[] { P("@id", _id) }, "F:Permission:GetPermissionById", _ct);
+            EnsureRead(_functionReturn);
+            DataRow _row = _dataTable.FirstRow();
+            return _row == null ? null : MapPermission(_row);
+        }
 
         /// <summary>Audit snapshot: only business fields, never secrets.</summary>
         private static object Snapshot(ModuleDto m) => m == null ? null : new { m.Code, m.Name, m.Category, m.SortOrder, m.IsActive, m.MenuPath };
@@ -107,16 +141,21 @@ namespace SageAdminApi.AppFunctions
 
                 string _search = string.IsNullOrWhiteSpace(_filter.Search) ? null : "%" + _filter.Search.Trim().EscapeLike() + "%";
                 var _totalCount = IntOut("@TotalCount");
-                var _parameters = new List<SqlParameter>
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteProcedureDataTableAsync(SP.PermissionGetPaged, new[]
                 {
                     P("@ModuleId", _filter.ModuleId), P("@IsActive", _filter.IsActive), P("@Search", _search),
                     P("@SortBy", _paging.SortBy), P("@SortDirection", _paging.SortDirection),
                     P("@Offset", _paging.Offset), P("@PageSize", _paging.PageSize), _totalCount
-                };
-                IReadOnlyList<PermissionDto> _items = await _databaseFunctions.QueryProcedureAsync(SP.PermissionGetPaged, MapPermission, _parameters, _ct);
-                int _total = OutInt(_totalCount);
+                }, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
 
-                return (new PagedResult<PermissionDto> { Items = _items, Page = _paging.Page, PageSize = _paging.PageSize, TotalCount = _total }, new FunctionReturn { MethodName = _methodName });
+                return (new PagedResult<PermissionDto>
+                {
+                    Items = _dataTable.MapRows(MapPermission),
+                    Page = _paging.Page,
+                    PageSize = _paging.PageSize,
+                    TotalCount = OutInt(_totalCount)
+                }, _functionReturn);
             }
             catch (Exception ex)
             {
@@ -130,15 +169,24 @@ namespace SageAdminApi.AppFunctions
             string _methodName = "F:Permission:GetModules";
             try
             {
-                IReadOnlyList<ModuleDto> _modules = await _databaseFunctions.QueryAsync(
-                    ModuleSelect + " WHERE (@inc = 1 OR m.IsActive = 1) ORDER BY m.SortOrder, m.Name", MapModule, new[] { P("@inc", _includeInactive) }, _ct);
-                IReadOnlyList<PermissionDto> _permissions = await _databaseFunctions.QueryAsync(
-                    $"SELECT {PermissionColumns} {PermissionFrom} WHERE (@inc = 1 OR (p.IsActive = 1 AND m.IsActive = 1)) ORDER BY p.Code",
-                    MapPermission, new[] { P("@inc", _includeInactive) }, _ct);
+                StringBuilder _moduleQuery = ModuleQuery();
+                _moduleQuery.Append(" WHERE (@inc = 1 OR m.IsActive = 1) ");
+                _moduleQuery.Append(" ORDER BY m.SortOrder, m.Name ");
+                (IFunctionReturn _functionReturn, DataTable _moduleTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                    _moduleQuery.ToString(), new[] { P("@inc", _includeInactive) }, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
 
-                ILookup<long, PermissionDto> _byModule = _permissions.ToLookup(p => p.ModuleId);
+                StringBuilder _permissionQuery = PermissionQuery();
+                _permissionQuery.Append(" WHERE (@inc = 1 OR (p.IsActive = 1 AND m.IsActive = 1)) ");
+                _permissionQuery.Append(" ORDER BY p.Code ");
+                (_functionReturn, DataTable _permissionTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                    _permissionQuery.ToString(), new[] { P("@inc", _includeInactive) }, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+
+                List<ModuleDto> _modules = _moduleTable.MapRows(MapModule);
+                ILookup<long, PermissionDto> _byModule = _permissionTable.MapRows(MapPermission).ToLookup(p => p.ModuleId);
                 foreach (ModuleDto _module in _modules) _module.Permissions = _byModule[_module.Id].ToList();
-                return (_modules.ToList(), new FunctionReturn { MethodName = _methodName });
+                return (_modules, _functionReturn);
             }
             catch (Exception ex)
             {
