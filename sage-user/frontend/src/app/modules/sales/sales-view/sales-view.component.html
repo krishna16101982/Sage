@@ -114,6 +114,24 @@
             @if (o.billToAddress) { <div><span class="text-muted">Bill to</span><div style="white-space: pre-line">{{ o.billToAddress }}</div></div> }
           </div>
         </section>
+        @if (o.wording; as w) {
+          <section class="card">
+            <header class="card-header row">
+              <h2 class="section-title">Order wording</h2>
+              <span class="spacer"></span>
+              <button type="button" class="link-button text-sm" (click)="wordingOpen.set(!wordingOpen())">{{ wordingOpen() ? 'Hide' : 'Show' }}</button>
+            </header>
+            @if (wordingOpen()) {
+              <div class="card-body stack-sm text-sm">
+                @for (section of wordingSections; track section.key) {
+                  @if (w[section.key]) {
+                    <div><span class="text-muted">{{ section.label }}</span><div style="white-space: pre-line">{{ w[section.key] }}</div></div>
+                  }
+                }
+              </div>
+            }
+          </section>
+        }
       }
     }
 

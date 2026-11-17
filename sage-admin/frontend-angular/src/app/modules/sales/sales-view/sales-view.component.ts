@@ -5,6 +5,7 @@ import { errorText } from '../../../services/rest/global-rest-service';
 import { SalesService } from '../../../services/sales/sales.service';
 import type { Sale } from '../../../shared/interfaces/sale.interface';
 import { formatDate } from '../../../shared/utils/dates';
+import { WORDING_SECTIONS } from '../../../shared/utils/order-wording';
 import { formatDateTime, formatDuration, formatInr } from '../../../shared/utils/format';
 
 /** /sales/:id — one sale, read-only (sales are recorded and cancelled in the User Panel). */
@@ -14,6 +15,8 @@ import { formatDateTime, formatDuration, formatInr } from '../../../shared/utils
   templateUrl: './sales-view.component.html',
 })
 export class SalesView implements OnInit {
+  protected readonly wordingSections = WORDING_SECTIONS;
+  readonly wordingOpen = signal(false);
   /** From the route (:id). */
   readonly id = input.required<string>();
   private readonly service = inject(SalesService);

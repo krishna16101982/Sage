@@ -32,7 +32,8 @@ CREATE OR ALTER PROCEDURE dbo.usp_SaleOrder_Create
     @BillingContactDesignation  NVARCHAR(100)  = NULL,
     @BillingContactEmail        NVARCHAR(256)  = NULL,
     @BillingContactPhone        NVARCHAR(20)   = NULL,
-    @BillToAddress              NVARCHAR(500)  = NULL
+    @BillToAddress              NVARCHAR(500)  = NULL,
+    @OrderWording               NVARCHAR(MAX)  = NULL   -- JSON: the order form's wording sections (DDL 031)
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -60,6 +61,8 @@ BEGIN
         THROW 50400, 'Choose a payment term from the list', 1;
     IF NOT EXISTS (SELECT 1 FROM dbo.MasterValues WHERE Id = @CurrencyId AND MasterType = 'Currency' AND IsActive = 1)
         THROW 50400, 'Choose a currency from the list', 1;
+    IF @OrderWording IS NOT NULL AND ISJSON(@OrderWording) = 0
+        THROW 50400, 'The order wording is not valid', 1;
     IF NULLIF(LTRIM(RTRIM(@PrimaryContactName)), N'') IS NULL
         THROW 50400, 'Enter the primary contact''s name', 1;
 
@@ -85,7 +88,8 @@ BEGIN
         PrimaryContactEmail = @PrimaryContactEmail, PrimaryContactPhone = @PrimaryContactPhone,
         BillingContactName = @BillingContactName, BillingContactDesignation = @BillingContactDesignation,
         BillingContactEmail = @BillingContactEmail, BillingContactPhone = @BillingContactPhone,
-        BillToAddress = @BillToAddress
+        BillToAddress = @BillToAddress,
+        OrderWording = @OrderWording
     WHERE PublicId = @publicId;
 
     COMMIT;

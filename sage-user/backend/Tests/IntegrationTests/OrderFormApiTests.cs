@@ -53,7 +53,17 @@ public class OrderFormApiTests
             ["currencyId"] = DefaultId(options, "currencies"),
             ["primaryContact"] = new { name = "Mr. Abhishek Awasthi", designation = "Founder & CEO", email = "abhi@absoft.example.com", phone = "9984818226" },
             ["billingSameAsPrimary"] = true,
-            ["billToAddress"] = "Floor 2, WeWork, Vaswani Chambers, Annie Besant Road, Mumbai 400030"
+            ["billToAddress"] = "Floor 2, WeWork, Vaswani Chambers, Annie Besant Road, Mumbai 400030",
+            ["wording"] = new
+            {
+                signReturnLine = "Sign and return to i2k2 Networks Pvt Ltd",
+                orderNotes = "Custom note <b>for this order</b> only.",
+                freeMonthNote = "This order includes 2 free months at no cost as a one-time offering.",
+                productTitle = "Sales Navigator Advanced",
+                taxInformation = "Tax Information: 18% GST will be applicable.",
+                signatureClauses = "Clause one.\nClause two.",
+                footer = "Thank you.\ni2k2 Networks Proprietary and Confidential"
+            }
         };
         change?.Invoke(body);
         return body;
@@ -67,6 +77,11 @@ public class OrderFormApiTests
         res.Status.ShouldBe(200, res.Root.ToString());
         res.Data.GetProperty("defaultGstPercent").GetDecimal().ShouldBe(18m);
         res.Data.GetProperty("maxFreeMonths").GetInt32().ShouldBe(12);
+        var wording = res.Data.GetProperty("wording");
+        wording.GetProperty("signReturnLine").GetString().ShouldBe("Sign and return to i2k2 Networks Pvt Ltd");
+        wording.GetProperty("freeMonthNote").GetString()!.ShouldContain("{freeMonths}");
+        wording.GetProperty("taxInformation").GetString()!.ShouldContain("{gstPercent}%");
+        wording.GetProperty("signatureClauses").GetString()!.Split('\n').Length.ShouldBe(5);
         foreach (var list in new[] { "billingFrequencies", "billingMethods", "paymentMethods", "paymentTerms", "currencies" })
             res.Data.GetProperty(list).EnumerateArray().Count(o => o.GetProperty("isDefault").GetBoolean()).ShouldBe(1, list);
         res.Data.GetProperty("billingFrequencies").EnumerateArray().Select(o => o.GetProperty("name").GetString())
@@ -110,6 +125,12 @@ public class OrderFormApiTests
         d.GetProperty("primaryContact").GetProperty("designation").GetString().ShouldBe("Founder & CEO");
         d.GetProperty("billingContact").GetProperty("email").GetString().ShouldBe("abhi@absoft.example.com");   // same as primary
         d.GetProperty("billToAddress").GetString()!.ShouldStartWith("Floor 2, WeWork");
+        // The wording is kept as sent for this order (tags removed, lines kept).
+        var w = d.GetProperty("wording");
+        w.GetProperty("orderNotes").GetString().ShouldBe("Custom note for this order only.");
+        w.GetProperty("freeMonthNote").GetString()!.ShouldContain("2 free months");
+        w.GetProperty("signatureClauses").GetString().ShouldBe("Clause one.\nClause two.");
+        w.GetProperty("extraItemTitle").ValueKind.ShouldBe(JsonValueKind.Null);
 
         // The manager sees it too; another seller does not.
         (await Call(HttpMethod.Get, $"{Api}/order-form/{id}", bearer: await TokenAsync(manager))).Status.ShouldBe(200);
@@ -144,6 +165,18 @@ public class OrderFormApiTests
     }
 
     [Fact]
+    public async Task FreeMonthNote_IsDropped_WithoutFreeMonths()
+    {
+        var token = await TokenAsync(await SalesData.CreateAsync(_fx.Db));
+        var options = (await Call(HttpMethod.Get, $"{Api}/order-form/options", bearer: token)).Data;
+        var res = await Call(HttpMethod.Post, $"{Api}/order-form", Order(await CustomerAsync(token), await PlanAsync(), options, b => b["freeMonths"] = 0), token);
+        res.Status.ShouldBe(201, res.Root.ToString());
+        var w = (await Call(HttpMethod.Get, $"{Api}/order-form/{res.Data.GetProperty("id").GetGuid()}", bearer: token)).Data.GetProperty("wording");
+        w.GetProperty("freeMonthNote").ValueKind.ShouldBe(JsonValueKind.Null);
+        w.GetProperty("signReturnLine").GetString().ShouldBe("Sign and return to i2k2 Networks Pvt Ltd");
+    }
+
+    [Fact]
     public async Task SimpleSale_IsUnchanged_AndHasNoOrderForm()
     {
         var token = await TokenAsync(await SalesData.CreateAsync(_fx.Db));
@@ -159,5 +192,6 @@ public class OrderFormApiTests
         details.Data.GetProperty("hasOrderForm").GetBoolean().ShouldBeFalse();
         details.Data.GetProperty("taxAmount").GetDecimal().ShouldBe(0m);
         details.Data.GetProperty("totalAmount").GetDecimal().ShouldBe(1000m);
+        details.Data.GetProperty("wording").ValueKind.ShouldBe(JsonValueKind.Null);
     }
 }

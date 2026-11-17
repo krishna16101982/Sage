@@ -181,7 +181,7 @@ Customers are shared with the User Panel (sales users add them there; admins add
 | `POST /api/admin/masters` · `PUT /api/admin/masters/{id}` | `Setting.Edit` | add / change a value (`usp_MasterValue_Save`): making a value the default clears the old default in the same transaction; the default cannot be turned off; a value in use is turned off, never removed; audited |
 
 - Order details live on the same `dbo.Sales` row (DDL 029/030): `GstPercent`, `TaxAmount`, `TotalAmount` (computed: sale amount + tax), `FreeMonths`, the five list ids (foreign keys to `MasterValues`), primary / billing contact and `BillToAddress`. A sale from the simple New sale page keeps GST 0 and no details.
-- Settings > Order form: `Sales.DefaultGstPercent` (18) and `Sales.MaxFreeMonths` (12). UI: Settings > **Order form lists** (`/settings/masters`); the Admin sale page shows GST, order total and the order details; the CSV export has GST %, Tax, Total and Free months.
+- Settings > Order form: `Sales.DefaultGstPercent` (18) and `Sales.MaxFreeMonths` (12). Settings > Order form wording (SeedData 011): the standard text of each wording section (`OrderForm.*`; `{freeMonths}` and `{gstPercent}` are filled in by the form). The order keeps its final wording as JSON in `Sales.OrderWording` (DDL 031); the Admin sale page shows it under Order wording. UI: Settings > **Order form lists** (`/settings/masters`); the Admin sale page shows GST, order total and the order details; the CSV export has GST %, Tax, Total and Free months.
 
 ## My Profile
 | Endpoint | Permission | Notes |

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SageCommonLib.AppFunctions;
@@ -42,6 +43,49 @@ namespace SageUserApi.AppFunctions
         }
 
         #region Helpers
+
+        private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        private const int MaxWordingLength = 4000;
+
+        /// <summary>Settings key of each standard wording section.</summary>
+        private static readonly (string Key, Action<OrderWording, string> Set)[] WordingSettings =
+        {
+            ("OrderForm.SignReturnLine", (w, v) => w.SignReturnLine = v),
+            ("OrderForm.SignReturnInstruction", (w, v) => w.SignReturnInstruction = v),
+            ("OrderForm.OrderNotes", (w, v) => w.OrderNotes = v),
+            ("OrderForm.FreeMonthNote", (w, v) => w.FreeMonthNote = v),
+            ("OrderForm.TaxInformation", (w, v) => w.TaxInformation = v),
+            ("OrderForm.SignatureClauses", (w, v) => w.SignatureClauses = v),
+            ("OrderForm.Footer", (w, v) => w.Footer = v)
+        };
+
+        /// <summary>Trims each section, strips tags and checks its length; null when nothing is left.</summary>
+        private static OrderWording CleanWording(OrderWording _wording, List<string> _errors)
+        {
+            if (_wording == null) return null;
+            string Section(string _value, string _label)
+            {
+                string _clean = Clean(_value?.Replace("\r\n", "\n"));
+                if (_clean != null && _clean.Length > MaxWordingLength) _errors.Add($"{_label} must be {MaxWordingLength} characters or fewer.");
+                return _clean;
+            }
+            var _result = new OrderWording
+            {
+                SignReturnLine = Section(_wording.SignReturnLine, "Sign-and-return line"),
+                SignReturnInstruction = Section(_wording.SignReturnInstruction, "Sign-and-return instruction"),
+                OrderNotes = Section(_wording.OrderNotes, "Order notes"),
+                FreeMonthNote = Section(_wording.FreeMonthNote, "Free-month note"),
+                ExtraItemTitle = Section(_wording.ExtraItemTitle, "Extra item title"),
+                ExtraItemDescription = Section(_wording.ExtraItemDescription, "Extra item description"),
+                ProductTitle = Section(_wording.ProductTitle, "Product title"),
+                ProductDescription = Section(_wording.ProductDescription, "Product description"),
+                PeriodLine = Section(_wording.PeriodLine, "Period line"),
+                TaxInformation = Section(_wording.TaxInformation, "Tax information"),
+                SignatureClauses = Section(_wording.SignatureClauses, "Signature clauses"),
+                Footer = Section(_wording.Footer, "Footer")
+            };
+            return _result;
+        }
 
         private static bool HasMoreThanTwoDecimals(decimal? _value) => _value.HasValue && decimal.Round(_value.Value, 2) != _value.Value;
 
@@ -89,7 +133,7 @@ namespace SageUserApi.AppFunctions
                 // Its two number settings.
                 _sqlQuery = new StringBuilder();
                 _sqlQuery.Append(" SELECT SettingKey, SettingValue FROM dbo.Settings ");
-                _sqlQuery.Append(" WHERE SettingKey IN ('Sales.DefaultGstPercent', 'Sales.MaxFreeMonths') ");
+                _sqlQuery.Append(" WHERE SettingKey IN ('Sales.DefaultGstPercent', 'Sales.MaxFreeMonths') OR SettingKey LIKE 'OrderForm.%' ");
                 (_functionReturn, DataTable _settings) = await _databaseFunctions.ExecuteSelectDataTableAsync(_sqlQuery.ToString(), null, _methodName, _ct);
                 if (!_functionReturn.Status) return (null, _functionReturn);
 
@@ -101,6 +145,9 @@ namespace SageUserApi.AppFunctions
                     MaxDiscountPercent = _rules.MaxDiscountPercent,
                     MaxBackdateDays = _rules.MaxBackdateDays
                 };
+                foreach ((string _key, Action<OrderWording, string> _set) in WordingSettings)
+                    foreach (DataRow _row in _settings.Rows)
+                        if (_row.GetText("SettingKey") == _key) _set(_options.Wording, _row.GetText("SettingValue"));
                 foreach (DataRow _row in _masters.Rows)
                 {
                     var _option = new MasterOption { Id = _row.GetInt("Id"), Code = _row.GetText("Code"), Name = _row.GetText("Name"), IsDefault = _row.GetBool("IsDefault") };
@@ -158,6 +205,9 @@ namespace SageUserApi.AppFunctions
                 OrderContact _billing = _params.BillingSameAsPrimary ? _primary : CleanContact(_params.BillingContact, "billing contact", false, _errors) ?? _primary;
                 string _address = Clean(_params.BillToAddress);
                 if (_address != null && _address.Length > 500) _errors.Add("The bill-to address must be 500 characters or fewer.");
+                OrderWording _wording = CleanWording(_params.Wording, _errors);
+                // The free-month note only belongs on an order with free months.
+                if (_wording != null && _params.FreeMonths <= 0) _wording.FreeMonthNote = null;
                 if (_errors.Count > 0) return (null, Invalid(_errors, _methodName));
 
                 // Free months, master values, discount limit, quantity, duration and renewal date are checked by the procedure.
@@ -178,7 +228,8 @@ namespace SageUserApi.AppFunctions
                         P("@PrimaryContactEmail", _primary?.Email), P("@PrimaryContactPhone", _primary?.Phone),
                         P("@BillingContactName", _billing?.Name), P("@BillingContactDesignation", _billing?.Designation),
                         P("@BillingContactEmail", _billing?.Email), P("@BillingContactPhone", _billing?.Phone),
-                        P("@BillToAddress", _address)
+                        P("@BillToAddress", _address),
+                        P("@OrderWording", _wording == null ? null : JsonSerializer.Serialize(_wording, JsonOptions))
                     }, _ct);
                 }
                 catch (AppException ex)
@@ -214,7 +265,7 @@ namespace SageUserApi.AppFunctions
                 _sqlQuery.Append(" SELECT s.PublicId, s.GstPercent, s.TaxAmount, s.TotalAmount, s.FreeMonths, ");
                 _sqlQuery.Append("        bf.Name AS BillingFrequency, bm.Name AS BillingMethod, pm.Name AS PaymentMethod, pt.Name AS PaymentTerm, cy.Name AS Currency, ");
                 _sqlQuery.Append("        s.PrimaryContactName, s.PrimaryContactDesignation, s.PrimaryContactEmail, s.PrimaryContactPhone, ");
-                _sqlQuery.Append("        s.BillingContactName, s.BillingContactDesignation, s.BillingContactEmail, s.BillingContactPhone, s.BillToAddress ");
+                _sqlQuery.Append("        s.BillingContactName, s.BillingContactDesignation, s.BillingContactEmail, s.BillingContactPhone, s.BillToAddress, s.OrderWording ");
                 _sqlQuery.Append(" FROM dbo.Sales s ");
                 _sqlQuery.Append(" LEFT JOIN dbo.MasterValues bf ON bf.Id = s.BillingFrequencyId ");
                 _sqlQuery.Append(" LEFT JOIN dbo.MasterValues bm ON bm.Id = s.BillingMethodId ");
@@ -267,8 +318,17 @@ namespace SageUserApi.AppFunctions
                 Currency = _row.GetText("Currency"),
                 PrimaryContact = Contact(_row, "PrimaryContact"),
                 BillingContact = Contact(_row, "BillingContact"),
-                BillToAddress = _row.GetText("BillToAddress")
+                BillToAddress = _row.GetText("BillToAddress"),
+                Wording = ReadWording(_row.GetText("OrderWording"))
             };
+        }
+
+        /// <summary>The stored wording JSON, or null when missing or unreadable.</summary>
+        private static OrderWording ReadWording(string _json)
+        {
+            if (string.IsNullOrEmpty(_json)) return null;
+            try { return JsonSerializer.Deserialize<OrderWording>(_json, JsonOptions); }
+            catch (JsonException) { return null; }
         }
     }
 }

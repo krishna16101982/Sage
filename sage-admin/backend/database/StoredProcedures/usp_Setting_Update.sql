@@ -1,5 +1,6 @@
 -- Changes one setting's value (Admin Panel > Settings). The API has already checked the value against the setting's
--- type and limits. Raises 50404 when the key does not exist. Returns the previous value (for the audit log).
+-- type and limits. Raises 50404 when the key does not exist. Returns 1 (a number, like the other write procedures: the
+-- API reads the old value itself for the audit log; returning the text value broke saving any non-number setting).
 CREATE OR ALTER PROCEDURE dbo.usp_Setting_Update
     @SettingKey   VARCHAR(100),
     @SettingValue NVARCHAR(2000),
@@ -22,6 +23,6 @@ BEGIN
 
     COMMIT;
 
-    SELECT @old;
+    SELECT CAST(1 AS BIGINT);
 END
 GO

@@ -45,6 +45,8 @@ namespace SageAdminApi.Models
         public string BillingContactEmail { get; set; }
         public string BillingContactPhone { get; set; }
         public string BillToAddress { get; set; }
+        /// <summary>The order form's wording sections as saved (JSON object), or null.</summary>
+        public System.Text.Json.JsonElement? Wording { get; set; }
     }
 }
 

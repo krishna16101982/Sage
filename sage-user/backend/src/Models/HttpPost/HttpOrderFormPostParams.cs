@@ -1,4 +1,5 @@
 using System;
+using SageUserApi.Models;
 
 namespace SageUserApi.Models.HttpPost
 {
@@ -32,6 +33,8 @@ namespace SageUserApi.Models.HttpPost
         public OrderContactParams BillingContact { get; set; }
         public bool BillingSameAsPrimary { get; set; }
         public string BillToAddress { get; set; }
+        /// <summary>"Edit wording by section": the final text of each section for this order.</summary>
+        public OrderWording Wording { get; set; }
     }
 
     public class OrderContactParams

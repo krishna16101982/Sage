@@ -595,6 +595,9 @@
   .summary-total { margin-top: 0.25rem; padding-top: 0.5rem; border-top: 1px solid var(--color-border); font-weight: 600; }
   .field-muted { background: var(--color-surface-muted); color: var(--color-text-muted); }
   .text-right { text-align: right; }
+  .wording-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.875rem; }
+  .wording-grid .wording-wide { grid-column: 1 / -1; }
+  @media (max-width: 900px) { .wording-grid { grid-template-columns: 1fr; } }
   .form-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.875rem; }
   .form-grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.875rem; }
   .form-grid-5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.875rem; }

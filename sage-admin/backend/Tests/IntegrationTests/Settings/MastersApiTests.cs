@@ -78,6 +78,27 @@ public class MastersApiTests
     }
 
     [Fact]
+    public async Task OrderFormWording_IsInSettings_AndKeepsLines()
+    {
+        var token = await TokenAsync("Setting.View", "Setting.Edit");
+        var list = await Call(HttpMethod.Get, "/api/admin/settings", token);
+        var wording = list.Data.EnumerateArray().Where(x => x.GetProperty("category").GetString() == "Order form wording").ToList();
+        wording.Count.ShouldBe(7);
+        var footer = wording.Single(x => x.GetProperty("key").GetString() == "OrderForm.Footer");
+        string original = footer.GetProperty("value").GetString()!;
+        try
+        {
+            var saved = await Call(HttpMethod.Put, "/api/admin/settings/OrderForm.Footer", token, new { value = "Thanks.\nSecond line" });
+            saved.Status.ShouldBe(200, saved.Root.ToString());
+            saved.Data.GetProperty("value").GetString().ShouldBe("Thanks.\nSecond line");
+        }
+        finally
+        {
+            await Call(HttpMethod.Put, "/api/admin/settings/OrderForm.Footer", token, new { value = original });
+        }
+    }
+
+    [Fact]
     public async Task AdminSalePage_ShowsTheOrderDetails()
     {
         var token = await TokenAsync("Sales.View");
@@ -99,7 +120,8 @@ public class MastersApiTests
             TestDb.P("@SaleAmount", 1800m), TestDb.P("@StartDate", DateTime.UtcNow.Date), TestDb.P("@GstPercent", 18m), TestDb.P("@FreeMonths", 1),
             TestDb.P("@BillingFrequencyId", await Default("BillingFrequency")), TestDb.P("@BillingMethodId", await Default("BillingMethod")),
             TestDb.P("@PaymentMethodId", await Default("PaymentMethod")), TestDb.P("@PaymentTermId", await Default("PaymentTerm")),
-            TestDb.P("@CurrencyId", await Default("Currency")), TestDb.P("@PrimaryContactName", "Asha Rao"), TestDb.P("@BillToAddress", "Floor 2, Pune")
+            TestDb.P("@CurrencyId", await Default("Currency")), TestDb.P("@PrimaryContactName", "Asha Rao"), TestDb.P("@BillToAddress", "Floor 2, Pune"),
+            TestDb.P("@OrderWording", "{\"signReturnLine\":\"Sign and return to i2k2\",\"footer\":\"Line 1\\nLine 2\"}")
         });
 
         var sale = await Call(HttpMethod.Get, $"/api/admin/sales/{saleId}", token);
@@ -112,6 +134,8 @@ public class MastersApiTests
         order.GetProperty("currency").GetString().ShouldBe("INR");
         order.GetProperty("primaryContactName").GetString().ShouldBe("Asha Rao");
         order.GetProperty("billToAddress").GetString().ShouldBe("Floor 2, Pune");
+        order.GetProperty("wording").GetProperty("signReturnLine").GetString().ShouldBe("Sign and return to i2k2");
+        order.GetProperty("wording").GetProperty("footer").GetString().ShouldBe("Line 1\nLine 2");
 
         // The list carries the totals too; a simple sale has no order details.
         var list = await Call(HttpMethod.Get, $"/api/admin/sales?sellerId={await _fx.Db.ExecuteScalarAsync<Guid>("SELECT PublicId FROM dbo.SalesUsers WHERE Id = @id", new[] { TestDb.P("@id", seller) })}", token);

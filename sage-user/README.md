@@ -17,7 +17,7 @@ Status: **Sprint 8 (foundation) and Sprint 9 (sales) done** — sign-in, session
 | Forgot password (emailed link), Reset password | `/forgot-password`, `/reset-password?token=` | anyone (signed out) |
 | Home (this month's sales, team figures for a manager) | `/home` | everyone |
 | New sale | `/sales/add` | everyone |
-| New order form (GST, free months, billing / payment terms, contacts, bill-to address, live order summary) | `/sales/order-form` | everyone |
+| New order form (GST, free months, billing / payment terms, contacts, bill-to address, live order summary; section 5 "Edit wording by section" is hidden until Show: standard text from Admin > Settings > Order form wording, changeable for one order) | `/sales/order-form` | everyone |
 | My sales | `/sales/list` | everyone |
 | Team sales (filter by sales person) | `/sales/team` | sales managers |
 | Sale details, Cancel sale (with a reason) | `/sales/{id}` | the seller and their manager |

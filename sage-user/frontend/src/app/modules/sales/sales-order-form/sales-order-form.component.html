@@ -210,6 +210,45 @@
               </label>
             </div>
           </section>
+
+          <!-- 5. Edit wording by section -->
+          <section class="card">
+            <header class="card-header">
+              <div class="step-head" style="flex: 1">
+                <span class="step-badge">5</span>
+                <div style="flex: 1">
+                  <h2 class="section-title">Edit wording by section</h2>
+                  <p class="hint">Standard text is filled in. Change any section for this order form only.
+                    @if (changedSections() > 0) { {{ changedSections() }} changed. }</p>
+                </div>
+                <button type="button" class="link-button text-sm" [attr.aria-expanded]="wordingOpen()" (click)="wordingOpen.set(!wordingOpen())">
+                  {{ wordingOpen() ? 'Hide' : 'Show' }}
+                </button>
+              </div>
+            </header>
+            @if (wordingOpen()) {
+              <div class="card-body wording-grid">
+                @for (section of wordingSections; track section.key) {
+                  @if (section.key !== 'freeMonthNote' || freeMonths() > 0) {
+                    <label class="field-label" [class.wording-wide]="section.wide">
+                      <span class="row-tight">
+                        <span>{{ section.label }}</span>
+                        @if (isChanged(section.key)) {
+                          <span class="badge badge-warning">Changed</span>
+                          <button type="button" class="link-button text-xs" (click)="resetWording(section.key)">Reset</button>
+                        }
+                      </span>
+                      <textarea class="field" [name]="'w-' + section.key" [rows]="section.rows" maxlength="4000"
+                                [ngModel]="wording()[section.key] ?? ''" (ngModelChange)="setWording(section.key, $event)"></textarea>
+                    </label>
+                  }
+                }
+                @if (changedSections() > 0) {
+                  <div class="wording-wide"><button type="button" class="link-button text-sm" (click)="resetWording()">Reset every section to the standard text</button></div>
+                }
+              </div>
+            }
+          </section>
         </div>
 
         <!-- Order summary and actions -->

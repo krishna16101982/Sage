@@ -42,6 +42,11 @@ export class SettingsList implements OnInit {
     return groups;
   });
 
+  /** Text settings longer than a line (the order form wording) are edited in a full-width text area. */
+  isLong(s: Setting): boolean {
+    return s.valueType === 'string' && (s.maxLength ?? 0) > 200;
+  }
+
   async ngOnInit(): Promise<void> {
     try {
       const list = await this.service.list();

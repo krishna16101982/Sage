@@ -33,7 +33,7 @@
                 </span>
               </div>
 
-              <div class="row-tight" style="flex: 0 1 auto">
+              <div class="row-tight" [style.flex]="isLong(s) ? '1 1 100%' : '0 1 auto'">
                 @switch (s.valueType) {
                   @case ('bool') {
                     <label class="switch">
@@ -52,8 +52,13 @@
                               [ngModel]="draft(s.key)" (ngModelChange)="setDraft(s.key, $event)"></textarea>
                   }
                   @default {
+                    @if (isLong(s)) {
+                      <textarea class="field" rows="4" style="flex: 1; min-width: 0" [id]="'setting-' + s.key" [disabled]="!canEdit" [attr.maxlength]="s.maxLength"
+                                [ngModel]="draft(s.key)" (ngModelChange)="setDraft(s.key, $event)"></textarea>
+                    } @else {
                     <input class="field field-inline w-56" [id]="'setting-' + s.key" [disabled]="!canEdit" [attr.maxlength]="s.maxLength"
                            [ngModel]="draft(s.key)" (ngModelChange)="setDraft(s.key, $event)" />
+                    }
                   }
                 }
                 @if (canEdit) {

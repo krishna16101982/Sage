@@ -7,6 +7,7 @@ import { errorText } from '../../../services/rest/global-rest-service';
 import { SalesService } from '../../../services/sales/sales.service';
 import { OrderFormService } from '../../../services/order-form/order-form.service';
 import type { OrderDetails } from '../../../shared/interfaces/order-form.interface';
+import { WORDING_SECTIONS } from '../../../shared/utils/order-wording';
 import type { CancelRequest, Sale } from '../../../shared/interfaces/sale.interface';
 import { formatDate } from '../../../shared/utils/dates';
 import { formatDateTime, formatDuration, formatInr } from '../../../shared/utils/format';
@@ -37,6 +38,8 @@ export class SalesView implements OnInit {
   /** Order-form details (GST, terms, contacts); hasOrderForm is false for a sale from the simple page. */
   readonly order = signal<OrderDetails | null>(null);
   private readonly orderFormService = inject(OrderFormService);
+  protected readonly wordingSections = WORDING_SECTIONS;
+  readonly wordingOpen = signal(false);
   readonly error = signal<string | null>(null);
   readonly notice = signal<string | null>(inject(MessageService).take());
   /** Which dialog is open. */

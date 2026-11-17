@@ -105,10 +105,26 @@ namespace SageAdminApi.AppFunctions
                         BillingContactDesignation = _row.GetText("BillingContactDesignation"),
                         BillingContactEmail = _row.GetText("BillingContactEmail"),
                         BillingContactPhone = _row.GetText("BillingContactPhone"),
-                        BillToAddress = _row.GetText("BillToAddress")
+                        BillToAddress = _row.GetText("BillToAddress"),
+                        Wording = ParseJson(_row.GetText("OrderWording"))
                     }
                     : null
             };
+        }
+
+        /// <summary>Stored JSON as a JSON value (null when empty or unreadable).</summary>
+        private static System.Text.Json.JsonElement? ParseJson(string _json)
+        {
+            if (string.IsNullOrEmpty(_json)) return null;
+            try
+            {
+                using System.Text.Json.JsonDocument _doc = System.Text.Json.JsonDocument.Parse(_json);
+                return _doc.RootElement.Clone();
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return null;
+            }
         }
 
         /// <summary>One page of sales (or, with _exportAll, every matching sale up to MaxExportRows) plus the totals.</summary>
@@ -180,7 +196,7 @@ namespace SageAdminApi.AppFunctions
                 _sqlQuery.Append("        s.GstPercent, s.TaxAmount, s.TotalAmount, s.FreeMonths, ");
                 _sqlQuery.Append("        bf.Name AS BillingFrequency, bm.Name AS BillingMethod, pm.Name AS PaymentMethod, pt.Name AS PaymentTerm, cy.Name AS Currency, ");
                 _sqlQuery.Append("        s.PrimaryContactName, s.PrimaryContactDesignation, s.PrimaryContactEmail, s.PrimaryContactPhone, ");
-                _sqlQuery.Append("        s.BillingContactName, s.BillingContactDesignation, s.BillingContactEmail, s.BillingContactPhone, s.BillToAddress ");
+                _sqlQuery.Append("        s.BillingContactName, s.BillingContactDesignation, s.BillingContactEmail, s.BillingContactPhone, s.BillToAddress, s.OrderWording ");
                 _sqlQuery.Append(" FROM dbo.Sales s ");
                 _sqlQuery.Append(" JOIN dbo.Customers cu ON cu.Id = s.CustomerId ");
                 _sqlQuery.Append(" JOIN dbo.ProductCategories c ON c.Id = s.CategoryId ");

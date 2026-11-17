@@ -45,4 +45,6 @@ export interface AdminOrderDetails {
   billingContactEmail: string | null;
   billingContactPhone: string | null;
   billToAddress: string | null;
+  /** The order form's wording sections as saved (keys as on the User Panel's order form), or null. */
+  wording: Record<string, string | null> | null;
 }

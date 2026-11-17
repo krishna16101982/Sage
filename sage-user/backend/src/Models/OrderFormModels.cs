@@ -25,6 +25,32 @@ namespace SageUserApi.Models
         public List<MasterOption> PaymentMethods { get; set; } = new List<MasterOption>();
         public List<MasterOption> PaymentTerms { get; set; } = new List<MasterOption>();
         public List<MasterOption> Currencies { get; set; } = new List<MasterOption>();
+        /// <summary>Standard wording (placeholders {freeMonths} and {gstPercent} are filled in by the form).</summary>
+        public OrderWording Wording { get; set; } = new OrderWording();
+    }
+
+    /// <summary>
+    /// The order form's wording, section by section ("Edit wording by section"). The standard text comes from Settings >
+    /// Order form wording; the seller may change any section for one order. Lines are separated by new lines.
+    /// </summary>
+    public class OrderWording
+    {
+        public string SignReturnLine { get; set; }
+        public string SignReturnInstruction { get; set; }
+        public string OrderNotes { get; set; }
+        /// <summary>Only used when the order has free months.</summary>
+        public string FreeMonthNote { get; set; }
+        /// <summary>An extra line item printed with the product (e.g. bundled seats); optional.</summary>
+        public string ExtraItemTitle { get; set; }
+        public string ExtraItemDescription { get; set; }
+        public string ProductTitle { get; set; }
+        public string ProductDescription { get; set; }
+        public string PeriodLine { get; set; }
+        public string TaxInformation { get; set; }
+        /// <summary>One clause per line.</summary>
+        public string SignatureClauses { get; set; }
+        /// <summary>One line per row.</summary>
+        public string Footer { get; set; }
     }
 
     /// <summary>A contact on an order form.</summary>
@@ -55,5 +81,7 @@ namespace SageUserApi.Models
         public OrderContact PrimaryContact { get; set; }
         public OrderContact BillingContact { get; set; }
         public string BillToAddress { get; set; }
+        /// <summary>The wording this order was saved with (null for a sale from the simple page).</summary>
+        public OrderWording Wording { get; set; }
     }
 }

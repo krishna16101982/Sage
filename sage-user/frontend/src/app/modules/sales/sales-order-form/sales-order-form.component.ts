@@ -8,7 +8,8 @@ import { OrderFormService } from '../../../services/order-form/order-form.servic
 import { errorText } from '../../../services/rest/global-rest-service';
 import { DURATION_UNITS, type CatalogCategory, type DurationUnit } from '../../../shared/interfaces/catalog.interface';
 import type { Customer } from '../../../shared/interfaces/customer.interface';
-import type { MasterOption, OrderContact, OrderFormOptions } from '../../../shared/interfaces/order-form.interface';
+import type { MasterOption, OrderContact, OrderFormOptions, OrderWording } from '../../../shared/interfaces/order-form.interface';
+import { WORDING_SECTIONS, longDate } from '../../../shared/utils/order-wording';
 import { addDays, addMonths, formatDate, today } from '../../../shared/utils/dates';
 import { formatDuration, formatInr } from '../../../shared/utils/format';
 import { CustomerPicker } from '../sales-add/customer-picker/customer-picker.component';
@@ -100,6 +101,44 @@ export class SalesOrderForm implements OnInit {
   });
   readonly currencyText = computed(() => this.nameOf(this.options()?.currencies, this.currencyId()));
 
+  // ---- 5. Edit wording by section ----
+  protected readonly wordingSections = WORDING_SECTIONS;
+  readonly wordingOpen = signal(false);
+  /** Sections the seller has changed for this order; the rest follow the standard text and the form's values. */
+  readonly wordingOverrides = signal<Partial<Record<keyof OrderWording, string>>>({});
+  /** Standard text with this order's values filled in. */
+  readonly standardWording = computed<OrderWording>(() => {
+    const std = this.options()?.wording;
+    const free = this.freeMonths();
+    const end = this.endDate();
+    const lastDay = end ? addDays(end, -1) : '';
+    return {
+      signReturnLine: std?.signReturnLine ?? '',
+      signReturnInstruction: std?.signReturnInstruction ?? '',
+      orderNotes: std?.orderNotes ?? '',
+      freeMonthNote: (std?.freeMonthNote ?? '').replace(/\{freeMonths\}/g, String(free)),
+      extraItemTitle: '',
+      extraItemDescription: '',
+      productTitle: this.product()?.name ?? '',
+      productDescription: this.product()?.description ?? this.plan()?.description ?? '',
+      periodLine: this.startDate() && lastDay
+        ? `${longDate(this.startDate())} to ${longDate(lastDay)}${free > 0 ? ` (${free} free month${free === 1 ? '' : 's'} included)` : ''}`
+        : '',
+      taxInformation: (std?.taxInformation ?? '').replace(/\{gstPercent\}/g, String(this.gstPercent() ?? 0)),
+      signatureClauses: std?.signatureClauses ?? '',
+      footer: std?.footer ?? '',
+    };
+  });
+  /** What the order will say: the seller's text where changed, otherwise the standard text. */
+  readonly wording = computed<OrderWording>(() => {
+    const std = this.standardWording();
+    const own = this.wordingOverrides();
+    const result = { ...std };
+    for (const key of Object.keys(own) as (keyof OrderWording)[]) result[key] = own[key] ?? null;
+    return result;
+  });
+  readonly changedSections = computed(() => Object.keys(this.wordingOverrides()).length);
+
   /** Problems shown under the form; Save stays disabled while there are any. */
   readonly problems = computed(() => {
     const p: string[] = [];
@@ -188,6 +227,27 @@ export class SalesOrderForm implements OnInit {
     this.billing.update((c) => ({ ...c, [field]: value }));
   }
 
+  setWording(key: keyof OrderWording, value: string): void {
+    this.wordingOverrides.update((o) => ({ ...o, [key]: value }));
+  }
+
+  /** Back to the standard text for one section (or all when no key). */
+  resetWording(key?: keyof OrderWording): void {
+    if (!key) {
+      this.wordingOverrides.set({});
+      return;
+    }
+    this.wordingOverrides.update((o) => {
+      const next = { ...o };
+      delete next[key];
+      return next;
+    });
+  }
+
+  isChanged(key: keyof OrderWording): boolean {
+    return key in this.wordingOverrides();
+  }
+
   /** "Same as primary": copies the primary contact into the billing contact. */
   copyPrimaryToBilling(): void {
     this.billing.set({ ...this.primary() });
@@ -218,6 +278,7 @@ export class SalesOrderForm implements OnInit {
         primaryContact: trim(this.primary()),
         billingContact: trim(this.billing()),
         billToAddress: this.billToAddress.trim() || undefined,
+        wording: { ...this.wording(), freeMonthNote: this.freeMonths() > 0 ? this.wording().freeMonthNote : null },
       });
       this.messages.success(`Order ${sale.saleNumber} saved.`);
       this.router.navigate(['/sales', sale.id]);
