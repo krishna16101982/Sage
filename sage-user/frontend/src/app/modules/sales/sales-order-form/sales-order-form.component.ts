@@ -9,7 +9,7 @@ import { errorText } from '../../../services/rest/global-rest-service';
 import { DURATION_UNITS, type CatalogCategory, type DurationUnit } from '../../../shared/interfaces/catalog.interface';
 import type { Customer } from '../../../shared/interfaces/customer.interface';
 import type { MasterOption, OrderContact, OrderFormOptions, OrderWording } from '../../../shared/interfaces/order-form.interface';
-import { WORDING_SECTIONS } from '../../../shared/utils/order-wording';
+import { WORDING_SECTIONS, longDate } from '../../../shared/utils/order-wording';
 import { findSeatRange, fyLabel, seatRangeLabel } from '../../../shared/utils/seat-prices';
 import { addDays, addMonths, dmy, formatDate, today } from '../../../shared/utils/dates';
 import { formatDuration, formatInr } from '../../../shared/utils/format';
@@ -38,8 +38,10 @@ export class SalesOrderForm implements OnInit {
   private readonly messages = inject(MessageService);
   protected readonly inr = formatInr;
   protected readonly date = formatDate;
-  /** dd-MM-yyyy for the order's start and end dates. */
+  /** dd-MM-yyyy for the End date field. */
   protected readonly dmy = dmy;
+  /** "16th November 2026" for the summary period (as on the order form PDF). */
+  protected readonly spaced = (date: string) => longDate(date).replace(/-/g, ' ');
   protected readonly durationText = formatDuration;
   protected readonly units = DURATION_UNITS;
   protected readonly orderDate = today();
@@ -65,6 +67,8 @@ export class SalesOrderForm implements OnInit {
   readonly quantity = signal<number | null>(1);
   readonly discountPercent = signal<number | null>(0);
   readonly gstPercent = signal<number | null>(18);
+  /** Quantity of the plan's included item (Team Link Extend seats), from the plan; the seller may change it. */
+  readonly includedItemQuantity = signal<number | null>(null);
 
   /**
    * Seat-priced plans (e.g. LinkedIn Advanced / Advanced Plus): the range the seat count falls in, for this financial
@@ -146,19 +150,21 @@ export class SalesOrderForm implements OnInit {
         .replace(/\{paidMonths\}/g, String(this.paidMonths()))
         .replace(/\{freeMonths\}/g, String(free))
         .replace(/\{totalMonths\}/g, String(this.paidMonths() + free))
-        .replace(/\{seats\}/g, String(this.quantity() ?? 0));
+        .replace(/\{seats\}/g, String(this.quantity() ?? 0))
+        .replace(/\{quantity\}/g, String(this.includedItemQuantity() ?? ''));
     const lastDay = this.endDate();
     return {
       signReturnLine: std?.signReturnLine ?? '',
       signReturnInstruction: std?.signReturnInstruction ?? '',
       orderNotes: std?.orderNotes ?? '',
-      freeMonthNote: (std?.freeMonthNote ?? '').replace(/\{freeMonths\}/g, String(free)),
+      // "{freeMonths} free months" reads "1 free month" for one month.
+      freeMonthNote: (std?.freeMonthNote ?? '').replace(/\{freeMonths\} free months/g, free === 1 ? '1 free month' : `${free} free months`).replace(/\{freeMonths\}/g, String(free)),
       extraItemTitle: plan?.includedItemTitle ?? '',
       extraItemDescription: fill(plan?.includedItemDescription),
       productTitle: product && plan ? `${product.name} ${plan.name}` : (product?.name ?? ''),
       productDescription: plan?.description || product?.description || '',
       periodLine: this.startDate() && lastDay
-        ? `${dmy(this.startDate())} to ${dmy(lastDay)}${free > 0 ? ` (${free} free month${free === 1 ? '' : 's'} included)` : ''}`
+        ? `${longDate(this.startDate())} to ${longDate(lastDay)}${free > 0 ? ` (${free} free month${free === 1 ? '' : 's'} included)` : ''}`
         : '',
       taxInformation: (std?.taxInformation ?? '').replace(/\{gstPercent\}/g, String(this.gstPercent() ?? 0)),
       signatureClauses: std?.signatureClauses ?? '',
@@ -259,6 +265,7 @@ export class SalesOrderForm implements OnInit {
       this.durationUnit.set(plan.durationUnit);
       this.durationCount.set(plan.durationCount);
     }
+    this.includedItemQuantity.set(plan?.includedItemQuantity ?? null);
   }
 
   setPrimary(field: keyof OrderContact, value: string): void {
@@ -321,6 +328,7 @@ export class SalesOrderForm implements OnInit {
         billingContact: trim(this.billing()),
         billToAddress: this.billToAddress.trim() || undefined,
         wording: { ...this.wording(), freeMonthNote: this.freeMonths() > 0 ? this.wording().freeMonthNote : null },
+        includedItemQuantity: this.wording().extraItemTitle && this.includedItemQuantity() ? Number(this.includedItemQuantity()) : undefined,
       });
       this.messages.success(`Order ${sale.saleNumber} saved.`);
       this.router.navigate(['/sales', sale.id]);

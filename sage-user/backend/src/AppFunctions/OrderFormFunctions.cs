@@ -208,6 +208,8 @@ namespace SageUserApi.AppFunctions
                 OrderWording _wording = CleanWording(_params.Wording, _errors);
                 // The free-month note only belongs on an order with free months.
                 if (_wording != null && _params.FreeMonths <= 0) _wording.FreeMonthNote = null;
+                if (_params.IncludedItemQuantity.HasValue && (_params.IncludedItemQuantity < 1 || _params.IncludedItemQuantity > 10_000_000))
+                    _errors.Add("The Team Link Extend seat quantity must be a whole number from 1 to 10000000.");
                 if (_errors.Count > 0) return (null, Invalid(_errors, _methodName));
 
                 // Free months, master values, discount limit, quantity, duration and renewal date are checked by the procedure.
@@ -229,7 +231,8 @@ namespace SageUserApi.AppFunctions
                         P("@BillingContactName", _billing?.Name), P("@BillingContactDesignation", _billing?.Designation),
                         P("@BillingContactEmail", _billing?.Email), P("@BillingContactPhone", _billing?.Phone),
                         P("@BillToAddress", _address),
-                        P("@OrderWording", _wording == null ? null : JsonSerializer.Serialize(_wording, JsonOptions))
+                        P("@OrderWording", _wording == null ? null : JsonSerializer.Serialize(_wording, JsonOptions)),
+                        P("@IncludedItemQuantity", _params.IncludedItemQuantity)
                     }, _ct);
                 }
                 catch (AppException ex)
@@ -265,7 +268,7 @@ namespace SageUserApi.AppFunctions
                 _sqlQuery.Append(" SELECT s.PublicId, s.GstPercent, s.TaxAmount, s.TotalAmount, s.FreeMonths, ");
                 _sqlQuery.Append("        bf.Name AS BillingFrequency, bm.Name AS BillingMethod, pm.Name AS PaymentMethod, pt.Name AS PaymentTerm, cy.Name AS Currency, ");
                 _sqlQuery.Append("        s.PrimaryContactName, s.PrimaryContactDesignation, s.PrimaryContactEmail, s.PrimaryContactPhone, ");
-                _sqlQuery.Append("        s.BillingContactName, s.BillingContactDesignation, s.BillingContactEmail, s.BillingContactPhone, s.BillToAddress, s.OrderWording, s.PriceFiscalYear, s.PriceSeatRange ");
+                _sqlQuery.Append("        s.BillingContactName, s.BillingContactDesignation, s.BillingContactEmail, s.BillingContactPhone, s.BillToAddress, s.OrderWording, s.PriceFiscalYear, s.PriceSeatRange, s.IncludedItemQuantity ");
                 _sqlQuery.Append(" FROM dbo.Sales s ");
                 _sqlQuery.Append(" LEFT JOIN dbo.MasterValues bf ON bf.Id = s.BillingFrequencyId ");
                 _sqlQuery.Append(" LEFT JOIN dbo.MasterValues bm ON bm.Id = s.BillingMethodId ");
@@ -321,7 +324,8 @@ namespace SageUserApi.AppFunctions
                 BillToAddress = _row.GetText("BillToAddress"),
                 Wording = ReadWording(_row.GetText("OrderWording")),
                 PriceFiscalYear = _row.GetNullableInt("PriceFiscalYear"),
-                PriceSeatRange = _row.GetText("PriceSeatRange")
+                PriceSeatRange = _row.GetText("PriceSeatRange"),
+                IncludedItemQuantity = _row.GetNullableInt("IncludedItemQuantity")
             };
         }
 

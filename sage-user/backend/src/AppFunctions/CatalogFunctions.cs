@@ -59,7 +59,7 @@ namespace SageUserApi.AppFunctions
                 _sqlQuery.Append(" SELECT c.Id AS CategoryId, c.Code AS CategoryCode, c.Name AS CategoryName, ");
                 _sqlQuery.Append("        p.Id AS ProductId, p.Code AS ProductCode, p.Name AS ProductName, p.Description AS ProductDescription, ");
                 _sqlQuery.Append("        pl.Id AS PlanId, pl.Name AS PlanName, pl.Description AS PlanDescription, ");
-                _sqlQuery.Append("        pl.IncludedItemTitle, pl.IncludedItemDescription, ");
+                _sqlQuery.Append("        pl.IncludedItemTitle, pl.IncludedItemDescription, pl.IncludedItemQuantity, ");
                 _sqlQuery.Append("        pl.DurationUnit, pl.DurationCount, pl.Price, pl.Cost ");
                 _sqlQuery.Append(" FROM dbo.ProductCategories c ");
                 _sqlQuery.Append(" JOIN dbo.Products p ON p.CategoryId = c.Id AND p.IsActive = 1 ");
@@ -86,6 +86,7 @@ namespace SageUserApi.AppFunctions
                         Description = _row.GetText("PlanDescription"),
                         IncludedItemTitle = _row.GetText("IncludedItemTitle"),
                         IncludedItemDescription = _row.GetText("IncludedItemDescription"),
+                        IncludedItemQuantity = _row.GetNullableInt("IncludedItemQuantity"),
                         DurationUnit = _row.GetText("DurationUnit"),
                         DurationCount = _row.GetInt("DurationCount"),
                         Price = _row.GetDecimal("Price"),

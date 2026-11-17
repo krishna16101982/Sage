@@ -8,9 +8,12 @@
   <label class="field-label">Team Link Extend seat: title <span class="hint">(optional; on the order form for this plan)</span>
     <input class="field" name="includedItemTitle" maxlength="200" [(ngModel)]="includedItemTitle" />
   </label>
+  <label class="field-label">Team Link Extend seat: quantity <span class="hint">(e.g. 1000; shown at ₹ 0.00 on the order form)</span>
+    <input class="field" name="includedItemQuantity" type="number" min="1" step="1" [(ngModel)]="includedItemQuantity" />
+  </label>
   <label class="field-label">Team Link Extend seat: description
     <textarea class="field" name="includedItemDescription" rows="2" maxlength="1000" [(ngModel)]="includedItemDescription"></textarea>
-    <span class="hint">Printed on the order form under the title. You can use {{ '{' }}totalMonths{{ '}' }}, {{ '{' }}paidMonths{{ '}' }}, {{ '{' }}freeMonths{{ '}' }} and {{ '{' }}seats{{ '}' }}: e.g. "{{ '{' }}totalMonths{{ '}' }} months {{ '{' }}seats{{ '}' }} Team Link Extend seats …".</span>
+    <span class="hint">Printed on the order form under the title. You can use {{ '{' }}totalMonths{{ '}' }}, {{ '{' }}paidMonths{{ '}' }}, {{ '{' }}freeMonths{{ '}' }}, {{ '{' }}quantity{{ '}' }} (the quantity above) and {{ '{' }}seats{{ '}' }}: e.g. "{{ '{' }}totalMonths{{ '}' }} months {{ '{' }}quantity{{ '}' }} Team Link Extend seats …".</span>
   </label>
   <div class="form-grid-2">
     <label class="field-label">Duration <input class="field" name="durationCount" type="number" min="1" max="120" required [(ngModel)]="durationCount" /></label>

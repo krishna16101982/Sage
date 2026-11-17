@@ -33,3 +33,6 @@ Thumbs.db
 
 # Tool crash logs
 debug.log
+
+# Order form PDFs saved by order number (OrderFormPdf:StoragePath)
+storage/

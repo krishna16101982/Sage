@@ -40,6 +40,25 @@ export class SalesView implements OnInit {
   private readonly orderFormService = inject(OrderFormService);
   protected readonly wordingSections = WORDING_SECTIONS;
   readonly wordingOpen = signal(false);
+  /** Order form PDF: busy while it is fetched; its error shows on the card. */
+  readonly pdfBusy = signal(false);
+  readonly pdfError = signal<string | null>(null);
+
+  /** Opens (preview) or saves (download) the order form PDF saved by order number. */
+  async orderPdf(download: boolean): Promise<void> {
+    const s = this.sale();
+    if (!s) return;
+    this.pdfError.set(null);
+    this.pdfBusy.set(true);
+    try {
+      if (download) await this.orderFormService.downloadPdf(s.id, s.saleNumber);
+      else await this.orderFormService.previewPdf(s.id);
+    } catch (err) {
+      this.pdfError.set(errorText(err, 'The order form PDF could not be opened.'));
+    } finally {
+      this.pdfBusy.set(false);
+    }
+  }
   readonly error = signal<string | null>(null);
   readonly notice = signal<string | null>(inject(MessageService).take());
   /** Which dialog is open. */

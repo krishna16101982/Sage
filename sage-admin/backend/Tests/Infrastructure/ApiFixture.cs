@@ -34,6 +34,8 @@ public sealed class ApiFixture : IAsyncLifetime
 
     private readonly SqlServerFixture _sql = new();
     public CapturingNotifier Notifier { get; } = new();
+    /// <summary>Order form PDFs used by the tests (not the real storage folder).</summary>
+    public static string OrderFormsPath { get; } = Path.Combine(Path.GetTempPath(), "sage-tests-order-forms", "admin-" + Guid.NewGuid().ToString("N")[..8]);
     public WebApplicationFactory<Program> Factory { get; private set; } = default!;
     public IDatabaseFunctions Db { get; private set; } = default!;
     public string ConnectionString => _sql.ConnectionString;
@@ -61,6 +63,7 @@ public sealed class ApiFixture : IAsyncLifetime
                     ["AuthSettings:RefreshCookieSecure"] = "false",
                     ["RateLimiting:AuthPermitPerMinute"] = "100000",
                     ["Serilog:FilePath"] = Path.Combine(Path.GetTempPath(), "sage-tests-logs"),
+                    ["OrderFormPdf:StoragePath"] = OrderFormsPath,
                 };
                 if (overrides != null) foreach (var kv in overrides) values[kv.Key] = kv.Value;
                 cfg.AddInMemoryCollection(values);

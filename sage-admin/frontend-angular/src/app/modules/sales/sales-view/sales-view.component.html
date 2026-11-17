@@ -59,8 +59,14 @@
 
     @if (s.orderDetails; as o) {
       <section class="card">
-        <header class="card-header"><h2 class="section-title">Order form</h2></header>
+        <header class="card-header row">
+          <h2 class="section-title">Order form</h2>
+          <span class="spacer"></span>
+          <button type="button" class="btn btn-secondary" [disabled]="pdfBusy()" (click)="orderPdf(false)">Preview PDF</button>
+          <button type="button" class="btn btn-primary" [disabled]="pdfBusy()" (click)="orderPdf(true)">Download PDF</button>
+        </header>
         <div class="card-body stack-sm text-sm">
+          @if (pdfError()) { <app-alert kind="error">{{ pdfError() }}</app-alert> }
           <div class="form-grid-3">
             <div><span class="text-muted">Free months</span><div>{{ o.freeMonths > 0 ? '+' + o.freeMonths : 'None' }}</div></div>
             <div><span class="text-muted">Billing</span><div>{{ o.billingFrequency }}, {{ o.billingMethod }}</div></div>

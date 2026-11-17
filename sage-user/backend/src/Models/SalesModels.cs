@@ -28,6 +28,8 @@ namespace SageUserApi.Models
         public string IncludedItemTitle { get; set; }
         /// <summary>May use {paidMonths}, {freeMonths}, {totalMonths} and {seats} (the order form fills them in).</summary>
         public string IncludedItemDescription { get; set; }
+        /// <summary>Standard quantity of the included item (e.g. 1000).</summary>
+        public int? IncludedItemQuantity { get; set; }
         /// <summary>List price per unit (INR) for one plan term.</summary>
         public decimal Price { get; set; }
         /// <summary>Cost per unit (INR) for one plan term.</summary>

@@ -41,6 +41,8 @@ public sealed class UserApiFixture : IAsyncLifetime
     public WebApplicationFactory<Program> Factory { get; private set; } = default!;
     public IDatabaseFunctions Db { get; private set; } = default!;
     public CapturingNotifier Notifier { get; } = new();
+    /// <summary>Order form PDFs made by the tests (not the real storage folder).</summary>
+    public static string OrderFormsPath { get; } = Path.Combine(Path.GetTempPath(), "sage-tests-order-forms", "user-" + Guid.NewGuid().ToString("N")[..8]);
 
     public async Task InitializeAsync()
     {
@@ -58,6 +60,7 @@ public sealed class UserApiFixture : IAsyncLifetime
                 ["AuthSettings:RefreshCookieSecure"] = "false",
                 ["RateLimiting:AuthPermitPerMinute"] = "100000",
                 ["Serilog:FilePath"] = Path.Combine(Path.GetTempPath(), "sage-user-tests-logs"),
+                ["OrderFormPdf:StoragePath"] = OrderFormsPath,
             }));
             b.ConfigureTestServices(services =>
             {

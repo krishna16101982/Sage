@@ -39,6 +39,72 @@ export class GlobalRestService {
     return this.request<T>('DELETE', path);
   }
 
+  /** Downloads a file (e.g. the order form PDF) and saves it; the name comes from Content-Disposition, or fallbackName. */
+  async download(path: string, fallbackName: string): Promise<void> {
+    const file = await this.file(path);
+    const url = URL.createObjectURL(file.blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.fileName ?? fallbackName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  /**
+   * Opens a file (e.g. a PDF preview) in a new browser tab. The tab is opened at once (so pop-up blockers allow it)
+   * and shows the file when it has arrived.
+   */
+  async open(path: string): Promise<void> {
+    const tab = window.open('', '_blank');
+    try {
+      const file = await this.file(path);
+      const url = URL.createObjectURL(file.blob);
+      if (tab) tab.location.href = url;
+      else window.location.href = url;
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      tab?.close();
+      throw err;
+    }
+  }
+
+  /** A file from the API (with the usual one silent refresh on 401); errors are the JSON envelope, thrown as ApiError. */
+  private async file(path: string): Promise<{ blob: Blob; fileName: string | null }> {
+    let r = await this.sendForFile(path);
+    if (r.status === 401) {
+      if (await this.refreshSession()) r = await this.sendForFile(path);
+      else this.onSessionExpired?.();
+    }
+    if (!r.ok || !r.blob) throw new ApiError(r.status, r.envelope?.messageType ?? 'SYSTEM_ERROR', r.envelope?.message ?? ['The file could not be opened. Please try again.']);
+    return { blob: r.blob, fileName: r.fileName };
+  }
+
+  private async sendForFile(path: string): Promise<{ ok: boolean; status: number; blob: Blob | null; fileName: string | null; envelope: ApiResponse<unknown> | null }> {
+    let headers = new HttpHeaders({ Accept: 'application/pdf, application/json' });
+    if (this.accessToken) headers = headers.set('Authorization', `Bearer ${this.accessToken}`);
+    try {
+      const res = await firstValueFrom(
+        this.http.get(`${environment.apiBaseUrl}${path}`, { headers, withCredentials: true, observe: 'response', responseType: 'blob' }),
+      );
+      return { ok: true, status: res.status, blob: res.body, fileName: fileNameOf(res.headers.get('Content-Disposition')), envelope: null };
+    } catch (err) {
+      if (err instanceof HttpErrorResponse) {
+        // The error body arrives as a Blob because of responseType 'blob'; it holds the usual JSON envelope.
+        let envelope: ApiResponse<unknown> | null = null;
+        try {
+          const parsed = err.error instanceof Blob ? JSON.parse(await err.error.text()) : null;
+          envelope = parsed && typeof parsed === 'object' && 'status' in parsed ? parsed : null;
+        } catch {
+          envelope = null;
+        }
+        return { ok: false, status: err.status, blob: null, fileName: null, envelope };
+      }
+      throw err;
+    }
+  }
+
   /** Single-flight refresh: parallel 401s share one refresh call. */
   refreshSession(): Promise<LoginResponse | null> {
     if (!this.refreshing) {
@@ -88,6 +154,15 @@ export class GlobalRestService {
       throw err;
     }
   }
+}
+
+/** filename="x.pdf" or filename*=UTF-8''x.pdf from a Content-Disposition header. */
+function fileNameOf(header: string | null): string | null {
+  if (!header) return null;
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (star) return decodeURIComponent(star[1].trim());
+  const plain = /filename="?([^";]+)"?/i.exec(header);
+  return plain ? plain[1].trim() : null;
 }
 
 /** Builds "?a=1&b=x" from an object, skipping empty values. */

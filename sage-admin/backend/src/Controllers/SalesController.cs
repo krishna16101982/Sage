@@ -80,5 +80,26 @@ namespace SageAdminApi.Controllers
         [RequirePermission(PermissionConstants.SalesView)]
         public Task<IActionResult> GetSale(Guid id, CancellationToken _ct)
             => RunAsync<AdminSaleDto>("C:Sales:GetSale", () => _salesReportFunctions.GetSaleAsync(id, _ct));
+
+        /// <summary>The order form PDF saved by the User Panel ({SaleNumber}.pdf). download=true saves it; otherwise it opens (preview).</summary>
+        [HttpGet("{id:guid}/order-form-pdf")]
+        [RequirePermission(PermissionConstants.SalesView)]
+        public async Task<IActionResult> GetOrderFormPdf(Guid id, [FromQuery] bool download, [FromServices] IOrderFormPdfStore _store, CancellationToken _ct)
+        {
+            try
+            {
+                (OrderFormPdfFile _file, IFunctionReturn _functionReturn) = await _store.GetAsync(id, _ct);
+                if (!_functionReturn.Status) return ApplicationCommonFunctions.ErrorResult(_apiResponse, _functionReturn);
+                Response.Headers.CacheControl = "no-store";
+                if (download) return File(_file.Content, "application/pdf", _file.FileName);
+                Response.Headers.ContentDisposition = $"inline; filename=\"{_file.FileName}\"";
+                return File(_file.Content, "application/pdf");
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error("C:Sales:GetOrderFormPdf", ex.Message, ex);
+                return ApplicationCommonFunctions.SystemErrorResult(_apiResponse);
+            }
+        }
     }
 }

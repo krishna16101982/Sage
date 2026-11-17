@@ -36,7 +36,8 @@ CREATE OR ALTER PROCEDURE dbo.usp_SaleOrder_Create
     @BillingContactEmail        NVARCHAR(256)  = NULL,
     @BillingContactPhone        NVARCHAR(20)   = NULL,
     @BillToAddress              NVARCHAR(500)  = NULL,
-    @OrderWording               NVARCHAR(MAX)  = NULL   -- JSON: the order form's wording sections (DDL 031)
+    @OrderWording               NVARCHAR(MAX)  = NULL,  -- JSON: the order form's wording sections (DDL 031)
+    @IncludedItemQuantity       INT            = NULL   -- quantity of the plan's included item, e.g. Team Link Extend seats (DDL 034)
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -66,6 +67,8 @@ BEGIN
         THROW 50400, 'Choose a currency from the list', 1;
     IF @OrderWording IS NOT NULL AND ISJSON(@OrderWording) = 0
         THROW 50400, 'The order wording is not valid', 1;
+    IF @IncludedItemQuantity IS NOT NULL AND (@IncludedItemQuantity < 1 OR @IncludedItemQuantity > 10000000)
+        THROW 50400, 'The Team Link Extend seat quantity must be between 1 and 10000000', 1;
     IF NULLIF(LTRIM(RTRIM(@PrimaryContactName)), N'') IS NULL
         THROW 50400, 'Enter the primary contact''s name', 1;
 
@@ -157,7 +160,8 @@ BEGIN
         BillingContactName = @BillingContactName, BillingContactDesignation = @BillingContactDesignation,
         BillingContactEmail = @BillingContactEmail, BillingContactPhone = @BillingContactPhone,
         BillToAddress = @BillToAddress,
-        OrderWording = @OrderWording
+        OrderWording = @OrderWording,
+        IncludedItemQuantity = @IncludedItemQuantity
     WHERE PublicId = @publicId;
 
     COMMIT;

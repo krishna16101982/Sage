@@ -137,6 +137,26 @@ public class MastersApiTests
         order.GetProperty("wording").GetProperty("signReturnLine").GetString().ShouldBe("Sign and return to i2k2");
         order.GetProperty("wording").GetProperty("footer").GetString().ShouldBe("Line 1\nLine 2");
 
+        // The order form PDF the User Panel saves by order number: 404 until saved, then the file itself.
+        async Task<HttpResponseMessage> Pdf()
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, $"/api/admin/sales/{saleId}/order-form-pdf?download=true");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            return await _fx.CreateClient().SendAsync(request);
+        }
+        (await Pdf()).StatusCode.ShouldBe(System.Net.HttpStatusCode.NotFound);
+        var number = sale.Data.GetProperty("saleNumber").GetString()!;
+        var folder = Path.Combine(ApiFixture.OrderFormsPath, number);
+        Directory.CreateDirectory(folder);
+        await File.WriteAllBytesAsync(Path.Combine(folder, number + ".pdf"), System.Text.Encoding.ASCII.GetBytes("%PDF-1.4 test"));
+        using (var pdf = await Pdf())
+        {
+            pdf.StatusCode.ShouldBe(System.Net.HttpStatusCode.OK);
+            pdf.Content.Headers.ContentType!.MediaType.ShouldBe("application/pdf");
+            pdf.Content.Headers.ContentDisposition!.FileName!.Trim('"').ShouldBe(number + ".pdf");
+            System.Text.Encoding.ASCII.GetString(await pdf.Content.ReadAsByteArrayAsync()).ShouldBe("%PDF-1.4 test");
+        }
+
         // The list carries the totals too; a simple sale has no order details.
         var list = await Call(HttpMethod.Get, $"/api/admin/sales?sellerId={await _fx.Db.ExecuteScalarAsync<Guid>("SELECT PublicId FROM dbo.SalesUsers WHERE Id = @id", new[] { TestDb.P("@id", seller) })}", token);
         list.Data.GetProperty("items")[0].GetProperty("totalAmount").GetDecimal().ShouldBe(2124m);

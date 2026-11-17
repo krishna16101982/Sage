@@ -177,6 +177,26 @@ public class OrderFormApiTests
         var d = (await Call(HttpMethod.Get, $"{Api}/order-form/{res.Data.GetProperty("id").GetGuid()}", bearer: token)).Data;
         d.GetProperty("priceFiscalYear").GetInt32().ShouldBe(fy);
         d.GetProperty("priceSeatRange").GetString().ShouldBe("10-19");
+
+        // The order form PDF was saved by order number when the order was saved, and opens for the seller.
+        var saleId = res.Data.GetProperty("id").GetGuid();
+        var saleNumber = res.Data.GetProperty("saleNumber").GetString()!;
+        var saved = Path.Combine(UserApiFixture.OrderFormsPath, saleNumber, saleNumber + ".pdf");
+        File.Exists(saved).ShouldBeTrue(saved);
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{Api}/order-form/{saleId}/pdf?download=true");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        using var pdf = await _fx.CreateClient().SendAsync(request);
+        pdf.StatusCode.ShouldBe(System.Net.HttpStatusCode.OK);
+        pdf.Content.Headers.ContentType!.MediaType.ShouldBe("application/pdf");
+        pdf.Content.Headers.ContentDisposition!.FileName!.Trim('"').ShouldBe(saleNumber + ".pdf");
+        var bytes = await pdf.Content.ReadAsByteArrayAsync();
+        System.Text.Encoding.ASCII.GetString(bytes, 0, 5).ShouldBe("%PDF-");
+        bytes.ShouldBe(await File.ReadAllBytesAsync(saved));
+
+        // Another seller cannot open it.
+        using var other = new HttpRequestMessage(HttpMethod.Get, $"{Api}/order-form/{saleId}/pdf");
+        other.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", await TokenAsync(await SalesData.CreateAsync(_fx.Db)));
+        (await _fx.CreateClient().SendAsync(other)).StatusCode.ShouldBe(System.Net.HttpStatusCode.NotFound);
     }
 
     [Fact]

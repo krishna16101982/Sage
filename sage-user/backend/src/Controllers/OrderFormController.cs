@@ -21,11 +21,14 @@ namespace SageUserApi.Controllers
     public class OrderFormController : SalesControllerBase
     {
         private readonly IOrderFormFunctions _orderFormFunctions;
+        private readonly IOrderFormPdfFunctions _orderFormPdfFunctions;
 
-        public OrderFormController(ILoggerFunctions __loggerFunctions, IApiResponse __apiResponse, ISalesUserContextFunctions __userContext, IOrderFormFunctions __orderFormFunctions)
+        public OrderFormController(ILoggerFunctions __loggerFunctions, IApiResponse __apiResponse, ISalesUserContextFunctions __userContext, IOrderFormFunctions __orderFormFunctions,
+                                   IOrderFormPdfFunctions __orderFormPdfFunctions)
             : base(__loggerFunctions, __apiResponse, __userContext)
         {
             _orderFormFunctions = __orderFormFunctions;
+            _orderFormPdfFunctions = __orderFormPdfFunctions;
         }
 
         /// <summary>Billing / payment lists (active values, defaults marked), default GST, most free months, discount and backdating limits.</summary>
@@ -41,6 +44,8 @@ namespace SageUserApi.Controllers
         public Task<IActionResult> CreateOrder([FromBody] HttpOrderFormPostParams _params, CancellationToken _ct) => WithUserAsync("C:OrderForm:CreateOrder", async _user =>
         {
             var (_sale, _fr) = await _orderFormFunctions.CreateOrderAsync(_params, _user, ClientIp, _ct);
+            // The order form PDF is made and saved by order number right away (a failure is logged; it is made again when opened).
+            if (_fr.Status && _sale != null) await _orderFormPdfFunctions.CreateAsync(_sale.Id, _ct);
             return Result(_sale, _fr);
         }, _ct);
 
@@ -50,6 +55,18 @@ namespace SageUserApi.Controllers
         {
             var (_details, _fr) = await _orderFormFunctions.GetOrderDetailsAsync(saleId, _user, _ct);
             return Result(_details, _fr);
+        }, _ct);
+
+        /// <summary>The order form PDF ({SaleNumber}.pdf). download=true saves it; otherwise it opens in the browser (preview).</summary>
+        [HttpGet("{saleId:guid}/pdf")]
+        public Task<IActionResult> GetPdf(Guid saleId, [FromQuery] bool download, CancellationToken _ct) => WithUserAsync("C:OrderForm:GetPdf", async _user =>
+        {
+            var (_file, _fr) = await _orderFormPdfFunctions.GetAsync(saleId, _user, _ct);
+            if (!_fr.Status) return Result<object>(null, _fr);
+            Response.Headers.CacheControl = "no-store";
+            if (download) return File(_file.Content, "application/pdf", _file.FileName);
+            Response.Headers.ContentDisposition = $"inline; filename=\"{_file.FileName}\"";
+            return File(_file.Content, "application/pdf");
         }, _ct);
     }
 }

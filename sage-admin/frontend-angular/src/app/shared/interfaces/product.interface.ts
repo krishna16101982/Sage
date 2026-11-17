@@ -17,6 +17,8 @@ export interface ProductPlan {
   includedItemTitle: string | null;
   /** May use {paidMonths}, {freeMonths}, {totalMonths} and {seats}. */
   includedItemDescription: string | null;
+  /** Standard quantity of the included item on an order (e.g. 1000). */
+  includedItemQuantity: number | null;
   /** Priced by seat range per financial year; price/cost above are then only a fallback. */
   hasSeatPrices: boolean;
 }

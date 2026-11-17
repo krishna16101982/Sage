@@ -6,6 +6,7 @@ CREATE OR ALTER PROCEDURE dbo.usp_ProductPlan_Update
     @Description   NVARCHAR(1000) = NULL,
     @IncludedItemTitle       NVARCHAR(200)  = NULL,
     @IncludedItemDescription NVARCHAR(1000) = NULL,
+    @IncludedItemQuantity    INT            = NULL,
     @DurationUnit  VARCHAR(10),
     @DurationCount INT,
     @Price         DECIMAL(18,2),
@@ -29,6 +30,7 @@ BEGIN
 
     UPDATE dbo.ProductPlans
     SET Name = @Name, Description = @Description, IncludedItemTitle = @IncludedItemTitle, IncludedItemDescription = @IncludedItemDescription,
+        IncludedItemQuantity = @IncludedItemQuantity,
         DurationUnit = @DurationUnit, DurationCount = @DurationCount,
         Price = @Price, Cost = @Cost, SortOrder = @SortOrder, IsActive = @IsActive,
         UpdatedAtUtc = SYSUTCDATETIME(), UpdatedBy = @ActorUserId

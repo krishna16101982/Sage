@@ -86,5 +86,7 @@ namespace SageUserApi.Models
         /// <summary>Seat-priced plans: the financial year (2027 = FY27) and seat range the price came from, e.g. "10-19" or "50000+". Null = the plan's single price.</summary>
         public int? PriceFiscalYear { get; set; }
         public string PriceSeatRange { get; set; }
+        /// <summary>Quantity of the included item (e.g. 1000 Team Link Extend seats), or null.</summary>
+        public int? IncludedItemQuantity { get; set; }
     }
 }

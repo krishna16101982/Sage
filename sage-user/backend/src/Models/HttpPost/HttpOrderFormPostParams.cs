@@ -35,6 +35,8 @@ namespace SageUserApi.Models.HttpPost
         public string BillToAddress { get; set; }
         /// <summary>"Edit wording by section": the final text of each section for this order.</summary>
         public OrderWording Wording { get; set; }
+        /// <summary>Quantity of the plan's included item on this order (e.g. 1000 Team Link Extend seats); empty = none.</summary>
+        public int? IncludedItemQuantity { get; set; }
     }
 
     public class OrderContactParams

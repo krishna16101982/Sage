@@ -70,6 +70,8 @@ export interface OrderInput {
   billingContact: OrderContact;
   billToAddress?: string;
   wording: OrderWording;
+  /** Quantity of the plan's included item (e.g. 1000 Team Link Extend seats). */
+  includedItemQuantity?: number;
 }
 
 /** GET /api/user/order-form/{saleId} */
@@ -93,4 +95,5 @@ export interface OrderDetails {
   /** Seat-priced plans: the financial year and seat range ("10-19", "50000+") the price came from; null = the plan's single price. */
   priceFiscalYear: number | null;
   priceSeatRange: string | null;
+  includedItemQuantity: number | null;
 }

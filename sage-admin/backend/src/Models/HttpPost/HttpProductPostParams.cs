@@ -55,6 +55,8 @@ namespace SageAdminApi.Models.HttpPost
         public string IncludedItemTitle { get; set; }
         /// <summary>May use {paidMonths}, {freeMonths}, {totalMonths} and {seats}.</summary>
         public string IncludedItemDescription { get; set; }
+        /// <summary>Standard quantity of the included item on an order (e.g. 1000 Team Link Extend seats).</summary>
+        public int? IncludedItemQuantity { get; set; }
     }
 
     public class HttpProductPlanPutParams : HttpProductPlanPostParams

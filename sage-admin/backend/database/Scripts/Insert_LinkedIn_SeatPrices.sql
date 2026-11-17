@@ -17,8 +17,9 @@ DECLARE @AdvancedPlusCost  DECIMAL(18,2) = 0;             -- cost per seat for a
 
 DECLARE @AdvancedDescription NVARCHAR(1000) = N'Find leads and forge deeper relationships by leveraging real-time sales intelligence and team collaboration. Provides access to relevant lead and account insights, powered by LinkedIn''s professional network data. Includes 50 InMail messages per month, Buyer Interest, BI Integrations, List Sharing, Smart Links, Team Link, and other features. Get even more out of Sales Navigator with access to qualifying Sales Navigator Success Plans, which include onboarding, education, adoption, and support resources. Learn more here: https://lnkd.in/SuccessPlans';
 DECLARE @TeamLinkTitle       NVARCHAR(200)  = N'Sales Navigator Team Link Extend Seat';
--- {totalMonths} is filled in on the order form (paid + free months, e.g. 14).
-DECLARE @TeamLinkDescription NVARCHAR(1000) = N'{totalMonths} months 1000 Team Link Extend seats which are included with Customer''s Sales Navigator Advanced or Advanced Plus purchase.';
+-- {totalMonths} (paid + free months, e.g. 14) and {quantity} (e.g. 1000) are filled in on the order form.
+DECLARE @TeamLinkQuantity    INT            = 1000;
+DECLARE @TeamLinkDescription NVARCHAR(1000) = N'{totalMonths} months {quantity} Team Link Extend seats which are included with Customer''s Sales Navigator Advanced or Advanced Plus purchase.';
 
 -- Seat ranges and prices per seat (MaxSeats NULL = 50,000 and above).
 DECLARE @Prices TABLE (MinSeats INT, MaxSeats INT NULL, AdvancedFY26 DECIMAL(18,2), AdvancedFY27 DECIMAL(18,2), PlusFY26 DECIMAL(18,2), PlusFY27 DECIMAL(18,2));
@@ -58,7 +59,7 @@ BEGIN
     DECLARE @created TABLE (Id BIGINT);
     INSERT @created EXEC dbo.usp_ProductPlan_Create
         @ProductId = @productId, @Name = N'Advanced', @Description = @AdvancedDescription,
-        @IncludedItemTitle = @TeamLinkTitle, @IncludedItemDescription = @TeamLinkDescription,
+        @IncludedItemTitle = @TeamLinkTitle, @IncludedItemDescription = @TeamLinkDescription, @IncludedItemQuantity = @TeamLinkQuantity,
         @DurationUnit = 'Year', @DurationCount = 1, @Price = @advancedPrice, @Cost = @AdvancedCost, @SortOrder = 1;
     SET @advancedId = (SELECT TOP 1 Id FROM @created);
     DELETE @created;
@@ -72,14 +73,14 @@ BEGIN
     -- Advanced Plus description: add it in Admin Panel > Products > Edit plan (not in the price sheet).
     INSERT @createdPlus EXEC dbo.usp_ProductPlan_Create
         @ProductId = @productId, @Name = N'Advanced Plus', @Description = NULL,
-        @IncludedItemTitle = @TeamLinkTitle, @IncludedItemDescription = @TeamLinkDescription,
+        @IncludedItemTitle = @TeamLinkTitle, @IncludedItemDescription = @TeamLinkDescription, @IncludedItemQuantity = @TeamLinkQuantity,
         @DurationUnit = 'Year', @DurationCount = 1, @Price = @plusPrice, @Cost = @AdvancedPlusCost, @SortOrder = 2;
     SET @plusId = (SELECT TOP 1 Id FROM @createdPlus);
 END
 
 -- Existing plans: add the Team Link Extend text only where it is missing.
 UPDATE dbo.ProductPlans
-SET IncludedItemTitle = @TeamLinkTitle, IncludedItemDescription = @TeamLinkDescription, UpdatedAtUtc = SYSUTCDATETIME()
+SET IncludedItemTitle = @TeamLinkTitle, IncludedItemDescription = @TeamLinkDescription, IncludedItemQuantity = @TeamLinkQuantity, UpdatedAtUtc = SYSUTCDATETIME()
 WHERE Id IN (@advancedId, @plusId) AND IncludedItemTitle IS NULL;
 
 -- 2. Seat prices (details): each plan and year replaced as a whole.

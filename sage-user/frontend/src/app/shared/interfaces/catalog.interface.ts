@@ -12,6 +12,8 @@ export interface CatalogPlan {
   includedItemTitle: string | null;
   /** May use {paidMonths}, {freeMonths}, {totalMonths} and {seats}. */
   includedItemDescription: string | null;
+  /** Standard quantity of the included item (e.g. 1000). */
+  includedItemQuantity: number | null;
   /** List price per unit for one plan term. */
   price: number;
   /** Cost per unit for one plan term. */

@@ -45,6 +45,8 @@ namespace SageAdminApi.Models
         public string IncludedItemTitle { get; set; }
         /// <summary>May use {paidMonths}, {freeMonths}, {totalMonths} and {seats}.</summary>
         public string IncludedItemDescription { get; set; }
+        /// <summary>Standard quantity of the included item on an order (e.g. 1000).</summary>
+        public int? IncludedItemQuantity { get; set; }
         /// <summary>True when the plan is priced by seat range (dbo.ProductPlanSeatPrices); Price/Cost are then only a fallback.</summary>
         public bool HasSeatPrices { get; set; }
     }

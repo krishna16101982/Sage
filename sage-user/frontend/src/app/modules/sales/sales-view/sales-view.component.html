@@ -86,8 +86,14 @@
     @if (order(); as o) {
       @if (o.hasOrderForm) {
         <section class="card">
-          <header class="card-header"><h2 class="section-title">Order form</h2></header>
+          <header class="card-header row">
+            <h2 class="section-title">Order form</h2>
+            <span class="spacer"></span>
+            <button type="button" class="btn btn-secondary" [disabled]="pdfBusy()" (click)="orderPdf(false)">Preview PDF</button>
+            <button type="button" class="btn btn-primary" [disabled]="pdfBusy()" (click)="orderPdf(true)">Download PDF</button>
+          </header>
           <div class="card-body stack-sm text-sm">
+            @if (pdfError()) { <app-alert kind="error">{{ pdfError() }}</app-alert> }
             <table class="data-table">
               <tbody>
                 <tr><td>Sale amount</td><td class="amount">{{ inr(s.saleAmount) }}</td></tr>

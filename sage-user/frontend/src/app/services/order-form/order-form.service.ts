@@ -11,4 +11,7 @@ export class OrderFormService {
   options = () => this.rest.get<OrderFormOptions>('/api/user/order-form/options');
   create = (body: OrderInput) => this.rest.post<Sale>('/api/user/order-form', body);
   details = (saleId: string) => this.rest.get<OrderDetails>(`/api/user/order-form/${saleId}`);
+  /** The order form PDF saved by order number: opened in a new tab (preview) or saved as {saleNumber}.pdf. */
+  previewPdf = (saleId: string) => this.rest.open(`/api/user/order-form/${saleId}/pdf`);
+  downloadPdf = (saleId: string, saleNumber: string) => this.rest.download(`/api/user/order-form/${saleId}/pdf?download=true`, `${saleNumber}.pdf`);
 }

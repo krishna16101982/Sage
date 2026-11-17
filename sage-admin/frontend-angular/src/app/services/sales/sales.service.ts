@@ -13,6 +13,9 @@ export class SalesService {
   summary = (q: { groupBy: 'seller' | 'manager'; soldFrom?: string; soldTo?: string }) =>
     this.rest.get<SalesSummaryRow[]>(`${this.base}/summary${toQuery(q)}`);
   sellers = () => this.rest.get<SellerOption[]>(`${this.base}/sellers`);
+  /** The order form PDF the User Panel saved by order number: opened in a new tab (preview) or saved as {saleNumber}.pdf. */
+  previewOrderPdf = (id: string) => this.rest.open(`${this.base}/${id}/order-form-pdf`);
+  downloadOrderPdf = (id: string, saleNumber: string) => this.rest.download(`${this.base}/${id}/order-form-pdf?download=true`, `${saleNumber}.pdf`);
   /** Every sale matching the filters (no paging) as a CSV file; the server refuses more than 50,000. */
   exportList = (q: Omit<SaleQuery, 'page' | 'pageSize'>) => this.rest.download(`${this.base}/export${toQuery(q)}`, 'sales.csv');
   exportSummary = (q: { groupBy: 'seller' | 'manager'; soldFrom?: string; soldTo?: string }) =>

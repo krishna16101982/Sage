@@ -55,6 +55,27 @@ export class GlobalRestService {
     saveFile(r.blob, r.fileName ?? fallbackName);
   }
 
+  /**
+   * Opens a file (e.g. a PDF preview) in a new browser tab. The tab is opened at once (so pop-up blockers allow it)
+   * and shows the file when it has arrived.
+   */
+  async open(path: string): Promise<void> {
+    const tab = window.open('', '_blank');
+    let r = await this.sendForFile(path);
+    if (r.status === 401) {
+      if (await this.refreshSession()) r = await this.sendForFile(path);
+      else this.onSessionExpired?.();
+    }
+    if (!r.ok || !r.blob) {
+      tab?.close();
+      throw new ApiError(r.status, r.envelope?.messageType ?? 'SYSTEM_ERROR', r.envelope?.message ?? ['The file could not be opened. Please try again.']);
+    }
+    const url = URL.createObjectURL(r.blob);
+    if (tab) tab.location.href = url;
+    else window.location.href = url;
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+
   /** Single-flight refresh: parallel 401s share one refresh call. */
   refreshSession(): Promise<LoginResponse | null> {
     if (!this.refreshing) {
@@ -106,7 +127,7 @@ export class GlobalRestService {
   }
 
   private async sendForFile(path: string): Promise<{ ok: boolean; status: number; blob: Blob | null; fileName: string | null; envelope: ApiResponse<unknown> | null }> {
-    let headers = new HttpHeaders({ Accept: 'text/csv, application/json' });
+    let headers = new HttpHeaders({ Accept: 'text/csv, application/pdf, application/json' });
     if (this.accessToken) headers = headers.set('Authorization', `Bearer ${this.accessToken}`);
     try {
       const res = await firstValueFrom(

@@ -26,12 +26,30 @@ export class SalesView implements OnInit {
   protected readonly durationText = formatDuration;
   readonly sale = signal<Sale | null>(null);
   readonly error = signal<string | null>(null);
+  readonly pdfBusy = signal(false);
+  readonly pdfError = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
     try {
       this.sale.set(await this.service.get(this.id()));
     } catch (err) {
       this.error.set(errorText(err, 'Sale not found.'));
+    }
+  }
+
+  /** Opens (preview) or saves (download) the order form PDF saved by the User Panel. */
+  async orderPdf(download: boolean): Promise<void> {
+    const s = this.sale();
+    if (!s) return;
+    this.pdfError.set(null);
+    this.pdfBusy.set(true);
+    try {
+      if (download) await this.service.downloadOrderPdf(s.id, s.saleNumber);
+      else await this.service.previewOrderPdf(s.id);
+    } catch (err) {
+      this.pdfError.set(errorText(err, 'The order form PDF could not be opened.'));
+    } finally {
+      this.pdfBusy.set(false);
     }
   }
 }

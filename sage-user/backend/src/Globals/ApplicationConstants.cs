@@ -69,6 +69,7 @@ namespace SageUserApi.Globals
             public const string CorsAllowedOrigins = "Cors:AllowedOrigins";
             public const string AuthSettings = "AuthSettings";
             public const string RateLimitAuthPermit = "RateLimiting:AuthPermitPerMinute";
+            public const string OrderFormPdf = "OrderFormPdf";
         }
 
         public static class SeriLog

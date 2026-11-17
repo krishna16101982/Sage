@@ -32,6 +32,15 @@ namespace SageUserApi.AppFunctions.Interfaces
     }
 
     /// <summary>The New order form: lists and defaults, saving an order, its details for a sale.</summary>
+    /// <summary>The order form PDF, saved by order number (see OrderFormPdfSettings).</summary>
+    public interface IOrderFormPdfFunctions
+    {
+        /// <summary>Makes and saves the PDF of a just-saved order; failures are logged, not thrown.</summary>
+        Task CreateAsync(Guid _saleId, CancellationToken _ct = default);
+        /// <summary>The saved PDF (made now if missing) of an order the user may see.</summary>
+        Task<(OrderFormPdfFile file, IFunctionReturn functionReturn)> GetAsync(Guid _saleId, SalesUserContext _user, CancellationToken _ct = default);
+    }
+
     public interface IOrderFormFunctions
     {
         Task<(OrderFormOptions options, IFunctionReturn functionReturn)> GetOptionsAsync(CancellationToken _ct = default);

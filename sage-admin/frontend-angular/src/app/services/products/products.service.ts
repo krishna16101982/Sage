@@ -12,6 +12,7 @@ export interface PlanInput {
   sortOrder: number;
   includedItemTitle?: string;
   includedItemDescription?: string;
+  includedItemQuantity?: number;
 }
 
 /** /api/admin/products — categories, products and plans (price list). */

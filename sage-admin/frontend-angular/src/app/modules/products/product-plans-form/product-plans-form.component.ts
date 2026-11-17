@@ -24,6 +24,7 @@ export class ProductPlansForm implements OnInit {
   description = '';
   includedItemTitle = '';
   includedItemDescription = '';
+  includedItemQuantity: number | null = null;
   durationUnit: DurationUnit = 'Year';
   durationCount = 1;
   sortOrder = 0;
@@ -49,6 +50,7 @@ export class ProductPlansForm implements OnInit {
       this.description = p.description ?? '';
       this.includedItemTitle = p.includedItemTitle ?? '';
       this.includedItemDescription = p.includedItemDescription ?? '';
+      this.includedItemQuantity = p.includedItemQuantity;
       this.durationUnit = p.durationUnit;
       this.durationCount = p.durationCount;
       this.price.set(p.price);
@@ -72,6 +74,7 @@ export class ProductPlansForm implements OnInit {
         sortOrder: Number(this.sortOrder) || 0,
         includedItemTitle: this.includedItemTitle.trim() || undefined,
         includedItemDescription: this.includedItemDescription.trim() || undefined,
+        includedItemQuantity: this.includedItemQuantity === null || `${this.includedItemQuantity}` === '' ? undefined : Number(this.includedItemQuantity),
       };
       const p = this.plan();
       if (p) await this.service.updatePlan(p.id, { ...data, isActive: this.active });
