@@ -4,3 +4,8 @@
   @if (!found() && !error()) { <p class="text-sm text-muted">Loading...</p> }
   @if (found(); as f) { <app-product-plans-form [product]="f.product" [plan]="f.plan" (saved)="saved($event)" /> }
 </div>
+@if (found(); as f) {
+  <div class="stack max-w-3xl" style="margin-top: 1.5rem">
+    <app-product-plan-seat-prices [plan]="f.plan" />
+  </div>
+}

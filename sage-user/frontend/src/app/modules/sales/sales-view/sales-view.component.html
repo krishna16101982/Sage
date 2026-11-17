@@ -96,6 +96,7 @@
               </tbody>
             </table>
             <div class="form-grid-3">
+              @if (o.priceSeatRange) { <div><span class="text-muted">Seat price</span><div>FY{{ (o.priceFiscalYear ?? 0) % 100 }}, {{ o.priceSeatRange }} seats</div></div> }
               <div><span class="text-muted">Free months</span><div>{{ o.freeMonths > 0 ? '+' + o.freeMonths : 'None' }}</div></div>
               <div><span class="text-muted">Billing</span><div>{{ o.billingFrequency }}, {{ o.billingMethod }}</div></div>
               <div><span class="text-muted">Payment</span><div>{{ o.paymentMethod }}, {{ o.paymentTerm }}</div></div>

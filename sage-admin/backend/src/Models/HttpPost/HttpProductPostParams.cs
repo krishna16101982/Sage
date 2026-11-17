@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace SageAdminApi.Models.HttpPost
 {
     public class HttpProductCategoryPostParams
@@ -54,5 +56,22 @@ namespace SageAdminApi.Models.HttpPost
     public class HttpProductPlanPutParams : HttpProductPlanPostParams
     {
         public bool IsActive { get; set; } = true;
+    }
+
+    /// <summary>All seat ranges of a plan for one financial year. An empty list removes that year.</summary>
+    public class HttpPlanSeatPricesPutParams
+    {
+        public List<HttpSeatPriceRange> Ranges { get; set; } = new List<HttpSeatPriceRange>();
+    }
+
+    public class HttpSeatPriceRange
+    {
+        public int? MinSeats { get; set; }
+        /// <summary>Blank = "and above" (last range only).</summary>
+        public int? MaxSeats { get; set; }
+        /// <summary>Per seat, INR, at most 2 decimals.</summary>
+        public decimal? Price { get; set; }
+        /// <summary>Optional; blank = the plan's own cost.</summary>
+        public decimal? Cost { get; set; }
     }
 }

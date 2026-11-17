@@ -10,6 +10,7 @@ import { DURATION_UNITS, type CatalogCategory, type DurationUnit } from '../../.
 import type { Customer } from '../../../shared/interfaces/customer.interface';
 import type { MasterOption, OrderContact, OrderFormOptions, OrderWording } from '../../../shared/interfaces/order-form.interface';
 import { WORDING_SECTIONS, longDate } from '../../../shared/utils/order-wording';
+import { findSeatRange, fyLabel, seatRangeLabel } from '../../../shared/utils/seat-prices';
 import { addDays, addMonths, formatDate, today } from '../../../shared/utils/dates';
 import { formatDuration, formatInr } from '../../../shared/utils/format';
 import { CustomerPicker } from '../sales-add/customer-picker/customer-picker.component';
@@ -40,6 +41,8 @@ export class SalesOrderForm implements OnInit {
   protected readonly durationText = formatDuration;
   protected readonly units = DURATION_UNITS;
   protected readonly orderDate = today();
+  protected readonly fyLabel = fyLabel;
+  protected readonly rangeLabel = seatRangeLabel;
 
   readonly catalog = signal<CatalogCategory[] | null>(null);
   readonly options = signal<OrderFormOptions | null>(null);
@@ -61,7 +64,22 @@ export class SalesOrderForm implements OnInit {
   readonly discountPercent = signal<number | null>(0);
   readonly gstPercent = signal<number | null>(18);
 
-  readonly listAmount = computed(() => r2((this.plan()?.price ?? 0) * (this.quantity() ?? 0)));
+  /**
+   * Seat-priced plans (e.g. LinkedIn Advanced / Advanced Plus): the range the seat count falls in, for this financial
+   * year. Every seat is charged that range's price (8 seats -> the 1-9 price, 150 seats -> the 100-199 price).
+   */
+  readonly seatRange = computed(() => {
+    const plan = this.plan();
+    const seats = Number(this.quantity());
+    return plan?.hasSeatPrices && seats >= 1 ? findSeatRange(plan.seatPrices, seats) : null;
+  });
+  /** Price per seat: the seat range's price, or the plan's single price. */
+  readonly unitPrice = computed(() => {
+    const plan = this.plan();
+    if (!plan) return 0;
+    return plan.hasSeatPrices ? (this.seatRange()?.price ?? 0) : plan.price;
+  });
+  readonly listAmount = computed(() => r2(this.unitPrice() * (this.quantity() ?? 0)));
   readonly discountAmount = computed(() => r2((this.listAmount() * (this.discountPercent() ?? 0)) / 100));
   readonly saleAmount = computed(() => r2(this.listAmount() - this.discountAmount()));
   readonly taxAmount = computed(() => r2((this.saleAmount() * (this.gstPercent() ?? 0)) / 100));
@@ -146,6 +164,12 @@ export class SalesOrderForm implements OnInit {
     if (!this.plan()) p.push('Choose a category, product and plan.');
     const q = this.quantity();
     if (q === null || q < 1 || q > 100000 || !Number.isInteger(q)) p.push('Seats must be a whole number from 1 to 100000.');
+    else {
+      const plan = this.plan();
+      if (plan?.hasSeatPrices && plan.seatPrices.length === 0)
+        p.push(`This plan has no seat prices for ${fyLabel(plan.priceFiscalYear ?? 0)} yet. Ask the admin to add them.`);
+      else if (plan?.hasSeatPrices && !this.seatRange()) p.push(`No seat price covers ${q} seats for this plan.`);
+    }
     const d = this.discountPercent();
     const maxDiscount = this.options()?.maxDiscountPercent ?? 100;
     if (d === null || d < 0 || d > 100) p.push('Discount must be from 0 to 100%.');

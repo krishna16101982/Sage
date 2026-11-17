@@ -106,12 +106,44 @@ namespace SageUserApi.AppFunctions
                     }).ToList()
                 }).ToList();
 
+                await AddSeatPricesAsync(_rows.Select(x => x.Plan).ToList(), _ct);
                 return (_catalog, _functionReturn);
             }
             catch (Exception ex)
             {
                 _loggerFunctions.Error(_methodName, ex.Message, ex);
                 return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
+
+        /// <summary>
+        /// Seat prices (DDL 032) for the financial year of today in India, the same year dbo.usp_SaleOrder_Create uses.
+        /// A plan that has seat prices but none for this year gets HasSeatPrices = true and an empty list (it cannot be sold
+        /// on the order form until the admin adds them).
+        /// </summary>
+        private async Task AddSeatPricesAsync(List<CatalogPlan> _plans, CancellationToken _ct)
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" DECLARE @today DATE = CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '+05:30') AS DATE); ");
+            _sqlQuery.Append(" DECLARE @fy INT = CASE WHEN MONTH(@today) >= 4 THEN YEAR(@today) + 1 ELSE YEAR(@today) END; ");
+            _sqlQuery.Append(" SELECT @fy AS FiscalYear, pl.Id AS PlanId, sp.MinSeats, sp.MaxSeats, sp.Price, ISNULL(sp.Cost, pl.Cost) AS Cost ");
+            _sqlQuery.Append(" FROM dbo.ProductPlans pl ");
+            _sqlQuery.Append(" LEFT JOIN dbo.ProductPlanSeatPrices sp ON sp.PlanId = pl.Id AND sp.FiscalYear = @fy ");
+            _sqlQuery.Append(" WHERE pl.IsActive = 1 AND EXISTS (SELECT 1 FROM dbo.ProductPlanSeatPrices x WHERE x.PlanId = pl.Id) ");
+            _sqlQuery.Append(" ORDER BY pl.Id, sp.MinSeats ");
+
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(_sqlQuery.ToString(), null, "F:Catalog:SeatPrices", _ct);
+            EnsureRead(_functionReturn);
+
+            Dictionary<long, CatalogPlan> _byId = _plans.ToDictionary(p => p.Id);
+            foreach (DataRow _row in _dataTable.Rows)
+            {
+                if (!_byId.TryGetValue(_row.GetLong("PlanId"), out CatalogPlan _plan)) continue;
+                _plan.HasSeatPrices = true;
+                _plan.PriceFiscalYear = _row.GetInt("FiscalYear");
+                int? _min = _row.GetNullableInt("MinSeats");
+                if (_min.HasValue)
+                    _plan.SeatPrices.Add(new CatalogSeatPrice { MinSeats = _min.Value, MaxSeats = _row.GetNullableInt("MaxSeats"), Price = _row.GetDecimal("Price"), Cost = _row.GetDecimal("Cost") });
             }
         }
     }

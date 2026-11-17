@@ -47,6 +47,9 @@ namespace SageAdminApi.Models
         public string BillToAddress { get; set; }
         /// <summary>The order form's wording sections as saved (JSON object), or null.</summary>
         public System.Text.Json.JsonElement? Wording { get; set; }
+        /// <summary>Seat-priced plans: the financial year (2027 = FY27) and seat range ("10-19", "50000+") the price came from.</summary>
+        public int? PriceFiscalYear { get; set; }
+        public string PriceSeatRange { get; set; }
     }
 }
 

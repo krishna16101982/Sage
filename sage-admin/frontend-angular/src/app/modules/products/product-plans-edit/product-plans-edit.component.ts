@@ -6,12 +6,13 @@ import { MessageService } from '../../../services/message/message.service';
 import { ProductsService } from '../../../services/products/products.service';
 import { errorText } from '../../../services/rest/global-rest-service';
 import type { Product, ProductPlan } from '../../../shared/interfaces/product.interface';
+import { ProductPlanSeatPrices } from '../product-plan-seat-prices/product-plan-seat-prices.component';
 import { ProductPlansForm } from '../product-plans-form/product-plans-form.component';
 
-/** /products/plans/:id/edit — edit a plan's details, price and cost. */
+/** /products/plans/:id/edit — edit a plan's details, price and cost, and its seat prices per financial year. */
 @Component({
   selector: 'app-product-plans-edit',
-  imports: [Alert, PageHeader, ProductPlansForm],
+  imports: [Alert, PageHeader, ProductPlansForm, ProductPlanSeatPrices],
   templateUrl: './product-plans-edit.component.html',
 })
 export class ProductPlansEdit implements OnInit {

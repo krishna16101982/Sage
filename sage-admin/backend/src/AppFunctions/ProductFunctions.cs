@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -30,7 +32,9 @@ namespace SageAdminApi.AppFunctions
         // The three catalog tables are read whole (tens of rows) or by Id; the caller adds WHERE / ORDER BY.
         private const string CategoryColumns = " SELECT Id, Code, Name, Description, SortOrder, IsActive FROM dbo.ProductCategories ";
         private const string ProductColumns = " SELECT Id, CategoryId, Code, Name, Description, SortOrder, IsActive FROM dbo.Products ";
-        private const string PlanColumns = " SELECT Id, ProductId, Name, Description, DurationUnit, DurationCount, Price, Cost, SortOrder, IsActive FROM dbo.ProductPlans ";
+        private const string PlanColumns = " SELECT Id, ProductId, Name, Description, DurationUnit, DurationCount, Price, Cost, SortOrder, IsActive, "
+                                         + " CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.ProductPlanSeatPrices sp WHERE sp.PlanId = dbo.ProductPlans.Id) THEN 1 ELSE 0 END AS BIT) AS HasSeatPrices "
+                                         + " FROM dbo.ProductPlans ";
 
         private readonly ILoggerFunctions _loggerFunctions;
         private readonly IDatabaseFunctions _databaseFunctions;
@@ -78,7 +82,8 @@ namespace SageAdminApi.AppFunctions
             Price = _row.GetDecimal("Price"),
             Cost = _row.GetDecimal("Cost"),
             SortOrder = _row.GetInt("SortOrder"),
-            IsActive = _row.GetBool("IsActive")
+            IsActive = _row.GetBool("IsActive"),
+            HasSeatPrices = _row.GetBool("HasSeatPrices")
         };
 
         /// <summary>Runs one catalog SELECT and maps its rows.</summary>
@@ -319,6 +324,89 @@ namespace SageAdminApi.AppFunctions
                 await AuditAsync(_actorUserId, _existing.IsActive != _updated.IsActive ? ApplicationEnumeration.AuditAction.StatusChange : ApplicationEnumeration.AuditAction.Update,
                     ApplicationEnumeration.ObjectType.ProductPlan, _id, Snapshot(_existing), Snapshot(_updated), _ipAddress, _ct);
                 return (_updated, Ok(_methodName, "Plan updated."));
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
+
+        /// <summary>Reads a plan's seat ranges, grouped by financial year (newest first).</summary>
+        private async Task<List<PlanSeatPriceYear>> ReadSeatPricesAsync(long _planId, int? _fiscalYear, CancellationToken _ct)
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            _sqlQuery.Append(" SELECT FiscalYear, MinSeats, MaxSeats, Price, Cost FROM dbo.ProductPlanSeatPrices ");
+            _sqlQuery.Append(" WHERE PlanId = @planId ");
+            if (_fiscalYear.HasValue) _sqlQuery.Append(" AND FiscalYear = @fiscalYear ");
+            _sqlQuery.Append(" ORDER BY FiscalYear DESC, MinSeats ");
+
+            var _parameters = new List<SqlParameter> { P("@planId", _planId) };
+            if (_fiscalYear.HasValue) _parameters.Add(P("@fiscalYear", _fiscalYear.Value));
+
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(_sqlQuery.ToString(), _parameters.ToArray(), "F:Product:ReadSeatPrices", _ct);
+            EnsureRead(_functionReturn);
+
+            var _rows = _dataTable.MapRows(_row => new
+            {
+                FiscalYear = _row.GetInt("FiscalYear"),
+                Range = new SeatPriceRange
+                {
+                    MinSeats = _row.GetInt("MinSeats"),
+                    MaxSeats = _row.GetNullableInt("MaxSeats"),
+                    Price = _row.GetDecimal("Price"),
+                    Cost = _row.GetNullableDecimal("Cost")
+                }
+            });
+            return _rows.GroupBy(x => x.FiscalYear)
+                        .Select(g => new PlanSeatPriceYear { FiscalYear = g.Key, Ranges = g.Select(x => x.Range).ToList() })
+                        .ToList();
+        }
+
+        public async Task<(List<PlanSeatPriceYear> years, IFunctionReturn functionReturn)> GetSeatPricesAsync(long _planId, CancellationToken _ct = default)
+        {
+            string _methodName = "F:Product:GetSeatPrices";
+            try
+            {
+                if (await GetPlanByIdAsync(_planId, _ct) == null)
+                    return (null, ApplicationCommonFunctions.NotFound(ApplicationConstants.ValidationMessages.PlanNotFound, _methodName));
+                return (await ReadSeatPricesAsync(_planId, null, _ct), new FunctionReturn { MethodName = _methodName });
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
+
+        public async Task<(PlanSeatPriceYear year, IFunctionReturn functionReturn)> SaveSeatPricesAsync(long _planId, int _fiscalYear, HttpPlanSeatPricesPutParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default)
+        {
+            #region Local Variables
+            string _methodName = "F:Product:SaveSeatPrices";
+            IFunctionReturn _functionReturn;
+            #endregion
+            try
+            {
+                _functionReturn = ApplicationValidationFunctions.ValidateSeatPrices(_fiscalYear, _params?.Ranges, _methodName);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+
+                if (await GetPlanByIdAsync(_planId, _ct) == null)
+                    return (null, ApplicationCommonFunctions.NotFound(ApplicationConstants.ValidationMessages.PlanNotFound, _methodName));
+                PlanSeatPriceYear _before = (await ReadSeatPricesAsync(_planId, _fiscalYear, _ct)).FirstOrDefault();
+
+                // The procedure checks that the ranges start at 1 and follow on without gaps or overlaps, then replaces the year.
+                string _ranges = JsonSerializer.Serialize(_params.Ranges.Select(r => new { minSeats = r.MinSeats, maxSeats = r.MaxSeats, price = r.Price, cost = r.Cost }));
+                (_functionReturn, _) = await _databaseFunctions.ExecuteProcedureWriteAsync(SP.ProductPlanSeatPriceSaveYear, new[]
+                {
+                    P("@PlanId", _planId), P("@FiscalYear", _fiscalYear), P("@Ranges", _ranges), P("@ActorUserId", _actorUserId)
+                }, _methodName, null, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+
+                PlanSeatPriceYear _after = (await ReadSeatPricesAsync(_planId, _fiscalYear, _ct)).FirstOrDefault()
+                                           ?? new PlanSeatPriceYear { FiscalYear = _fiscalYear };
+                await AuditAsync(_actorUserId, ApplicationEnumeration.AuditAction.Update, ApplicationEnumeration.ObjectType.ProductPlan, _planId,
+                    _before == null ? null : new { SeatPrices = _before }, new { SeatPrices = _after }, _ipAddress, _ct);
+                return (_after, Ok(_methodName, _after.Ranges.Count == 0 ? $"Seat prices for FY{_fiscalYear % 100:00} removed." : $"Seat prices for FY{_fiscalYear % 100:00} saved."));
             }
             catch (Exception ex)
             {

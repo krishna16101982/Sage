@@ -28,6 +28,22 @@ namespace SageUserApi.Models
         public decimal Price { get; set; }
         /// <summary>Cost per unit (INR) for one plan term.</summary>
         public decimal Cost { get; set; }
+        /// <summary>True when the plan is priced by seat range (even if the current financial year has no prices yet).</summary>
+        public bool HasSeatPrices { get; set; }
+        /// <summary>The financial year SeatPrices are for (the current one: 2027 = FY27 = Apr 2026 to Mar 2027).</summary>
+        public int? PriceFiscalYear { get; set; }
+        /// <summary>This financial year's seat ranges: every seat of an order costs the price of the range its seat count falls in.</summary>
+        public List<CatalogSeatPrice> SeatPrices { get; set; } = new List<CatalogSeatPrice>();
+    }
+
+    /// <summary>One seat range of a plan. Price and Cost are per seat for one plan term (Cost already falls back to the plan's).</summary>
+    public class CatalogSeatPrice
+    {
+        public int MinSeats { get; set; }
+        /// <summary>Null = "and above".</summary>
+        public int? MaxSeats { get; set; }
+        public decimal Price { get; set; }
+        public decimal Cost { get; set; }
     }
 
     public class CatalogProduct

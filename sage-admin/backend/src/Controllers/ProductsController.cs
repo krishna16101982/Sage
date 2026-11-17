@@ -109,5 +109,29 @@ namespace SageAdminApi.Controllers
             //*************************************************************
             return RunAsync<ProductPlanDto>("C:Products:UpdatePlan", async () => await _productFunctions.UpdatePlanAsync(id, _params, await ActorIdAsync(_ct), ClientIp, _ct));
         }
+
+        /// <summary>A plan's seat prices by financial year (2027 = FY27, Apr 2026 to Mar 2027), newest first.</summary>
+        [HttpGet]
+        [Route("plans/{id:long}/seat-prices")]
+        [RequirePermission(PermissionConstants.ProductView)]
+        public Task<IActionResult> GetSeatPrices(long id, CancellationToken _ct)
+        {
+            //*************************************************************
+            // Required Permission: Product.View
+            //*************************************************************
+            return RunAsync<List<PlanSeatPriceYear>>("C:Products:GetSeatPrices", () => _productFunctions.GetSeatPricesAsync(id, _ct));
+        }
+
+        /// <summary>Replace all seat ranges of a plan for one financial year (an empty list removes that year).</summary>
+        [HttpPut]
+        [Route("plans/{id:long}/seat-prices/{fiscalYear:int}")]
+        [RequirePermission(PermissionConstants.ProductEdit)]
+        public Task<IActionResult> SaveSeatPrices(long id, int fiscalYear, [FromBody] HttpPlanSeatPricesPutParams _params, CancellationToken _ct)
+        {
+            //*************************************************************
+            // Required Permission: Product.Edit
+            //*************************************************************
+            return RunAsync<PlanSeatPriceYear>("C:Products:SaveSeatPrices", async () => await _productFunctions.SaveSeatPricesAsync(id, fiscalYear, _params, await ActorIdAsync(_ct), ClientIp, _ct));
+        }
     }
 }

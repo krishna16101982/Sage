@@ -76,6 +76,9 @@ namespace SageAdminApi.Globals
             public const string DurationCountInvalid = "Duration must be between 1 and 120";
             public const string PriceInvalid = "Price is required: 0 or more, at most 2 decimal places";
             public const string CostInvalid = "Cost is required: 0 or more, at most 2 decimal places";
+            public const string FiscalYearInvalid = "Choose a financial year between FY00 and FY99 (2000-2100)";
+            public const string SeatRangesTooMany = "A year can have at most 100 seat ranges";
+            public const string SeatRangeInvalid = "Each seat range needs a first seat of 1 or more, a last seat that is not before it (or blank for 'and above'), a price, and an optional cost: 0 or more, at most 2 decimal places";
             public const string FirstNameRequired = "First name is required (max 100 characters)";
             public const string LastNameRequired = "Last name is required (max 100 characters)";
             public const string SalesRoleInvalid = "Role must be SalesPerson or SalesManager";

@@ -140,6 +140,41 @@ public class OrderFormApiTests
     }
 
     [Fact]
+    public async Task SeatPricedPlan_CatalogHasThisYearsRanges_AndTheOrderUsesTheRangeForTheSeats()
+    {
+        var token = await TokenAsync(await SalesData.CreateAsync(_fx.Db));
+        var options = (await Call(HttpMethod.Get, $"{Api}/order-form/options", bearer: token)).Data;
+        var plan = await PlanAsync(price: 1000m, cost: 600m);
+        var india = DateTime.UtcNow.AddMinutes(330);
+        int fy = india.Month >= 4 ? india.Year + 1 : india.Year;
+        // This year: 1-9 at 111578, 10-19 at 107116 (cost 90000), 20+ at 100000. Last year is ignored.
+        await _fx.Db.ExecuteNonQueryAsync(
+            "INSERT dbo.ProductPlanSeatPrices (PlanId, FiscalYear, MinSeats, MaxSeats, Price, Cost) VALUES " +
+            "(@p, @fy, 1, 9, 111578, NULL), (@p, @fy, 10, 19, 107116, 90000), (@p, @fy, 20, NULL, 100000, NULL), (@p, @fy - 1, 1, NULL, 5, NULL)",
+            new[] { TestDb.P("@p", plan), TestDb.P("@fy", fy) });
+
+        var catalogPlan = (await Call(HttpMethod.Get, $"{Api}/catalog", bearer: token)).Data.EnumerateArray()
+            .SelectMany(c => c.GetProperty("products").EnumerateArray()).SelectMany(p => p.GetProperty("plans").EnumerateArray())
+            .Single(p => p.GetProperty("id").GetInt64() == plan);
+        catalogPlan.GetProperty("hasSeatPrices").GetBoolean().ShouldBeTrue();
+        catalogPlan.GetProperty("priceFiscalYear").GetInt32().ShouldBe(fy);
+        var ranges = catalogPlan.GetProperty("seatPrices");
+        ranges.GetArrayLength().ShouldBe(3);
+        ranges[0].GetProperty("cost").GetDecimal().ShouldBe(600m);          // blank cost = the plan's cost
+        ranges[1].GetProperty("cost").GetDecimal().ShouldBe(90000m);
+        ranges[2].GetProperty("maxSeats").ValueKind.ShouldBe(JsonValueKind.Null);
+
+        // 11 seats -> the 10-19 range: 11 x 107116 = 1178276, less the 1100 discount.
+        var res = await Call(HttpMethod.Post, $"{Api}/order-form", Order(await CustomerAsync(token), plan, options), token);
+        res.Status.ShouldBe(201, res.Root.ToString());
+        res.Data.GetProperty("listAmount").GetDecimal().ShouldBe(1178276m);
+        res.Data.GetProperty("saleAmount").GetDecimal().ShouldBe(1177176m);
+        var d = (await Call(HttpMethod.Get, $"{Api}/order-form/{res.Data.GetProperty("id").GetGuid()}", bearer: token)).Data;
+        d.GetProperty("priceFiscalYear").GetInt32().ShouldBe(fy);
+        d.GetProperty("priceSeatRange").GetString().ShouldBe("10-19");
+    }
+
+    [Fact]
     public async Task CreateOrder_RefusesWrongValues_AndSavesNothing()
     {
         var person = await SalesData.CreateAsync(_fx.Db);

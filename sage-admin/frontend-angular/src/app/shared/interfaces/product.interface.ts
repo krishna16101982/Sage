@@ -13,6 +13,24 @@ export interface ProductPlan {
   cost: number;
   sortOrder: number;
   isActive: boolean;
+  /** Priced by seat range per financial year; price/cost above are then only a fallback. */
+  hasSeatPrices: boolean;
+}
+
+/** One seat range: every seat of an order in this range costs `price` (per seat, one plan term). */
+export interface SeatPriceRange {
+  minSeats: number;
+  /** null = "and above". */
+  maxSeats: number | null;
+  price: number;
+  /** null = the plan's own cost. */
+  cost: number | null;
+}
+
+/** A plan's seat ranges for one Indian financial year: 2027 = FY27 = Apr 2026 to Mar 2027. */
+export interface PlanSeatPriceYear {
+  fiscalYear: number;
+  ranges: SeatPriceRange[];
 }
 
 export interface Product {

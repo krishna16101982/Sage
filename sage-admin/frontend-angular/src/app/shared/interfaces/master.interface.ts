@@ -47,4 +47,7 @@ export interface AdminOrderDetails {
   billToAddress: string | null;
   /** The order form's wording sections as saved (keys as on the User Panel's order form), or null. */
   wording: Record<string, string | null> | null;
+  /** Seat-priced plans: the financial year and seat range ("10-19", "50000+") the price came from; null = the plan's single price. */
+  priceFiscalYear: number | null;
+  priceSeatRange: string | null;
 }

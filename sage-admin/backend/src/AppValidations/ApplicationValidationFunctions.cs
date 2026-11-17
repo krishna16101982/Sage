@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using SageAdminApi.Globals;
 using SageCommonLib.AppValidations;
@@ -210,6 +211,23 @@ namespace SageAdminApi.AppValidations
             if (_durationCount < 1 || _durationCount > 120) _errors.Add(ApplicationConstants.ValidationMessages.DurationCountInvalid);
             if (!IsValidAmount(_price)) _errors.Add(ApplicationConstants.ValidationMessages.PriceInvalid);
             if (!IsValidAmount(_cost)) _errors.Add(ApplicationConstants.ValidationMessages.CostInvalid);
+            return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
+        }
+
+        /// <summary>
+        /// Validate one financial year of seat prices (row by row). The procedure checks that the ranges start at 1 and
+        /// follow on without gaps or overlaps.
+        /// </summary>
+        public static IFunctionReturn ValidateSeatPrices(int _fiscalYear, List<Models.HttpPost.HttpSeatPriceRange> _ranges, string _methodName)
+        {
+            var _errors = new List<string>();
+            if (_fiscalYear < 2000 || _fiscalYear > 2100) _errors.Add(ApplicationConstants.ValidationMessages.FiscalYearInvalid);
+            if (_ranges == null) _errors.Add(ApplicationConstants.ValidationMessages.SeatRangeInvalid);
+            else if (_ranges.Count > 100) _errors.Add(ApplicationConstants.ValidationMessages.SeatRangesTooMany);
+            else if (_ranges.Any(r => r == null || !r.MinSeats.HasValue || r.MinSeats < 1 || r.MinSeats > 10_000_000
+                                      || (r.MaxSeats.HasValue && (r.MaxSeats < r.MinSeats || r.MaxSeats > 10_000_000))
+                                      || !IsValidAmount(r.Price) || (r.Cost.HasValue && !IsValidAmount(r.Cost))))
+                _errors.Add(ApplicationConstants.ValidationMessages.SeatRangeInvalid);
             return _errors.Count == 0 ? new FunctionReturn { MethodName = _methodName } : Invalid(_errors, _methodName);
         }
 

@@ -90,4 +90,7 @@ export interface OrderDetails {
   billToAddress: string | null;
   /** The wording this order was saved with (null for a sale from the simple page). */
   wording: OrderWording | null;
+  /** Seat-priced plans: the financial year and seat range ("10-19", "50000+") the price came from; null = the plan's single price. */
+  priceFiscalYear: number | null;
+  priceSeatRange: string | null;
 }

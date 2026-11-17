@@ -1,0 +1,116 @@
+<section class="card">
+  <header class="card-header row">
+    <h2 class="section-title">Seat prices</h2>
+    <span class="spacer"></span>
+    <label class="field-label row">
+      <span>Financial year</span>
+      <select class="field" name="fiscalYear" [ngModel]="fiscalYear()" (ngModelChange)="chooseYear($event)">
+        @for (fy of yearOptions(); track fy) {
+          <option [ngValue]="fy">{{ fyLabel(fy) }} ({{ fyPeriod(fy) }}){{ savedYears().includes(fy) ? '' : ' – not set' }}{{ fy === currentFy ? ' · current' : '' }}</option>
+        }
+      </select>
+    </label>
+  </header>
+
+  <div class="stack">
+    <p class="hint">
+      Price per seat for one plan term ({{ plan().durationCount }} {{ plan().durationUnit }}{{ plan().durationCount === 1 ? '' : 's' }}).
+      On the order form every seat is charged the price of the range the seat count falls in, for the financial year of the order date
+      (8 seats → the 1–9 price; 150 seats → the 100–199 price). Cost blank = the plan's cost ({{ inr(plan().cost) }}).
+      A plan with no seat prices sells at its single price.
+    </p>
+
+    @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+    @if (notice()) { <app-alert kind="success">{{ notice() }}</app-alert> }
+    @if (!loaded()) { <p class="text-sm text-muted">Loading...</p> }
+
+    @if (loaded()) {
+      @if (canEdit) {
+        <div class="row" style="flex-wrap: wrap; gap: 0.5rem">
+          <button type="button" class="btn btn-secondary" (click)="showPaste.set(!showPaste())">Paste from Excel</button>
+          @if (savedYears().length > 0) {
+            <span class="text-sm text-muted">Copy from</span>
+            <select class="field" style="width: auto" name="copyFrom" [(ngModel)]="copyFrom">
+              @for (fy of savedYears(); track fy) { @if (fy !== fiscalYear()) { <option [ngValue]="fy">{{ fyLabel(fy) }}</option> } }
+            </select>
+            <span class="text-sm text-muted">change %</span>
+            <input class="field" style="width: 6rem" type="number" step="0.1" name="copyPercent" [(ngModel)]="copyPercent" />
+            <button type="button" class="btn btn-secondary" [disabled]="!copyFrom || copyFrom === fiscalYear()" (click)="copyYear()">Copy</button>
+          }
+        </div>
+      }
+
+      @if (showPaste()) {
+        <div class="subcard stack">
+          <label class="field-label">Paste rows: seat range (or first and last seat), price per seat, optional cost per seat
+            <textarea class="field" rows="8" name="paste" placeholder="1-9	111578&#10;10-19	107116&#10;...&#10;50,000+	45000" [(ngModel)]="pasteText"></textarea>
+          </label>
+          <div class="row" style="gap: 0.5rem">
+            <button type="button" class="btn btn-primary" (click)="applyPaste()">Use these rows</button>
+            <button type="button" class="btn btn-secondary" (click)="showPaste.set(false)">Cancel</button>
+          </div>
+        </div>
+      }
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Seats</th><th class="amount">From</th><th class="amount">To</th><th class="amount">Price per seat (₹)</th><th class="amount">Cost per seat (₹)</th><th></th></tr>
+          </thead>
+          <tbody>
+            @for (r of ranges(); track $index; let i = $index) {
+              <tr>
+                <td class="font-medium">{{ rangeLabel(r) }}@if (r.problem) { <div class="text-sm text-danger">{{ r.problem }}</div> }</td>
+                <td class="amount">{{ r.minSeats.toLocaleString('en-IN') }}</td>
+                <td class="amount">
+                  @if (canEdit) {
+                    <input class="field text-right" type="number" min="1" step="1" [name]="'max' + i" placeholder="and above"
+                      [ngModel]="rows()[i].maxSeats" (ngModelChange)="setRow(i, 'maxSeats', $event)" />
+                  } @else { {{ r.maxSeats === null ? 'and above' : r.maxSeats.toLocaleString('en-IN') }} }
+                </td>
+                <td class="amount">
+                  @if (canEdit) {
+                    <input class="field text-right" type="number" min="0" step="0.01" [name]="'price' + i"
+                      [ngModel]="rows()[i].price" (ngModelChange)="setRow(i, 'price', $event)" />
+                  } @else { {{ inr(r.price) }} }
+                </td>
+                <td class="amount">
+                  @if (canEdit) {
+                    <input class="field text-right" type="number" min="0" step="0.01" [name]="'cost' + i" placeholder="plan cost"
+                      [ngModel]="rows()[i].cost" (ngModelChange)="setRow(i, 'cost', $event)" />
+                  } @else { {{ r.cost === null ? '—' : inr(r.cost) }} }
+                </td>
+                <td class="actions">@if (canEdit) { <button type="button" class="link-button text-sm" (click)="removeRow(i)">Remove</button> }</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="6" class="table-empty">No seat prices for {{ fyLabel(fiscalYear()) }}. @if (canEdit) { Add ranges, paste them, or copy another year. }</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (canEdit) {
+        <div class="row" style="gap: 0.5rem; flex-wrap: wrap">
+          <button type="button" class="btn btn-secondary" (click)="addRow()">Add range</button>
+          <span class="spacer"></span>
+          @if (isSaved()) { <button type="button" class="btn btn-secondary" [disabled]="busy()" (click)="removeYear()">Remove {{ fyLabel(fiscalYear()) }}</button> }
+          <button type="button" class="btn btn-primary" [disabled]="busy() || !dirty() || hasProblems() || rows().length === 0" (click)="save()">
+            {{ busy() ? 'Please wait...' : 'Save ' + fyLabel(fiscalYear()) + ' prices' }}
+          </button>
+        </div>
+      }
+
+      @if (ranges().length > 0) {
+        <div class="row text-sm" style="gap: 0.5rem; flex-wrap: wrap">
+          <span class="text-muted">Check:</span>
+          <input class="field" style="width: 7rem" type="number" min="1" name="testSeats" [ngModel]="testSeats()" (ngModelChange)="testSeats.set($event)" />
+          <span class="text-muted">seats →</span>
+          @if (test(); as t) {
+            @if (t.range) { <span>{{ rangeLabel(t.range) }} range · {{ inr(t.range.price) }} × {{ t.seats.toLocaleString('en-IN') }} = <span class="font-medium">{{ inr(t.total) }}</span></span> }
+            @else { <span class="text-danger">no range covers {{ t.seats.toLocaleString('en-IN') }} seats</span> }
+          }
+        </div>
+      }
+    }
+  </div>
+</section>

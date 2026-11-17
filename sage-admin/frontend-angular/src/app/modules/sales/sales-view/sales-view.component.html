@@ -75,6 +75,7 @@
                 <div class="text-muted">{{ o.billingContactEmail }} {{ o.billingContactPhone }}</div></div>
             }
           </div>
+          @if (o.priceSeatRange) { <div><span class="text-muted">Seat price</span><div>FY{{ (o.priceFiscalYear ?? 0) % 100 }}, {{ o.priceSeatRange }} seats</div></div> }
           @if (o.billToAddress) { <div><span class="text-muted">Bill to</span><div style="white-space: pre-line">{{ o.billToAddress }}</div></div> }
         </div>
       </section>

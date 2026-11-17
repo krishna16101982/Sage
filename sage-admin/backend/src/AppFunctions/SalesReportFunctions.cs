@@ -106,7 +106,9 @@ namespace SageAdminApi.AppFunctions
                         BillingContactEmail = _row.GetText("BillingContactEmail"),
                         BillingContactPhone = _row.GetText("BillingContactPhone"),
                         BillToAddress = _row.GetText("BillToAddress"),
-                        Wording = ParseJson(_row.GetText("OrderWording"))
+                        Wording = ParseJson(_row.GetText("OrderWording")),
+                        PriceFiscalYear = _row.GetNullableInt("PriceFiscalYear"),
+                        PriceSeatRange = _row.GetText("PriceSeatRange")
                     }
                     : null
             };
@@ -196,7 +198,7 @@ namespace SageAdminApi.AppFunctions
                 _sqlQuery.Append("        s.GstPercent, s.TaxAmount, s.TotalAmount, s.FreeMonths, ");
                 _sqlQuery.Append("        bf.Name AS BillingFrequency, bm.Name AS BillingMethod, pm.Name AS PaymentMethod, pt.Name AS PaymentTerm, cy.Name AS Currency, ");
                 _sqlQuery.Append("        s.PrimaryContactName, s.PrimaryContactDesignation, s.PrimaryContactEmail, s.PrimaryContactPhone, ");
-                _sqlQuery.Append("        s.BillingContactName, s.BillingContactDesignation, s.BillingContactEmail, s.BillingContactPhone, s.BillToAddress, s.OrderWording ");
+                _sqlQuery.Append("        s.BillingContactName, s.BillingContactDesignation, s.BillingContactEmail, s.BillingContactPhone, s.BillToAddress, s.OrderWording, s.PriceFiscalYear, s.PriceSeatRange ");
                 _sqlQuery.Append(" FROM dbo.Sales s ");
                 _sqlQuery.Append(" JOIN dbo.Customers cu ON cu.Id = s.CustomerId ");
                 _sqlQuery.Append(" JOIN dbo.ProductCategories c ON c.Id = s.CategoryId ");

@@ -265,7 +265,7 @@ namespace SageUserApi.AppFunctions
                 _sqlQuery.Append(" SELECT s.PublicId, s.GstPercent, s.TaxAmount, s.TotalAmount, s.FreeMonths, ");
                 _sqlQuery.Append("        bf.Name AS BillingFrequency, bm.Name AS BillingMethod, pm.Name AS PaymentMethod, pt.Name AS PaymentTerm, cy.Name AS Currency, ");
                 _sqlQuery.Append("        s.PrimaryContactName, s.PrimaryContactDesignation, s.PrimaryContactEmail, s.PrimaryContactPhone, ");
-                _sqlQuery.Append("        s.BillingContactName, s.BillingContactDesignation, s.BillingContactEmail, s.BillingContactPhone, s.BillToAddress, s.OrderWording ");
+                _sqlQuery.Append("        s.BillingContactName, s.BillingContactDesignation, s.BillingContactEmail, s.BillingContactPhone, s.BillToAddress, s.OrderWording, s.PriceFiscalYear, s.PriceSeatRange ");
                 _sqlQuery.Append(" FROM dbo.Sales s ");
                 _sqlQuery.Append(" LEFT JOIN dbo.MasterValues bf ON bf.Id = s.BillingFrequencyId ");
                 _sqlQuery.Append(" LEFT JOIN dbo.MasterValues bm ON bm.Id = s.BillingMethodId ");
@@ -319,7 +319,9 @@ namespace SageUserApi.AppFunctions
                 PrimaryContact = Contact(_row, "PrimaryContact"),
                 BillingContact = Contact(_row, "BillingContact"),
                 BillToAddress = _row.GetText("BillToAddress"),
-                Wording = ReadWording(_row.GetText("OrderWording"))
+                Wording = ReadWording(_row.GetText("OrderWording")),
+                PriceFiscalYear = _row.GetNullableInt("PriceFiscalYear"),
+                PriceSeatRange = _row.GetText("PriceSeatRange")
             };
         }
 

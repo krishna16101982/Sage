@@ -41,6 +41,10 @@ namespace SageAdminApi.AppFunctions.Interfaces
         Task<(ProductDto product, IFunctionReturn functionReturn)> UpdateProductAsync(long _id, HttpProductPutParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
         Task<(ProductPlanDto plan, IFunctionReturn functionReturn)> CreatePlanAsync(long _productId, HttpProductPlanPostParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
         Task<(ProductPlanDto plan, IFunctionReturn functionReturn)> UpdatePlanAsync(long _id, HttpProductPlanPutParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
+        /// <summary>A plan's seat prices, newest financial year first.</summary>
+        Task<(List<PlanSeatPriceYear> years, IFunctionReturn functionReturn)> GetSeatPricesAsync(long _planId, CancellationToken _ct = default);
+        /// <summary>Replaces all seat ranges of one plan for one financial year (empty list = remove that year).</summary>
+        Task<(PlanSeatPriceYear year, IFunctionReturn functionReturn)> SaveSeatPricesAsync(long _planId, int _fiscalYear, HttpPlanSeatPricesPutParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
     }
 
     public interface ISalesUserFunctions

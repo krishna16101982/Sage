@@ -76,7 +76,7 @@
                   <input class="field" name="quantity" type="number" min="1" max="100000" step="1" [ngModel]="quantity()" (ngModelChange)="quantity.set($event)" />
                 </label>
                 <div class="field-label">Unit price (per seat)
-                  <div class="field amount">{{ plan() ? inr(plan()!.price) : '-' }}</div>
+                  <div class="field amount">{{ plan() && (!plan()!.hasSeatPrices || seatRange()) ? inr(unitPrice()) : '-' }}</div>
                 </div>
                 <label class="field-label">Discount %
                   <input class="field" name="discountPercent" type="number" min="0" max="100" step="0.01" [ngModel]="discountPercent()" (ngModelChange)="discountPercent.set($event)" />
@@ -85,6 +85,15 @@
                   <input class="field" name="gstPercent" type="number" min="0" max="28" step="0.01" [ngModel]="gstPercent()" (ngModelChange)="gstPercent.set($event)" />
                 </label>
               </div>
+              @if (plan()?.hasSeatPrices) {
+                <p class="hint">
+                  @if (seatRange(); as r) {
+                    Seat price for {{ fyLabel(plan()!.priceFiscalYear!) }}, {{ rangeLabel(r) }} seats: every seat is charged {{ inr(r.price) }}.
+                  } @else if (plan()!.seatPrices.length === 0) {
+                    This plan has no seat prices for {{ fyLabel(plan()!.priceFiscalYear!) }} yet.
+                  } @else { Enter the number of seats to get the seat price. }
+                </p>
+              }
               @if (opt.maxDiscountPercent < 100) { <p class="hint">The largest discount allowed is <strong>{{ opt.maxDiscountPercent }}%</strong>.</p> }
             </div>
           </section>
@@ -268,7 +277,7 @@
                 <div class="summary-row"><span class="text-muted">Currency</span><span>{{ currencyText() }}</span></div>
               </div>
               <div class="subcard stack-xs text-sm">
-                <div class="summary-row"><span>Subtotal ({{ quantity() ?? 0 }} × {{ inr(plan()?.price ?? 0) }})</span><span>{{ inr(listAmount()) }}</span></div>
+                <div class="summary-row"><span>Subtotal ({{ quantity() ?? 0 }} × {{ inr(unitPrice()) }})@if (seatRange(); as r) { <span class="text-muted"> · {{ fyLabel(plan()!.priceFiscalYear!) }}, {{ rangeLabel(r) }} seats</span> }</span><span>{{ inr(listAmount()) }}</span></div>
                 <div class="summary-row"><span>After {{ discountPercent() ?? 0 }}% discount</span><span>{{ inr(saleAmount()) }}</span></div>
                 <div class="summary-row"><span>Tax ({{ gstPercent() ?? 0 }}% GST)</span><span>{{ inr(taxAmount()) }}</span></div>
                 <div class="summary-row summary-total"><span>Order total</span><span>{{ inr(totalAmount()) }}</span></div>

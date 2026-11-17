@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { GlobalRestService } from '../rest/global-rest-service';
-import type { DurationUnit, Product, ProductCategory, ProductPlan } from '../../shared/interfaces/product.interface';
+import type { DurationUnit, PlanSeatPriceYear, Product, ProductCategory, ProductPlan, SeatPriceRange } from '../../shared/interfaces/product.interface';
 
 export interface PlanInput {
   name: string;
@@ -27,6 +27,11 @@ export class ProductsService {
     this.rest.put<Product>(`${this.base}/${id}`, data);
   createPlan = (productId: number, data: PlanInput) => this.rest.post<ProductPlan>(`${this.base}/${productId}/plans`, data);
   updatePlan = (id: number, data: PlanInput & { isActive: boolean }) => this.rest.put<ProductPlan>(`${this.base}/plans/${id}`, data);
+  /** A plan's seat prices by financial year, newest first. */
+  seatPrices = (planId: number) => this.rest.get<PlanSeatPriceYear[]>(`${this.base}/plans/${planId}/seat-prices`);
+  /** Replaces all seat ranges of one financial year (empty list removes the year). */
+  saveSeatPrices = (planId: number, fiscalYear: number, ranges: SeatPriceRange[]) =>
+    this.rest.put<PlanSeatPriceYear>(`${this.base}/plans/${planId}/seat-prices/${fiscalYear}`, { ranges });
 
   /** There are no single-item endpoints: find items in the full catalog (it is small). */
   async findCategory(id: number): Promise<ProductCategory | undefined> {

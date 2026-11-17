@@ -59,6 +59,7 @@
                         <tr>
                           <td>
                             {{ plan.name }} @if (!plan.isActive) { <span class="badge">inactive</span> }
+                            @if (plan.hasSeatPrices) { <span class="badge badge-success" title="Priced by seat range per financial year (see Edit)">seat prices</span> }
                             @if (plan.description) { <div class="hint">{{ plan.description }}</div> }
                           </td>
                           <td>{{ duration(plan.durationCount, plan.durationUnit) }}</td>
