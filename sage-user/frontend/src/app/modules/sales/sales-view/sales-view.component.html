@@ -76,7 +76,8 @@
             <tr><td>List amount ({{ s.quantity }} × {{ inr(s.unitPrice) }})</td><td class="amount">{{ inr(s.listAmount) }}</td></tr>
             <tr><td>Discount ({{ s.discountPercent }}%)</td><td class="amount">− {{ inr(s.discountAmount) }}</td></tr>
             <tr><td class="font-semibold">Sale amount</td><td class="amount font-semibold">{{ inr(s.saleAmount) }}</td></tr>
-            <tr><td>Cost ({{ s.quantity }} × {{ inr(s.unitCost) }})</td><td class="amount">{{ inr(s.costAmount) }}</td></tr>
+            <!-- No cost recorded (0.00): the cost line is left out. -->
+            @if (s.costAmount !== 0) { <tr><td>Cost ({{ s.quantity }} × {{ inr(s.unitCost) }})</td><td class="amount">{{ inr(s.costAmount) }}</td></tr> }
             <tr><td>Margin</td><td class="amount" [class.text-danger]="s.margin < 0">{{ inr(s.margin) }}</td></tr>
           </tbody>
         </table>
