@@ -2,8 +2,7 @@
   <div class="row">
     <h1 class="page-title">{{ isTeam() ? 'Team sales' : 'My sales' }}</h1>
     <div class="spacer"></div>
-    <a class="btn btn-secondary" routerLink="/sales/order-form">New order form</a>
-    <a class="btn btn-primary" routerLink="/sales/add">New sale</a>
+    <a class="btn btn-primary" routerLink="/sales/order-form">New order form</a>
   </div>
   @if (isTeam()) { <p class="hint">Sales made by the people who reported to you when the sale was recorded.</p> }
 
@@ -64,7 +63,7 @@
           </tr>
         } @empty {
           <tr><td [attr.colspan]="isTeam() ? 10 : 9" class="table-empty">
-            {{ loading() ? 'Loading...' : isTeam() ? 'No team sales match.' : 'No sales match. Record one with New sale.' }}
+            {{ loading() ? 'Loading...' : isTeam() ? 'No team sales match.' : 'No sales match. Record one with New order form.' }}
           </td></tr>
         }
       </tbody>

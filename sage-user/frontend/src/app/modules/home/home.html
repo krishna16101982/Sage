@@ -7,7 +7,7 @@
       </div>
       <div class="spacer"></div>
       <a class="btn btn-secondary" routerLink="/sales/list"><app-icon name="list" /> My sales</a>
-      <a class="btn btn-primary" routerLink="/sales/add"><app-icon name="plus" /> New sale</a>
+      <a class="btn btn-primary" routerLink="/sales/order-form"><app-icon name="plus" /> New order form</a>
     </div>
 
     @if (error()) { <p class="hint text-danger">{{ error() }}</p> }
@@ -112,7 +112,7 @@
         <ul class="activity-list">
           <li>
             <span class="stat-icon accent-teal" style="width: 2rem; height: 2rem"><app-icon name="plus-circle" /></span>
-            <div class="activity-text"><a class="link-button" routerLink="/sales/add">Record a new sale</a><div class="hint">Product, customer, price and term</div></div>
+            <div class="activity-text"><a class="link-button" routerLink="/sales/order-form">Record a new order</a><div class="hint">Customer, product and price, terms and the order form PDF</div></div>
           </li>
           <li>
             <span class="stat-icon accent-purple" style="width: 2rem; height: 2rem"><app-icon name="briefcase" /></span>
@@ -157,7 +157,7 @@
                 </td>
               </tr>
             } @empty {
-              <tr><td colspan="6" class="table-empty">No sales yet. <a class="link-button" routerLink="/sales/add">Record your first sale</a>.</td></tr>
+              <tr><td colspan="6" class="table-empty">No sales yet. <a class="link-button" routerLink="/sales/order-form">Record your first order</a>.</td></tr>
             }
           </tbody>
         </table>

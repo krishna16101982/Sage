@@ -11,10 +11,12 @@ export interface NavItem {
   managerOnly: boolean;
 }
 
-/** Menu items, in order, grouped by section. Team sales is shown to sales managers only. */
+/**
+ * Menu items, in order, grouped by section. Team sales is shown to sales managers only.
+ * The simple "New sale" page (/sales/add) is hidden: sales are recorded with the New order form.
+ */
 export const NAV_ITEMS: NavItem[] = [
   { href: '/home', label: 'Home', icon: 'home', section: 'Overview', managerOnly: false },
-  { href: '/sales/add', label: 'New sale', icon: 'plus-circle', section: 'Sales', managerOnly: false },
   { href: '/sales/order-form', label: 'New order form', icon: 'file-text', section: 'Sales', managerOnly: false },
   { href: '/sales/list', label: 'My sales', icon: 'list', section: 'Sales', managerOnly: false },
   { href: '/sales/team', label: 'Team sales', icon: 'users', section: 'Sales', managerOnly: true },
