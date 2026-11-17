@@ -44,7 +44,6 @@
           <th class="amount">Qty</th>
           <th class="amount" appSort [active]="sortBy() === 'saleAmount'" [direction]="sortDirection()" (sort)="sort('saleAmount', $event)">Sale amount</th>
           <th class="amount">Discount</th>
-          <th class="amount">Margin</th>
           <th appSort [active]="sortBy() === 'renewalDate'" [direction]="sortDirection()" (sort)="sort('renewalDate', $event)">Renewal</th>
           <th>Status</th>
         </tr>
@@ -63,14 +62,13 @@
             <td class="amount">{{ s.quantity }}</td>
             <td class="amount">{{ inr(s.saleAmount) }}</td>
             <td class="amount">{{ inr(s.discountAmount) }} <div class="hint">{{ s.discountPercent }}%</div></td>
-            <td class="amount" [class.text-danger]="s.margin < 0">{{ inr(s.margin) }}</td>
             <td class="date">{{ date(s.renewalDate) }}</td>
             <td>
               @if (s.status === 'Cancelled') { <span class="badge badge-danger">Cancelled</span> } @else { <span class="badge badge-success">Active</span> }
             </td>
           </tr>
         } @empty {
-          <tr><td colspan="11" class="table-empty">{{ loading() ? 'Loading...' : 'No sales match.' }}</td></tr>
+          <tr><td colspan="10" class="table-empty">{{ loading() ? 'Loading...' : 'No sales match.' }}</td></tr>
         }
       </tbody>
     </table>
