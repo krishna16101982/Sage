@@ -100,6 +100,10 @@ namespace SageAdminApi.Globals
             public const string ActionInvalid = "Action must start with a letter and contain only letters, digits, '_' or '-' (2-50 characters)";
             public const string PermissionNameRequired = "Permission name is required (max 150 characters)";
             public const string DescriptionTooLong = "Description must be at most 500 characters";
+            public const string PlanDescriptionTooLong = "The plan description must be at most 1000 characters";
+            public const string IncludedItemTitleTooLong = "The Team Link Extend seat title must be at most 200 characters";
+            public const string IncludedItemDescriptionTooLong = "The Team Link Extend seat description must be at most 1000 characters";
+            public const string IncludedItemTitleRequired = "Enter a Team Link Extend seat title, or clear its description";
             public const string ModuleCodeExists = "A module with this code already exists";
             public const string PermissionCodeExists = "This permission already exists for the module";
             public const string ModuleNotFound = "Module not found";

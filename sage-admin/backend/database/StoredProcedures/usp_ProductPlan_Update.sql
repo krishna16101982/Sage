@@ -3,7 +3,9 @@
 CREATE OR ALTER PROCEDURE dbo.usp_ProductPlan_Update
     @Id            BIGINT,
     @Name          NVARCHAR(100),
-    @Description   NVARCHAR(500) = NULL,
+    @Description   NVARCHAR(1000) = NULL,
+    @IncludedItemTitle       NVARCHAR(200)  = NULL,
+    @IncludedItemDescription NVARCHAR(1000) = NULL,
     @DurationUnit  VARCHAR(10),
     @DurationCount INT,
     @Price         DECIMAL(18,2),
@@ -26,7 +28,8 @@ BEGIN
         THROW 50409, 'A plan with this name already exists for the product', 1;
 
     UPDATE dbo.ProductPlans
-    SET Name = @Name, Description = @Description, DurationUnit = @DurationUnit, DurationCount = @DurationCount,
+    SET Name = @Name, Description = @Description, IncludedItemTitle = @IncludedItemTitle, IncludedItemDescription = @IncludedItemDescription,
+        DurationUnit = @DurationUnit, DurationCount = @DurationCount,
         Price = @Price, Cost = @Cost, SortOrder = @SortOrder, IsActive = @IsActive,
         UpdatedAtUtc = SYSUTCDATETIME(), UpdatedBy = @ActorUserId
     WHERE Id = @Id;

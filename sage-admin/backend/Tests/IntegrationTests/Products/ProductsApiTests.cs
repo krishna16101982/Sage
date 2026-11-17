@@ -211,6 +211,34 @@ public class ProductsApiTests
         JsonDocument.Parse(audit[0].New).RootElement.GetProperty("Price").GetDecimal().ShouldBe(26000m);
     }
 
+    [Fact]
+    public async Task Plan_KeepsItsOrderFormText_LongDescriptionAndIncludedItem()
+    {
+        var token = await AdminTokenAsync();
+        var productId = await ProductAsync(token, await CategoryAsync(token));
+        var longText = new string('x', 900);
+        var created = await Call(HttpMethod.Post, $"{Base}/{productId}/plans", token, new
+        {
+            name = "Advanced", durationUnit = "Year", durationCount = 1, price = 111578m, cost = 90000m, sortOrder = 1, description = longText,
+            includedItemTitle = "Sales Navigator Team Link Extend Seat",
+            includedItemDescription = "{totalMonths} months 1000 Team Link Extend seats included."
+        });
+        created.Status.ShouldBe(201, created.Root.ToString());
+        created.Data.GetProperty("description").GetString().ShouldBe(longText);
+        created.Data.GetProperty("includedItemTitle").GetString().ShouldBe("Sales Navigator Team Link Extend Seat");
+        var planId = created.Data.GetProperty("id").GetInt64();
+
+        // Clearing the included item on edit; a description without a title, or text too long, is refused.
+        var cleared = await Call(HttpMethod.Put, $"{Base}/plans/{planId}", token,
+            new { name = "Advanced", durationUnit = "Year", durationCount = 1, price = 111578m, cost = 90000m, sortOrder = 1, isActive = true });
+        cleared.Status.ShouldBe(200);
+        cleared.Data.GetProperty("includedItemTitle").ValueKind.ShouldBe(JsonValueKind.Null);
+        (await Call(HttpMethod.Put, $"{Base}/plans/{planId}", token,
+            new { name = "Advanced", durationUnit = "Year", durationCount = 1, price = 1m, cost = 1m, includedItemDescription = "no title" })).Status.ShouldBe(400);
+        (await Call(HttpMethod.Put, $"{Base}/plans/{planId}", token,
+            new { name = "Advanced", durationUnit = "Year", durationCount = 1, price = 1m, cost = 1m, description = new string('x', 1001) })).Status.ShouldBe(400);
+    }
+
     [Theory]
     [InlineData("", 100, 50, "Year", 1)]
     [InlineData("Plan", -1, 50, "Year", 1)]

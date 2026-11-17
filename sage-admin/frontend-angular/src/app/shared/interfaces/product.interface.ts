@@ -13,6 +13,10 @@ export interface ProductPlan {
   cost: number;
   sortOrder: number;
   isActive: boolean;
+  /** Optional item that comes with the plan, printed on the order form (e.g. "Sales Navigator Team Link Extend Seat"). */
+  includedItemTitle: string | null;
+  /** May use {paidMonths}, {freeMonths}, {totalMonths} and {seats}. */
+  includedItemDescription: string | null;
   /** Priced by seat range per financial year; price/cost above are then only a fallback. */
   hasSeatPrices: boolean;
 }

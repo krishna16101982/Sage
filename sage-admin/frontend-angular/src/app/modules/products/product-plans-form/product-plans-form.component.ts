@@ -22,6 +22,8 @@ export class ProductPlansForm implements OnInit {
   protected readonly units = DURATION_UNITS;
   name = '';
   description = '';
+  includedItemTitle = '';
+  includedItemDescription = '';
   durationUnit: DurationUnit = 'Year';
   durationCount = 1;
   sortOrder = 0;
@@ -45,6 +47,8 @@ export class ProductPlansForm implements OnInit {
     if (p) {
       this.name = p.name;
       this.description = p.description ?? '';
+      this.includedItemTitle = p.includedItemTitle ?? '';
+      this.includedItemDescription = p.includedItemDescription ?? '';
       this.durationUnit = p.durationUnit;
       this.durationCount = p.durationCount;
       this.price.set(p.price);
@@ -66,6 +70,8 @@ export class ProductPlansForm implements OnInit {
         price: Number(this.price()),
         cost: Number(this.cost()),
         sortOrder: Number(this.sortOrder) || 0,
+        includedItemTitle: this.includedItemTitle.trim() || undefined,
+        includedItemDescription: this.includedItemDescription.trim() || undefined,
       };
       const p = this.plan();
       if (p) await this.service.updatePlan(p.id, { ...data, isActive: this.active });

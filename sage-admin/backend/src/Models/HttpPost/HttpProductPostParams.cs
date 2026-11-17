@@ -51,6 +51,10 @@ namespace SageAdminApi.Models.HttpPost
         /// <summary>Required. Per unit, INR, at most 2 decimals.</summary>
         public decimal? Cost { get; set; }
         public int SortOrder { get; set; }
+        /// <summary>Optional item that comes with the plan, printed on the order form (e.g. LinkedIn "Sales Navigator Team Link Extend Seat").</summary>
+        public string IncludedItemTitle { get; set; }
+        /// <summary>May use {paidMonths}, {freeMonths}, {totalMonths} and {seats}.</summary>
+        public string IncludedItemDescription { get; set; }
     }
 
     public class HttpProductPlanPutParams : HttpProductPlanPostParams

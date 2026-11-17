@@ -3,7 +3,9 @@
 CREATE OR ALTER PROCEDURE dbo.usp_ProductPlan_Create
     @ProductId     BIGINT,
     @Name          NVARCHAR(100),
-    @Description   NVARCHAR(500) = NULL,
+    @Description   NVARCHAR(1000) = NULL,
+    @IncludedItemTitle       NVARCHAR(200)  = NULL,
+    @IncludedItemDescription NVARCHAR(1000) = NULL,
     @DurationUnit  VARCHAR(10),
     @DurationCount INT,
     @Price         DECIMAL(18,2),
@@ -27,8 +29,8 @@ BEGIN
     IF EXISTS (SELECT 1 FROM dbo.ProductPlans WITH (UPDLOCK, HOLDLOCK) WHERE ProductId = @ProductId AND Name = @Name)
         THROW 50409, 'A plan with this name already exists for the product', 1;
 
-    INSERT dbo.ProductPlans (ProductId, Name, Description, DurationUnit, DurationCount, Price, Cost, SortOrder, IsActive, CreatedBy)
-    VALUES (@ProductId, @Name, @Description, @DurationUnit, @DurationCount, @Price, @Cost, @SortOrder, 1, @ActorUserId);
+    INSERT dbo.ProductPlans (ProductId, Name, Description, IncludedItemTitle, IncludedItemDescription, DurationUnit, DurationCount, Price, Cost, SortOrder, IsActive, CreatedBy)
+    VALUES (@ProductId, @Name, @Description, @IncludedItemTitle, @IncludedItemDescription, @DurationUnit, @DurationCount, @Price, @Cost, @SortOrder, 1, @ActorUserId);
 
     DECLARE @newId BIGINT = SCOPE_IDENTITY();
 

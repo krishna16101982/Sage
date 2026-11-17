@@ -41,6 +41,10 @@ namespace SageAdminApi.Models
         public decimal Cost { get; set; }
         public int SortOrder { get; set; }
         public bool IsActive { get; set; }
+        /// <summary>Optional item that comes with the plan, printed on the order form.</summary>
+        public string IncludedItemTitle { get; set; }
+        /// <summary>May use {paidMonths}, {freeMonths}, {totalMonths} and {seats}.</summary>
+        public string IncludedItemDescription { get; set; }
         /// <summary>True when the plan is priced by seat range (dbo.ProductPlanSeatPrices); Price/Cost are then only a fallback.</summary>
         public bool HasSeatPrices { get; set; }
     }

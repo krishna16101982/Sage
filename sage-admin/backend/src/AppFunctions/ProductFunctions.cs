@@ -32,7 +32,7 @@ namespace SageAdminApi.AppFunctions
         // The three catalog tables are read whole (tens of rows) or by Id; the caller adds WHERE / ORDER BY.
         private const string CategoryColumns = " SELECT Id, Code, Name, Description, SortOrder, IsActive FROM dbo.ProductCategories ";
         private const string ProductColumns = " SELECT Id, CategoryId, Code, Name, Description, SortOrder, IsActive FROM dbo.Products ";
-        private const string PlanColumns = " SELECT Id, ProductId, Name, Description, DurationUnit, DurationCount, Price, Cost, SortOrder, IsActive, "
+        private const string PlanColumns = " SELECT Id, ProductId, Name, Description, IncludedItemTitle, IncludedItemDescription, DurationUnit, DurationCount, Price, Cost, SortOrder, IsActive, "
                                          + " CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.ProductPlanSeatPrices sp WHERE sp.PlanId = dbo.ProductPlans.Id) THEN 1 ELSE 0 END AS BIT) AS HasSeatPrices "
                                          + " FROM dbo.ProductPlans ";
 
@@ -77,6 +77,8 @@ namespace SageAdminApi.AppFunctions
             ProductId = _row.GetLong("ProductId"),
             Name = _row.GetText("Name"),
             Description = _row.GetText("Description"),
+            IncludedItemTitle = _row.GetText("IncludedItemTitle"),
+            IncludedItemDescription = _row.GetText("IncludedItemDescription"),
             DurationUnit = _row.GetText("DurationUnit"),
             DurationCount = _row.GetInt("DurationCount"),
             Price = _row.GetDecimal("Price"),
@@ -107,7 +109,7 @@ namespace SageAdminApi.AppFunctions
         // Audit snapshots: business fields only.
         private static object Snapshot(ProductCategoryDto c) => c == null ? null : new { c.Code, c.Name, c.Description, c.SortOrder, c.IsActive };
         private static object Snapshot(ProductDto p) => p == null ? null : new { p.CategoryId, p.Code, p.Name, p.Description, p.SortOrder, p.IsActive };
-        private static object Snapshot(ProductPlanDto p) => p == null ? null : new { p.ProductId, p.Name, p.Description, p.DurationUnit, p.DurationCount, p.Price, p.Cost, p.SortOrder, p.IsActive };
+        private static object Snapshot(ProductPlanDto p) => p == null ? null : new { p.ProductId, p.Name, p.Description, p.IncludedItemTitle, p.IncludedItemDescription, p.DurationUnit, p.DurationCount, p.Price, p.Cost, p.SortOrder, p.IsActive };
 
         private Task AuditAsync(long? _actorUserId, ApplicationEnumeration.AuditAction _action, ApplicationEnumeration.ObjectType _type, long _id, object _old, object _new, string _ipAddress, CancellationToken _ct)
             => _auditFunctions.LogAsync(_actorUserId, _action.ToString(), _type.ToString(), _id.ToString(), _old, _new, _ipAddress, _ct);
@@ -276,12 +278,14 @@ namespace SageAdminApi.AppFunctions
             #endregion
             try
             {
-                _functionReturn = ApplicationValidationFunctions.ValidateProductPlan(_params?.Name, _params?.Description, _params?.DurationUnit, _params?.DurationCount ?? 0, _params?.Price, _params?.Cost, _methodName);
+                _functionReturn = ApplicationValidationFunctions.ValidateProductPlan(_params?.Name, _params?.Description, _params?.DurationUnit, _params?.DurationCount ?? 0, _params?.Price, _params?.Cost, _methodName,
+                    _params?.IncludedItemTitle, _params?.IncludedItemDescription);
                 if (!_functionReturn.Status) return (null, _functionReturn);
 
                 (_functionReturn, _id) = await _databaseFunctions.ExecuteProcedureWriteAsync(SP.ProductPlanCreate, new[]
                 {
                     P("@ProductId", _productId), P("@Name", Clean(_params.Name)), P("@Description", Clean(_params.Description)), P("@DurationUnit", _params.DurationUnit),
+                    P("@IncludedItemTitle", Clean(_params.IncludedItemTitle)), P("@IncludedItemDescription", Clean(_params.IncludedItemDescription)),
                     P("@DurationCount", _params.DurationCount), Money("@Price", _params.Price.Value), Money("@Cost", _params.Cost.Value), P("@SortOrder", _params.SortOrder), P("@ActorUserId", _actorUserId)
                 }, _methodName, null, _ct);
                 if (!_functionReturn.Status) return (null, _functionReturn);
@@ -305,7 +309,8 @@ namespace SageAdminApi.AppFunctions
             #endregion
             try
             {
-                _functionReturn = ApplicationValidationFunctions.ValidateProductPlan(_params?.Name, _params?.Description, _params?.DurationUnit, _params?.DurationCount ?? 0, _params?.Price, _params?.Cost, _methodName);
+                _functionReturn = ApplicationValidationFunctions.ValidateProductPlan(_params?.Name, _params?.Description, _params?.DurationUnit, _params?.DurationCount ?? 0, _params?.Price, _params?.Cost, _methodName,
+                    _params?.IncludedItemTitle, _params?.IncludedItemDescription);
                 if (!_functionReturn.Status) return (null, _functionReturn);
 
                 ProductPlanDto _existing = await GetPlanByIdAsync(_id, _ct);
@@ -314,6 +319,7 @@ namespace SageAdminApi.AppFunctions
                 (_functionReturn, _) = await _databaseFunctions.ExecuteProcedureWriteAsync(SP.ProductPlanUpdate, new[]
                 {
                     P("@Id", _id), P("@Name", Clean(_params.Name)), P("@Description", Clean(_params.Description)), P("@DurationUnit", _params.DurationUnit),
+                    P("@IncludedItemTitle", Clean(_params.IncludedItemTitle)), P("@IncludedItemDescription", Clean(_params.IncludedItemDescription)),
                     P("@DurationCount", _params.DurationCount), Money("@Price", _params.Price.Value), Money("@Cost", _params.Cost.Value),
                     P("@SortOrder", _params.SortOrder), P("@IsActive", _params.IsActive), P("@ActorUserId", _actorUserId)
                 }, _methodName, null, _ct);

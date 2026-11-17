@@ -184,7 +184,7 @@
               </div>
               <div class="form-grid-5">
                 <div class="field-label">End date (automatic)
-                  <div class="field field-muted">{{ endDate() ? date(endDate()) : '-' }}</div>
+                  <div class="field field-muted">{{ endDate() ? dmy(endDate()) : '-' }}</div>
                 </div>
                 <label class="field-label">Billing frequency
                   <select class="field" name="billingFrequencyId" [ngModel]="billingFrequencyId()" (ngModelChange)="billingFrequencyId.set($event)">
@@ -237,20 +237,19 @@
             </header>
             @if (wordingOpen()) {
               <div class="card-body wording-grid">
+                <!-- Every section is always shown; the free-month note is left off the saved order when free months = 0. -->
                 @for (section of wordingSections; track section.key) {
-                  @if (section.key !== 'freeMonthNote' || freeMonths() > 0) {
-                    <label class="field-label" [class.wording-wide]="section.wide">
-                      <span class="row-tight">
-                        <span>{{ section.label }}</span>
-                        @if (isChanged(section.key)) {
-                          <span class="badge badge-warning">Changed</span>
-                          <button type="button" class="link-button text-xs" (click)="resetWording(section.key)">Reset</button>
-                        }
-                      </span>
-                      <textarea class="field" [name]="'w-' + section.key" [rows]="section.rows" maxlength="4000"
-                                [ngModel]="wording()[section.key] ?? ''" (ngModelChange)="setWording(section.key, $event)"></textarea>
-                    </label>
-                  }
+                  <label class="field-label" [class.wording-wide]="section.wide">
+                    <span class="row-tight">
+                      <span>{{ section.label }}</span>
+                      @if (isChanged(section.key)) {
+                        <span class="badge badge-warning">Changed</span>
+                        <button type="button" class="link-button text-xs" (click)="resetWording(section.key)">Reset</button>
+                      }
+                    </span>
+                    <textarea class="field" [name]="'w-' + section.key" [rows]="section.rows" maxlength="4000"
+                              [ngModel]="wording()[section.key] ?? ''" (ngModelChange)="setWording(section.key, $event)"></textarea>
+                  </label>
                 }
                 @if (changedSections() > 0) {
                   <div class="wording-wide"><button type="button" class="link-button text-sm" (click)="resetWording()">Reset every section to the standard text</button></div>
@@ -272,7 +271,7 @@
               <div class="stack-xs text-sm">
                 <div class="summary-row"><span class="text-muted">Term</span><span>{{ termText() }}</span></div>
                 <div class="summary-row"><span class="text-muted">Period</span>
-                  <span class="text-right">{{ startDate() ? date(startDate()) : '-' }} to {{ endDate() ? date(endDate()) : '-' }}</span></div>
+                  <span class="text-right">{{ startDate() ? dmy(startDate()) : '-' }} to {{ endDate() ? dmy(endDate()) : '-' }}</span></div>
                 <div class="summary-row"><span class="text-muted">Billing</span><span class="text-right">{{ billingText() }}</span></div>
                 <div class="summary-row"><span class="text-muted">Currency</span><span>{{ currencyText() }}</span></div>
               </div>

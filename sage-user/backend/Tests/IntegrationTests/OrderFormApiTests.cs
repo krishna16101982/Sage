@@ -145,6 +145,9 @@ public class OrderFormApiTests
         var token = await TokenAsync(await SalesData.CreateAsync(_fx.Db));
         var options = (await Call(HttpMethod.Get, $"{Api}/order-form/options", bearer: token)).Data;
         var plan = await PlanAsync(price: 1000m, cost: 600m);
+        await _fx.Db.ExecuteNonQueryAsync(
+            "UPDATE dbo.ProductPlans SET IncludedItemTitle = N'Sales Navigator Team Link Extend Seat', IncludedItemDescription = N'{totalMonths} months 1000 Team Link Extend seats' WHERE Id = @p",
+            new[] { TestDb.P("@p", plan) });
         var india = DateTime.UtcNow.AddMinutes(330);
         int fy = india.Month >= 4 ? india.Year + 1 : india.Year;
         // This year: 1-9 at 111578, 10-19 at 107116 (cost 90000), 20+ at 100000. Last year is ignored.
@@ -157,6 +160,8 @@ public class OrderFormApiTests
             .SelectMany(c => c.GetProperty("products").EnumerateArray()).SelectMany(p => p.GetProperty("plans").EnumerateArray())
             .Single(p => p.GetProperty("id").GetInt64() == plan);
         catalogPlan.GetProperty("hasSeatPrices").GetBoolean().ShouldBeTrue();
+        catalogPlan.GetProperty("includedItemTitle").GetString().ShouldBe("Sales Navigator Team Link Extend Seat");
+        catalogPlan.GetProperty("includedItemDescription").GetString().ShouldBe("{totalMonths} months 1000 Team Link Extend seats");
         catalogPlan.GetProperty("priceFiscalYear").GetInt32().ShouldBe(fy);
         var ranges = catalogPlan.GetProperty("seatPrices");
         ranges.GetArrayLength().ShouldBe(3);

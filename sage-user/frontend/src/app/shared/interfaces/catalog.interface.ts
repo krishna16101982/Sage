@@ -8,6 +8,10 @@ export interface CatalogPlan {
   description: string | null;
   durationUnit: DurationUnit;
   durationCount: number;
+  /** Optional item that comes with the plan, printed on the order form (e.g. "Sales Navigator Team Link Extend Seat"). */
+  includedItemTitle: string | null;
+  /** May use {paidMonths}, {freeMonths}, {totalMonths} and {seats}. */
+  includedItemDescription: string | null;
   /** List price per unit for one plan term. */
   price: number;
   /** Cost per unit for one plan term. */

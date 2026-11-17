@@ -9,9 +9,9 @@ import { errorText } from '../../../services/rest/global-rest-service';
 import { DURATION_UNITS, type CatalogCategory, type DurationUnit } from '../../../shared/interfaces/catalog.interface';
 import type { Customer } from '../../../shared/interfaces/customer.interface';
 import type { MasterOption, OrderContact, OrderFormOptions, OrderWording } from '../../../shared/interfaces/order-form.interface';
-import { WORDING_SECTIONS, longDate } from '../../../shared/utils/order-wording';
+import { WORDING_SECTIONS } from '../../../shared/utils/order-wording';
 import { findSeatRange, fyLabel, seatRangeLabel } from '../../../shared/utils/seat-prices';
-import { addDays, addMonths, formatDate, today } from '../../../shared/utils/dates';
+import { addDays, addMonths, dmy, formatDate, today } from '../../../shared/utils/dates';
 import { formatDuration, formatInr } from '../../../shared/utils/format';
 import { CustomerPicker } from '../sales-add/customer-picker/customer-picker.component';
 
@@ -38,6 +38,8 @@ export class SalesOrderForm implements OnInit {
   private readonly messages = inject(MessageService);
   protected readonly inr = formatInr;
   protected readonly date = formatDate;
+  /** dd-MM-yyyy for the order's start and end dates. */
+  protected readonly dmy = dmy;
   protected readonly durationText = formatDuration;
   protected readonly units = DURATION_UNITS;
   protected readonly orderDate = today();
@@ -108,7 +110,12 @@ export class SalesOrderForm implements OnInit {
   });
   readonly termText = computed(() => (this.freeMonths() > 0 ? `${this.paidMonths()} + ${this.freeMonths()} months` : `${this.paidMonths()} months`));
   /** Same rule as the server: start + paid duration + free months. */
-  readonly endDate = computed(() => (this.startDate() && this.paidMonths() > 0 ? addMonths(this.startDate(), this.paidMonths() + this.freeMonths()) : ''));
+  /**
+   * Last day of the order: start + paid months + free months, less one day (17-11-2026 for 1 year ends 16-11-2027;
+   * with 2 free months 16-01-2028). The sale's renewal date (saved by the server) is the day after.
+   */
+  readonly endDate = computed(() =>
+    this.startDate() && this.paidMonths() > 0 ? addDays(addMonths(this.startDate(), this.paidMonths() + this.freeMonths()), -1) : '');
   readonly freeMonthChoices = computed(() => Array.from({ length: (this.options()?.maxFreeMonths ?? 0) + 1 }, (_, i) => i));
   readonly earliestStart = computed(() => addDays(today(), -(this.options()?.maxBackdateDays ?? 365)));
 
@@ -124,23 +131,34 @@ export class SalesOrderForm implements OnInit {
   readonly wordingOpen = signal(false);
   /** Sections the seller has changed for this order; the rest follow the standard text and the form's values. */
   readonly wordingOverrides = signal<Partial<Record<keyof OrderWording, string>>>({});
-  /** Standard text with this order's values filled in. */
+  /**
+   * Standard text with this order's values filled in. Product title = product + plan name; product description and the
+   * included item (e.g. LinkedIn's Team Link Extend seat) come from the chosen plan, with {paidMonths}, {freeMonths},
+   * {totalMonths} and {seats} filled in.
+   */
   readonly standardWording = computed<OrderWording>(() => {
     const std = this.options()?.wording;
     const free = this.freeMonths();
-    const end = this.endDate();
-    const lastDay = end ? addDays(end, -1) : '';
+    const product = this.product();
+    const plan = this.plan();
+    const fill = (text: string | null | undefined) =>
+      (text ?? '')
+        .replace(/\{paidMonths\}/g, String(this.paidMonths()))
+        .replace(/\{freeMonths\}/g, String(free))
+        .replace(/\{totalMonths\}/g, String(this.paidMonths() + free))
+        .replace(/\{seats\}/g, String(this.quantity() ?? 0));
+    const lastDay = this.endDate();
     return {
       signReturnLine: std?.signReturnLine ?? '',
       signReturnInstruction: std?.signReturnInstruction ?? '',
       orderNotes: std?.orderNotes ?? '',
       freeMonthNote: (std?.freeMonthNote ?? '').replace(/\{freeMonths\}/g, String(free)),
-      extraItemTitle: '',
-      extraItemDescription: '',
-      productTitle: this.product()?.name ?? '',
-      productDescription: this.product()?.description ?? this.plan()?.description ?? '',
+      extraItemTitle: plan?.includedItemTitle ?? '',
+      extraItemDescription: fill(plan?.includedItemDescription),
+      productTitle: product && plan ? `${product.name} ${plan.name}` : (product?.name ?? ''),
+      productDescription: plan?.description || product?.description || '',
       periodLine: this.startDate() && lastDay
-        ? `${longDate(this.startDate())} to ${longDate(lastDay)}${free > 0 ? ` (${free} free month${free === 1 ? '' : 's'} included)` : ''}`
+        ? `${dmy(this.startDate())} to ${dmy(lastDay)}${free > 0 ? ` (${free} free month${free === 1 ? '' : 's'} included)` : ''}`
         : '',
       taxInformation: (std?.taxInformation ?? '').replace(/\{gstPercent\}/g, String(this.gstPercent() ?? 0)),
       signatureClauses: std?.signatureClauses ?? '',

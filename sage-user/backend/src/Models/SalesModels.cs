@@ -24,6 +24,10 @@ namespace SageUserApi.Models
         public string Description { get; set; }
         public string DurationUnit { get; set; } = string.Empty;
         public int DurationCount { get; set; }
+        /// <summary>Optional item that comes with the plan, printed on the order form (e.g. "Sales Navigator Team Link Extend Seat").</summary>
+        public string IncludedItemTitle { get; set; }
+        /// <summary>May use {paidMonths}, {freeMonths}, {totalMonths} and {seats} (the order form fills them in).</summary>
+        public string IncludedItemDescription { get; set; }
         /// <summary>List price per unit (INR) for one plan term.</summary>
         public decimal Price { get; set; }
         /// <summary>Cost per unit (INR) for one plan term.</summary>

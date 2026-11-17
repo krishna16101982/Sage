@@ -40,6 +40,13 @@ export function renewalDate(start: string, unit: DurationUnit, count: number): s
   return addMonths(start, months);
 }
 
+/** '2026-11-17' → '17-11-2026' (dd-MM-yyyy, the order form's date style). */
+export function dmy(date: string | null): string {
+  if (!date) return '-';
+  const [y, m, d] = date.split('-');
+  return `${d}-${m}-${y}`;
+}
+
 /** '2026-01-15' → '15 Jan 2026'. */
 export function formatDate(date: string | null): string {
   if (!date) return '-';

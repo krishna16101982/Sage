@@ -202,11 +202,17 @@ namespace SageAdminApi.AppValidations
         /// <summary>
         /// Validate a plan: name, duration, and price/cost (required, 0 or more, at most 2 decimals).
         /// </summary>
-        public static IFunctionReturn ValidateProductPlan(string _name, string _description, string _durationUnit, int _durationCount, decimal? _price, decimal? _cost, string _methodName)
+        public static IFunctionReturn ValidateProductPlan(string _name, string _description, string _durationUnit, int _durationCount, decimal? _price, decimal? _cost, string _methodName,
+                                                          string _includedItemTitle = null, string _includedItemDescription = null)
         {
             var _errors = new List<string>();
             CheckText(_errors, _name, 100, true, ApplicationConstants.ValidationMessages.PlanNameRequired);
-            CheckText(_errors, _description, 500, false, ApplicationConstants.ValidationMessages.DescriptionTooLong);
+            // A plan's description is its product text on the order form, so it may be longer than other descriptions.
+            CheckText(_errors, _description, 1000, false, ApplicationConstants.ValidationMessages.PlanDescriptionTooLong);
+            CheckText(_errors, _includedItemTitle, 200, false, ApplicationConstants.ValidationMessages.IncludedItemTitleTooLong);
+            CheckText(_errors, _includedItemDescription, 1000, false, ApplicationConstants.ValidationMessages.IncludedItemDescriptionTooLong);
+            if (string.IsNullOrWhiteSpace(_includedItemTitle) && !string.IsNullOrWhiteSpace(_includedItemDescription))
+                _errors.Add(ApplicationConstants.ValidationMessages.IncludedItemTitleRequired);
             if (System.Array.IndexOf(DurationUnits, _durationUnit) < 0) _errors.Add(ApplicationConstants.ValidationMessages.DurationUnitInvalid);
             if (_durationCount < 1 || _durationCount > 120) _errors.Add(ApplicationConstants.ValidationMessages.DurationCountInvalid);
             if (!IsValidAmount(_price)) _errors.Add(ApplicationConstants.ValidationMessages.PriceInvalid);
