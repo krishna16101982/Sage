@@ -21,6 +21,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/sales/list', label: 'My sales', icon: 'list', section: 'Sales', managerOnly: false },
   { href: '/sales/team', label: 'Team sales', icon: 'users', section: 'Sales', managerOnly: true },
   { href: '/team', label: 'My team', icon: 'user-check', section: 'Sales', managerOnly: true },
+  { href: '/team/add', label: 'Add sales person', icon: 'user-plus', section: 'Sales', managerOnly: true },
   { href: '/customers', label: 'Customers', icon: 'briefcase', section: 'Sales', managerOnly: false },
   { href: '/change-password', label: 'Change password', icon: 'lock', section: 'Account', managerOnly: false },
 ];

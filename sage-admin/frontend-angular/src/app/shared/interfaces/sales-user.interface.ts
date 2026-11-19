@@ -39,3 +39,18 @@ export interface SalesUserQuery {
   sortBy?: "name" | "username" | "email" | "role" | "status" | "manager" | "createdAtUtc" | "lastLoginAtUtc";
   sortDirection?: "asc" | "desc";
 }
+
+/** One change to a sales user (GET /api/admin/sales-users/history). */
+export interface SalesUserHistoryEntry {
+  atUtc: string;
+  salesUserId: string | null;
+  salesUserName: string | null;
+  username: string | null;
+  /** Created, Status, Manager, Role, Details, Cancel requests. */
+  change: string;
+  /** e.g. "Active → Inactive", "Kumar Gaurav → Asha Rao". */
+  details: string;
+  byName: string | null;
+  /** "Admin Panel" or "User Panel". */
+  byPanel: string;
+}

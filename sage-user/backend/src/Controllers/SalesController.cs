@@ -41,6 +41,22 @@ namespace SageUserApi.Controllers
             return Result(_members, _fr);
         }, _ct);
 
+        /// <summary>A sales manager adds a sales person to their own team (temporary password, changed at first sign-in). 201 with the member.</summary>
+        [HttpPost("team-members")]
+        public Task<IActionResult> CreateTeamMember([FromBody] HttpTeamMemberPostParams _params, CancellationToken _ct) => WithUserAsync("C:Sales:CreateTeamMember", async _user =>
+        {
+            var (_member, _fr) = await _saleFunctions.CreateTeamMemberAsync(_params, _user, ClientIp, _ct);
+            return Result(_member, _fr);
+        }, _ct);
+
+        /// <summary>A sales manager activates or deactivates a member of their own team.</summary>
+        [HttpPut("team-members/{id:guid}/status")]
+        public Task<IActionResult> SetTeamMemberStatus(Guid id, [FromBody] HttpTeamMemberStatusParams _params, CancellationToken _ct) => WithUserAsync("C:Sales:SetTeamMemberStatus", async _user =>
+        {
+            var (_member, _fr) = await _saleFunctions.SetTeamMemberStatusAsync(id, _params, _user, ClientIp, _ct);
+            return Result(_member, _fr);
+        }, _ct);
+
         [HttpGet("{id:guid}")]
         public Task<IActionResult> GetSale(Guid id, CancellationToken _ct) => WithUserAsync("C:Sales:GetSale", async _user =>
         {

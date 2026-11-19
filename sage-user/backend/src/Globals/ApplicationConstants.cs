@@ -98,6 +98,8 @@ namespace SageUserApi.Globals
             public const string SaleCancel = "dbo.usp_Sale_Cancel";
             public const string SaleGetPaged = "dbo.usp_Sale_GetPaged";
             public const string SaleCancelRequestCreate = "dbo.usp_SaleCancelRequest_Create";
+            public const string SalesUserCreate = "dbo.usp_SalesUser_Create";
+            public const string SalesUserSetStatus = "dbo.usp_SalesUser_SetStatus";
             public const string SaleCancelRequestDecide = "dbo.usp_SaleCancelRequest_Decide";
             public const string SalesUserSetCancelPermission = "dbo.usp_SalesUser_SetCancelPermission";
         }

@@ -6,6 +6,7 @@
     </div>
     <div class="spacer"></div>
     <a class="btn btn-secondary" routerLink="/sales/team">Team sales</a>
+    <a class="btn btn-primary" routerLink="/team/add">Add sales person</a>
   </div>
   <p class="hint">
     You can cancel any sale of your team. A team member can only <strong>ask</strong> for one of their sales to be cancelled,
@@ -53,7 +54,7 @@
     <header class="card-header"><h2 class="section-title">Team members</h2></header>
     <div class="table-wrap">
       <table class="data-table">
-        <thead><tr><th>Name</th><th>Status</th><th class="amount">Requests waiting</th><th>Can request cancellation</th></tr></thead>
+        <thead><tr><th>Name</th><th>Status</th><th class="amount">Requests waiting</th><th>Can request cancellation</th><th></th></tr></thead>
         <tbody>
           @for (m of members() ?? []; track m.id) {
             <tr>
@@ -73,9 +74,15 @@
                   <span class="text-sm">{{ m.canRequestCancellation ? 'Allowed' : 'Not allowed' }}</span>
                 </label>
               </td>
+              <td class="actions">
+                <button type="button" class="link-button" [class.danger]="m.status === 'Active'" [disabled]="saving() === m.id"
+                        (click)="setStatus(m, m.status === 'Active' ? 'Inactive' : 'Active')">
+                  {{ m.status === 'Active' ? 'Deactivate' : 'Activate' }}
+                </button>
+              </td>
             </tr>
           } @empty {
-            <tr><td colspan="4" class="table-empty">{{ members() ? 'Nobody reports to you yet.' : 'Loading...' }}</td></tr>
+            <tr><td colspan="5" class="table-empty">{{ members() ? 'Nobody reports to you yet. Use Add sales person.' : 'Loading...' }}</td></tr>
           }
         </tbody>
       </table>

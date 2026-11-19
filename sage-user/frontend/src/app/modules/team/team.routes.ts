@@ -9,4 +9,10 @@ export const teamRoutes: Routes = [
     canActivate: [managerGuard],
     loadComponent: () => import('./team-page/team-page.component').then((m) => m.TeamPage),
   },
+  {
+    path: 'add',
+    title: 'Add sales person - Sage Sales',
+    canActivate: [managerGuard],
+    loadComponent: () => import('./team-member-add/team-member-add.component').then((m) => m.TeamMemberAdd),
+  },
 ];

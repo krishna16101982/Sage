@@ -23,4 +23,10 @@ export class SalesService {
   teamMembers = () => this.rest.get<TeamMember[]>(`${this.base}/team-members`);
   setCancelPermission = (memberId: string, canRequestCancellation: boolean) =>
     this.rest.put<TeamMember>(`${this.base}/team-members/${memberId}/cancel-permission`, { canRequestCancellation });
+  /** Sales managers: add a sales person to their team (temporary password, changed at first sign-in). */
+  addTeamMember = (body: { firstName: string; lastName: string; username: string; email: string; mobileNumber?: string; password: string; confirmPassword: string }) =>
+    this.rest.post<TeamMember>(`${this.base}/team-members`, body);
+  /** Sales managers: activate or deactivate a team member (deactivating signs them out). */
+  setTeamMemberStatus = (memberId: string, status: 'Active' | 'Inactive') =>
+    this.rest.put<TeamMember>(`${this.base}/team-members/${memberId}/status`, { status });
 }

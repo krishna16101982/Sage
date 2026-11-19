@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Alert } from '../../../component/alert/alert';
 import { initials } from '../../../component/icon/icon';
+import { MessageService } from '../../../services/message/message.service';
 import { errorText } from '../../../services/rest/global-rest-service';
 import { SalesService } from '../../../services/sales/sales.service';
 import type { CancelRequest, TeamMember } from '../../../shared/interfaces/sale.interface';
@@ -12,6 +13,7 @@ import { CancelDecisionModal } from '../../sales/cancel-decision-modal/cancel-de
  * /team (sales managers) — the people who report to you:
  *   * "Can request cancellation" per person: when on, they see Request cancellation on their own sales.
  *   * Cancellation requests waiting for you: approve (the sale is cancelled) or reject.
+ *   * Add sales person, and Activate / Deactivate a team member (deactivating signs them out at once).
  */
 @Component({
   selector: 'app-team-page',
@@ -27,7 +29,7 @@ export class TeamPage implements OnInit {
   readonly requests = signal<CancelRequest[] | null>(null);
   readonly saving = signal<string | null>(null);
   readonly error = signal<string | null>(null);
-  readonly notice = signal<string | null>(null);
+  readonly notice = signal<string | null>(inject(MessageService).take());
   readonly deciding = signal<{ request: CancelRequest; approve: boolean } | null>(null);
 
   async ngOnInit(): Promise<void> {
@@ -60,6 +62,23 @@ export class TeamPage implements OnInit {
     } catch (err) {
       this.error.set(errorText(err));
       await this.load(); // put the switch back
+    } finally {
+      this.saving.set(null);
+    }
+  }
+
+  /** Activates or deactivates a team member; deactivating asks first and signs them out. */
+  async setStatus(member: TeamMember, status: 'Active' | 'Inactive'): Promise<void> {
+    if (status === 'Inactive' && !confirm(`Deactivate ${member.name}? They are signed out and cannot sign in until you activate them again.`)) return;
+    this.error.set(null);
+    this.notice.set(null);
+    this.saving.set(member.id);
+    try {
+      const updated = await this.service.setTeamMemberStatus(member.id, status);
+      this.members.update((list) => (list ?? []).map((m) => (m.id === member.id ? updated : m)));
+      this.notice.set(status === 'Active' ? `${member.name} is active again.` : `${member.name} is deactivated and signed out.`);
+    } catch (err) {
+      this.error.set(errorText(err));
     } finally {
       this.saving.set(null);
     }

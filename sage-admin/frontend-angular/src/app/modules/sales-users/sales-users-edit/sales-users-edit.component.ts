@@ -7,11 +7,12 @@ import { errorText } from '../../../services/rest/global-rest-service';
 import { SalesUsersService } from '../../../services/sales-users/sales-users.service';
 import type { SalesUser } from '../../../shared/interfaces/sales-user.interface';
 import { SalesUsersForm } from '../sales-users-form/sales-users-form.component';
+import { SalesUsersHistory } from '../sales-users-history/sales-users-history.component';
 
-/** /sales-users/:id/edit — edit details, role and manager. The username never changes. */
+/** /sales-users/:id/edit — edit details, role and manager (the username never changes), with this person's history. */
 @Component({
   selector: 'app-sales-users-edit',
-  imports: [Alert, PageHeader, SalesUsersForm],
+  imports: [Alert, PageHeader, SalesUsersForm, SalesUsersHistory],
   templateUrl: './sales-users-edit.component.html',
 })
 export class SalesUsersEdit implements OnInit {

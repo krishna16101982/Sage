@@ -40,6 +40,22 @@ namespace SageAdminApi.Controllers
             return RunAsync<PagedResult<SalesUserDto>>("C:SalesUsers:GetSalesUsers", () => _salesUserFunctions.GetSalesUsersAsync(_filter, _ct));
         }
 
+        /// <summary>
+        /// History of sales users, newest first: created, activated / deactivated, manager and role changes, edits and
+        /// cancellation-request permission, made in the Admin Panel or by the sales manager in the User Panel.
+        /// salesUserId = one person; empty = everyone (latest 500 changes).
+        /// </summary>
+        [HttpGet]
+        [Route("history")]
+        [RequirePermission(PermissionConstants.SalesUserView)]
+        public Task<IActionResult> GetHistory([FromQuery] Guid? salesUserId, [FromServices] ISalesUserHistoryFunctions _history, CancellationToken _ct)
+        {
+            //*************************************************************
+            // Required Permission: SalesUser.View
+            //*************************************************************
+            return RunAsync<List<SalesUserHistoryEntry>>("C:SalesUsers:GetHistory", () => _history.GetHistoryAsync(salesUserId, _ct));
+        }
+
         /// <summary>Active sales managers, for the manager drop-down.</summary>
         [HttpGet]
         [Route("managers")]

@@ -1,0 +1,30 @@
+<div class="stack max-w-lg">
+  <app-page-header title="Add sales person" backLink="/team" />
+  <p class="hint">The new sales person reports to you. Give them the username and the temporary password; they must change the password the first time they sign in.</p>
+  <form class="form" (ngSubmit)="submit()">
+    @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+    <div class="form-grid-2">
+      <label class="field-label">First name <input class="field" name="firstName" required maxlength="100" [(ngModel)]="firstName" /></label>
+      <label class="field-label">Last name <input class="field" name="lastName" required maxlength="100" [(ngModel)]="lastName" /></label>
+    </div>
+    <label class="field-label">Username
+      <input class="field" name="username" required minlength="3" maxlength="50" autocomplete="off" placeholder="e.g. neha.verma" [(ngModel)]="username" />
+      <span class="hint">3-50 characters: letters, digits, '.', '_' or '-'. It cannot be changed later.</span>
+    </label>
+    <div class="form-grid-2">
+      <label class="field-label">Email <input class="field" name="email" type="email" required maxlength="256" [(ngModel)]="email" /></label>
+      <label class="field-label">Mobile <input class="field" name="mobileNumber" type="tel" maxlength="20" [(ngModel)]="mobileNumber" /></label>
+      <label class="field-label">Temporary password
+        <input class="field" name="password" type="password" required autocomplete="new-password" [(ngModel)]="password" />
+      </label>
+      <label class="field-label">Confirm password
+        <input class="field" name="confirmPassword" type="password" required autocomplete="new-password" [(ngModel)]="confirmPassword" />
+      </label>
+    </div>
+    <p class="hint">At least 10 characters, with an uppercase and a lowercase letter, a digit and a special character.</p>
+    <div class="modal-footer">
+      <a class="btn btn-secondary" routerLink="/team">Cancel</a>
+      <button type="submit" class="btn btn-primary" [disabled]="busy()">{{ busy() ? 'Please wait...' : 'Add sales person' }}</button>
+    </div>
+  </form>
+</div>

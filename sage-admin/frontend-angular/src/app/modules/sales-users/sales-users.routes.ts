@@ -20,6 +20,13 @@ export const salesUserRoutes: Routes = [
     loadComponent: () => import('./sales-users-add/sales-users-add.component').then((m) => m.SalesUsersAdd),
   },
   {
+    path: 'history',
+    title: 'Sales users history - Sage Admin',
+    data: { access_perms: [Perm.SalesUserView] },
+    canActivate: [PermissionGuard],
+    loadComponent: () => import('./sales-users-history/sales-users-history-page.component').then((m) => m.SalesUsersHistoryPage),
+  },
+  {
     path: ':id',
     children: [
       {

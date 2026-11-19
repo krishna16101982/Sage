@@ -56,6 +56,10 @@ namespace SageUserApi.AppFunctions.Interfaces
         Task<(SaleDto sale, IFunctionReturn functionReturn)> CreateSaleAsync(HttpSalePostParams _params, SalesUserContext _user, string _ipAddress, CancellationToken _ct = default);
         Task<(SaleDto sale, IFunctionReturn functionReturn)> CancelSaleAsync(Guid _id, HttpSaleCancelParams _params, SalesUserContext _user, string _ipAddress, CancellationToken _ct = default);
         Task<(List<TeamMember> members, IFunctionReturn functionReturn)> GetTeamMembersAsync(SalesUserContext _user, CancellationToken _ct = default);
+        /// <summary>A sales manager adds a sales person to their own team (temporary password, changed at first sign-in).</summary>
+        /// <summary>A sales manager activates or deactivates a member of their own team (deactivating signs them out).</summary>
+        Task<(TeamMember member, IFunctionReturn functionReturn)> SetTeamMemberStatusAsync(Guid _memberId, HttpTeamMemberStatusParams _params, SalesUserContext _user, string _ipAddress, CancellationToken _ct = default);
+        Task<(TeamMember member, IFunctionReturn functionReturn)> CreateTeamMemberAsync(HttpTeamMemberPostParams _params, SalesUserContext _user, string _ipAddress, CancellationToken _ct = default);
         /// <summary>A sales person (allowed by their manager) asks to cancel one of their own sales.</summary>
         Task<(CancelRequestDto request, IFunctionReturn functionReturn)> CreateCancelRequestAsync(Guid _saleId, HttpSaleCancelParams _params, SalesUserContext _user, string _ipAddress, CancellationToken _ct = default);
         /// <summary>Managers: requests on their team's sales. Sales persons: their own requests.</summary>

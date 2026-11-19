@@ -6,3 +6,8 @@
     <app-sales-users-form [user]="u" (saved)="saved($event)" />
   }
 </div>
+@if (user(); as u) {
+  <div class="stack max-w-3xl" style="margin-top: 1.5rem">
+    <app-sales-users-history [salesUserId]="u.id" />
+  </div>
+}

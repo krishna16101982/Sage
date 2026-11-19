@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Options;
 using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.AppValidations;
@@ -13,6 +14,7 @@ using SageCommonLib.Globals;
 using SageCommonLib.Models;
 using SageCommonLib.Models.Interfaces;
 using SageCommonLib.Models.Paging;
+using SageCommonLib.Security;
 using SageUserApi.AppFunctions.Interfaces;
 using SageUserApi.AppValidations;
 using SageUserApi.Globals;
@@ -38,11 +40,14 @@ namespace SageUserApi.AppFunctions
         private readonly IDatabaseFunctions _databaseFunctions;
         private readonly ICatalogFunctions _catalogFunctions;
 
-        public SaleFunctions(ILoggerFunctions __loggerFunctions, IDatabaseFunctions __databaseFunctions, ICatalogFunctions __catalogFunctions)
+        private readonly AuthSettings _authSettings;
+
+        public SaleFunctions(ILoggerFunctions __loggerFunctions, IDatabaseFunctions __databaseFunctions, ICatalogFunctions __catalogFunctions, IOptions<AuthSettings> __authSettings)
         {
             _loggerFunctions = __loggerFunctions;
             _databaseFunctions = __databaseFunctions;
             _catalogFunctions = __catalogFunctions;
+            _authSettings = __authSettings.Value;
         }
 
         #region Helpers
@@ -351,6 +356,90 @@ namespace SageUserApi.AppFunctions
                 if (!_user.IsManager) return (null, ManagersOnly(_methodName));
                 List<TeamMember> _members = await ReadTeamAsync(_user.Id, _ct);
                 return (_members, new FunctionReturn { MethodName = _methodName });
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
+
+        public async Task<(TeamMember member, IFunctionReturn functionReturn)> SetTeamMemberStatusAsync(Guid _memberId, HttpTeamMemberStatusParams _params, SalesUserContext _user, string _ipAddress, CancellationToken _ct = default)
+        {
+            string _methodName = "F:Sale:SetTeamMemberStatus";
+            try
+            {
+                if (!_user.IsManager) return (null, ManagersOnly(_methodName, Msg.ManagersOnlyTeam));
+                string _status = _params?.Status?.Trim();
+                if (_status != "Active" && _status != "Inactive") return (null, ApplicationCommonFunctions.BadRequest("Status must be Active or Inactive.", _methodName));
+
+                // Only the manager's own team.
+                TeamMember _before = (await ReadTeamAsync(_user.Id, _ct)).FirstOrDefault(m => m.Id == _memberId);
+                if (_before == null) return (null, ApplicationCommonFunctions.NotFound("This person is not in your team.", _methodName));
+
+                if (_before.Status != _status)
+                {
+                    (IFunctionReturn _functionReturn, long _) = await _databaseFunctions.ExecuteProcedureWriteAsync(SP.SalesUserSetStatus, new[]
+                    {
+                        P("@PublicId", _memberId), P("@Status", _status), P("@ActorUserId", null)
+                    }, _methodName, null, _ct);
+                    if (!_functionReturn.Status) return (null, _functionReturn);
+                    await SalesAudit.LogAsync(_databaseFunctions, _loggerFunctions, "TeamMemberStatus", "SalesUser", _memberId, _user,
+                        new { From = _before.Status, To = _status }, _ipAddress, _ct);
+                }
+
+                TeamMember _member = (await ReadTeamAsync(_user.Id, _ct)).FirstOrDefault(m => m.Id == _memberId);
+                string _message = _status == "Active" ? $"{_member?.Name} is active again." : $"{_member?.Name} is deactivated and signed out.";
+                return (_member, new FunctionReturn { MethodName = _methodName, Message = new List<string> { _message } });
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
+
+        public async Task<(TeamMember member, IFunctionReturn functionReturn)> CreateTeamMemberAsync(HttpTeamMemberPostParams _params, SalesUserContext _user, string _ipAddress, CancellationToken _ct = default)
+        {
+            string _methodName = "F:Sale:CreateTeamMember";
+            try
+            {
+                if (!_user.IsManager) return (null, ManagersOnly(_methodName));
+
+                // Same rules as Admin Panel > Sales users > Add (names, username, email, mobile, password strength).
+                var _errors = new List<string>();
+                string _first = CleanText(_params?.FirstName), _last = CleanText(_params?.LastName);
+                string _username = _params?.Username?.Trim(), _email = _params?.Email?.Trim(), _mobile = CleanText(_params?.MobileNumber);
+                if (string.IsNullOrEmpty(_first) || _first.Length > 100) _errors.Add("Enter the first name (up to 100 characters).");
+                if (string.IsNullOrEmpty(_last) || _last.Length > 100) _errors.Add("Enter the last name (up to 100 characters).");
+                if (string.IsNullOrEmpty(_username)) _errors.Add("Enter a username.");
+                else if (!ValidationFunctions.IsValidUsername(_username)) _errors.Add("The username may use letters, numbers, dot, dash and underscore (3 to 50 characters).");
+                if (!ValidationFunctions.IsValidEmail(_email) || _email.Length > 256) _errors.Add("Enter a valid email address.");
+                if (_mobile != null && !ValidationFunctions.IsValidPhone(_mobile)) _errors.Add("Enter a valid mobile number.");
+                _errors.AddRange(ValidationFunctions.CheckPasswordStrength(_params?.Password));
+                if (_params?.Password != _params?.ConfirmPassword) _errors.Add("The passwords do not match.");
+                if (_errors.Count > 0) return (null, Invalid(_errors, _methodName));
+
+                // The procedure checks duplicate username / email and that the manager is an active sales manager.
+                Guid _id;
+                try
+                {
+                    _id = await _databaseFunctions.ExecuteProcedureScalarAsync<Guid>(SP.SalesUserCreate, new[]
+                    {
+                        P("@FirstName", _first), P("@LastName", _last), P("@Username", _username), P("@Email", _email), P("@MobileNumber", _mobile),
+                        P("@PasswordHash", SecurityHash.HashPassword(_params.Password, _authSettings.PasswordHashIterations)),
+                        P("@Role", "SalesPerson"), P("@ManagerPublicId", _user.PublicId), P("@ActorUserId", null)
+                    }, _ct);
+                }
+                catch (AppException ex)
+                {
+                    return (null, FunctionReturn.Fail(ex.MessageType, ex.Message, ex.HttpStatusCode, _methodName));
+                }
+
+                await SalesAudit.LogAsync(_databaseFunctions, _loggerFunctions, "CreateTeamMember", "SalesUser", _id, _user,
+                    new { FirstName = _first, LastName = _last, Username = _username, Email = _email, MobileNumber = _mobile, Role = "SalesPerson" }, _ipAddress, _ct);
+                TeamMember _member = (await ReadTeamAsync(_user.Id, _ct)).FirstOrDefault(m => m.Id == _id);
+                return (_member, new FunctionReturn { MethodName = _methodName, HttpStatusCode = Constants.HttpStatusCodes.Created, Message = new List<string> { $"{_first} {_last} added to your team." } });
             }
             catch (Exception ex)
             {
