@@ -98,8 +98,11 @@ export class SalesOrderForm implements OnInit {
 
   // ---- 4. Order terms ----
   readonly startDate = signal(today());
+  /** Paid months: 12, 24 or 36 (saved as 1, 2 or 3 years). Starts on "Select". */
+  protected readonly paidMonthChoices = [12, 24, 36];
+  readonly paidMonthsChoice = signal<number | null>(null);
   readonly durationUnit = signal<DurationUnit>('Year');
-  readonly durationCount = signal<number | null>(1);
+  readonly durationCount = signal<number | null>(null);
   readonly freeMonths = signal(0);
   readonly billingFrequencyId = signal<number | null>(null);
   readonly billingMethodId = signal<number | null>(null);
@@ -206,8 +209,7 @@ export class SalesOrderForm implements OnInit {
       if (c.email.trim() && !EMAIL.test(c.email.trim())) p.push(`Enter a valid email for the ${who}.`);
       if (c.phone.trim() && !PHONE.test(c.phone.trim())) p.push(`Enter a valid contact number for the ${who}.`);
     }
-    const count = this.durationCount();
-    if (count === null || count < 1 || count > 120) p.push('Paid duration must be from 1 to 120.');
+    if (!this.paidMonthsChoice()) p.push('Choose the paid months (12, 24 or 36).');
     if (!this.startDate()) p.push('Enter the start date.');
     else if (this.startDate() < this.earliestStart()) p.push('The start date is further back than the company allows.');
     if (!this.billingFrequencyId() || !this.billingMethodId() || !this.paymentMethodId() || !this.paymentTermId() || !this.currencyId())
@@ -232,13 +234,7 @@ export class SalesOrderForm implements OnInit {
       const [catalog, options] = await Promise.all([this.catalogService.catalog(), this.orderFormService.options()]);
       this.catalog.set(catalog);
       this.options.set(options);
-      // Every drop-down starts on its list's default (Admin Panel > Settings > Order form lists).
-      const def = (list: MasterOption[]) => (list.find((o) => o.isDefault) ?? list[0])?.id ?? null;
-      this.billingFrequencyId.set(def(options.billingFrequencies));
-      this.billingMethodId.set(def(options.billingMethods));
-      this.paymentMethodId.set(def(options.paymentMethods));
-      this.paymentTermId.set(def(options.paymentTerms));
-      this.currencyId.set(def(options.currencies));
+      // Billing, payment and currency start on "Select": the seller chooses each (lists: Admin Panel > Settings > Order form lists).
       this.gstPercent.set(options.defaultGstPercent);
       if (catalog.length === 1) this.chooseCategory(catalog[0].id);
     } catch (err) {
@@ -261,11 +257,14 @@ export class SalesOrderForm implements OnInit {
   choosePlan(id: number | null): void {
     this.planId.set(id);
     const plan = this.plan();
-    if (plan) {
-      this.durationUnit.set(plan.durationUnit);
-      this.durationCount.set(plan.durationCount);
-    }
     this.includedItemQuantity.set(plan?.includedItemQuantity ?? null);
+  }
+
+  /** 12 / 24 / 36 paid months, saved as 1 / 2 / 3 years. */
+  choosePaidMonths(months: number | null): void {
+    this.paidMonthsChoice.set(months);
+    this.durationUnit.set('Year');
+    this.durationCount.set(months ? months / 12 : null);
   }
 
   setPrimary(field: keyof OrderContact, value: string): void {

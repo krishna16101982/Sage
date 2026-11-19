@@ -84,8 +84,12 @@ public class OrderFormApiTests
         wording.GetProperty("signatureClauses").GetString()!.Split('\n').Length.ShouldBe(5);
         foreach (var list in new[] { "billingFrequencies", "billingMethods", "paymentMethods", "paymentTerms", "currencies" })
             res.Data.GetProperty(list).EnumerateArray().Count(o => o.GetProperty("isDefault").GetBoolean()).ShouldBe(1, list);
-        res.Data.GetProperty("billingFrequencies").EnumerateArray().Select(o => o.GetProperty("name").GetString())
-            .ShouldBe(new[] { "Monthly", "Quarterly", "Half-yearly", "Annual", "One-time" });
+        string[] Names(string list) => res.Data.GetProperty(list).EnumerateArray().Select(o => o.GetProperty("name").GetString()!).ToArray();
+        Names("billingFrequencies").ShouldBe(new[] { "Annual", "Half Yearly", "Quarterly", "Monthly" });
+        Names("billingMethods").ShouldBe(new[] { "Pay Upfront", "Pay in Arrears" });
+        Names("paymentMethods").ShouldBe(new[] { "Invoice", "Credit card", "Bank transfer" });
+        Names("paymentTerms").Take(5).ShouldBe(new[] { "Immediate", "Net 15", "Net 30", "Net 45", "Net 60" });
+        Names("currencies").ShouldBe(new[] { "INR", "USD", "GBP", "EUR" });
         (await Call(HttpMethod.Get, $"{Api}/order-form/options")).Status.ShouldBe(401);
     }
 

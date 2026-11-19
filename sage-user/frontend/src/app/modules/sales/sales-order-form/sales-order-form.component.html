@@ -165,12 +165,10 @@
                 <label class="field-label">Start date
                   <input class="field" name="startDate" type="date" [min]="earliestStart()" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" />
                 </label>
-                <label class="field-label">Paid duration
-                  <input class="field" name="durationCount" type="number" min="1" max="120" step="1" [ngModel]="durationCount()" (ngModelChange)="durationCount.set($event)" />
-                </label>
-                <label class="field-label">Unit
-                  <select class="field" name="durationUnit" [ngModel]="durationUnit()" (ngModelChange)="durationUnit.set($event)">
-                    @for (u of units; track u) { <option [value]="u">{{ u }}</option> }
+                <label class="field-label">Paid months
+                  <select class="field" name="paidMonths" [ngModel]="paidMonthsChoice()" (ngModelChange)="choosePaidMonths($event)">
+                    <option [ngValue]="null" disabled>Select</option>
+                    @for (m of paidMonthChoices; track m) { <option [ngValue]="m">{{ m }}</option> }
                   </select>
                 </label>
                 <label class="field-label">Free months (same price)
@@ -179,37 +177,41 @@
                   </select>
                 </label>
                 <div class="field-label">Term (automatic)
-                  <div class="field field-muted">{{ termText() }}</div>
+                  <div class="field field-muted">{{ paidMonths() > 0 ? termText() : 'Automatic' }}</div>
+                </div>
+                <div class="field-label">End date (automatic)
+                  <div class="field field-muted">{{ endDate() ? dmy(endDate()) : 'dd-mm-yyyy' }}</div>
                 </div>
               </div>
+              <!-- Every list starts on "Select": the seller chooses each one (Admin Panel > Settings > Order form lists). -->
               <div class="form-grid-5">
-                <div class="field-label">End date (automatic)
-                  <div class="field field-muted">{{ endDate() ? dmy(endDate()) : '-' }}</div>
-                </div>
                 <label class="field-label">Billing frequency
                   <select class="field" name="billingFrequencyId" [ngModel]="billingFrequencyId()" (ngModelChange)="billingFrequencyId.set($event)">
+                    <option [ngValue]="null" disabled>Select</option>
                     @for (o of opt.billingFrequencies; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }
                   </select>
                 </label>
                 <label class="field-label">Billing method
                   <select class="field" name="billingMethodId" [ngModel]="billingMethodId()" (ngModelChange)="billingMethodId.set($event)">
+                    <option [ngValue]="null" disabled>Select</option>
                     @for (o of opt.billingMethods; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }
                   </select>
                 </label>
                 <label class="field-label">Payment method
                   <select class="field" name="paymentMethodId" [ngModel]="paymentMethodId()" (ngModelChange)="paymentMethodId.set($event)">
+                    <option [ngValue]="null" disabled>Select</option>
                     @for (o of opt.paymentMethods; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }
                   </select>
                 </label>
                 <label class="field-label">Payment term
                   <select class="field" name="paymentTermId" [ngModel]="paymentTermId()" (ngModelChange)="paymentTermId.set($event)">
+                    <option [ngValue]="null" disabled>Select</option>
                     @for (o of opt.paymentTerms; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }
                   </select>
                 </label>
-              </div>
-              <div class="form-grid-5">
                 <label class="field-label">Currency
                   <select class="field" name="currencyId" [ngModel]="currencyId()" (ngModelChange)="currencyId.set($event)">
+                    <option [ngValue]="null" disabled>Select</option>
                     @for (o of opt.currencies; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }
                   </select>
                 </label>
