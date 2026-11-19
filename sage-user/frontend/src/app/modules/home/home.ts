@@ -38,10 +38,6 @@ export class Home implements OnInit {
 
   readonly countChange = computed(() => percentChange(this.mine()?.totalCount ?? 0, this.mineLast()?.totalCount ?? 0));
   readonly revenueChange = computed(() => percentChange(this.mine()?.totalSaleAmount ?? 0, this.mineLast()?.totalSaleAmount ?? 0));
-  readonly marginPercent = computed(() => {
-    const m = this.mine();
-    return m && m.totalSaleAmount > 0 ? Math.round((m.totalMargin / m.totalSaleAmount) * 100) : 0;
-  });
 
   /** My sale amount per day of this month, up to today. */
   readonly daily = computed<BarPoint[]>(() => {

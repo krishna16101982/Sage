@@ -53,18 +53,6 @@
         </div>
       </div>
 
-      <div class="card stat-card accent-orange">
-        <div class="stat-top">
-          <span class="stat-icon"><app-icon name="percent" /></span>
-          <div class="stack-xs">
-            <span class="stat-label">My margin this month</span>
-            <span class="stat-value" [class.text-danger]="(mine()?.totalMargin ?? 0) < 0">{{ mine() ? inr(mine()!.totalMargin) : '…' }}</span>
-            <span class="stat-sub">{{ marginPercent() }}% of revenue</span>
-          </div>
-        </div>
-        <div class="progress" aria-hidden="true"><span [style.width.%]="marginPercent() > 0 ? marginPercent() : 0"></span></div>
-      </div>
-
       @if (u.isManager) {
         <a class="card stat-card accent-purple" routerLink="/sales/team">
           <div class="stat-top">
