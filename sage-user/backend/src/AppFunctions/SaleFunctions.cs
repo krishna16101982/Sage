@@ -415,7 +415,7 @@ namespace SageUserApi.AppFunctions
                 if (string.IsNullOrEmpty(_username)) _errors.Add("Enter a username.");
                 else if (!ValidationFunctions.IsValidUsername(_username)) _errors.Add("The username may use letters, numbers, dot, dash and underscore (3 to 50 characters).");
                 if (!ValidationFunctions.IsValidEmail(_email) || _email.Length > 256) _errors.Add("Enter a valid email address.");
-                if (_mobile != null && !ValidationFunctions.IsValidPhone(_mobile)) _errors.Add("Enter a valid mobile number.");
+                if (_mobile != null && !ValidationFunctions.IsValidPhone(_mobile)) _errors.Add("Enter a 10-digit mobile number.");
                 _errors.AddRange(ValidationFunctions.CheckPasswordStrength(_params?.Password));
                 if (_params?.Password != _params?.ConfirmPassword) _errors.Add("The passwords do not match.");
                 if (_errors.Count > 0) return (null, Invalid(_errors, _methodName));

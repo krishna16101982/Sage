@@ -8,7 +8,7 @@
     <input class="field" name="username" required maxlength="50" autocomplete="off" [disabled]="!!user()" [(ngModel)]="username" />
   </label>
   <label class="field-label">Email <input class="field" name="email" type="email" required maxlength="256" [(ngModel)]="email" /></label>
-  <label class="field-label">Mobile <input class="field" name="mobile" maxlength="20" placeholder="+91 98765 43210" [(ngModel)]="mobileNumber" /></label>
+  <label class="field-label">Mobile <input class="field" name="mobile" type="tel" inputmode="numeric" maxlength="10" placeholder="10-digit number" [(ngModel)]="mobileNumber" /></label>
 
   <fieldset class="stack-sm text-sm">
     <legend>Role</legend>

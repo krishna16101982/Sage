@@ -25,6 +25,13 @@ public class ValidationFunctionsTests
     [Theory]
     [InlineData("+91 98765 43210", true)]
     [InlineData("9876543210", true)]
+    [InlineData("98765-43210", true)]
+    [InlineData("09876543210", true)]
+    [InlineData("+919876543210", true)]
+    [InlineData("98765432101", false)]     // 11 digits
+    [InlineData("987654321", false)]       // 9 digits
+    [InlineData("+44 7911 123456", false)] // other country codes
+    [InlineData("98765 4321a", false)]
     [InlineData("abc", false)]
     public void Phone(string v, bool ok) => ValidationFunctions.IsValidPhone(v).ShouldBe(ok);
 

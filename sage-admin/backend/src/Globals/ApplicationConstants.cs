@@ -55,7 +55,7 @@ namespace SageAdminApi.Globals
             public const string UsernameRequired = "Username is required";
             public const string UsernameInvalid = "Username must be 3-50 characters: letters, digits, '.', '_' or '-'";
             public const string EmailInvalid = "Email is invalid";
-            public const string MobileInvalid = "Mobile number is invalid";
+            public const string MobileInvalid = "Enter a 10-digit mobile number (digits only, +91 optional)";
             public const string PasswordMismatch = "Password and confirm password do not match";
             public const string GroupCodeInvalid = "Group code must start with a letter and contain only letters, digits, '_' or '-'";
             public const string GroupNameRequired = "Group name is required (max 100 characters)";

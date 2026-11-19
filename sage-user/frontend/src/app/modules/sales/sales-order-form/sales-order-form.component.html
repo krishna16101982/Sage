@@ -4,7 +4,7 @@
     <div class="row">
       <h1 class="page-title">New order form</h1>
       <span class="spacer"></span>
-      <span class="badge badge-warning">Draft</span>
+      <span class="badge badge-warning"></span>
     </div>
     <p class="hint">Fill in the sections; the order summary on the right updates as you go. Prices come from the price list.</p>
   </div>
@@ -85,11 +85,10 @@
                   <input class="field" name="gstPercent" type="number" min="0" max="28" step="0.01" [ngModel]="gstPercent()" (ngModelChange)="gstPercent.set($event)" />
                 </label>
               </div>
-              @if (plan()?.hasSeatPrices) {
+              <!-- The seat price is filled in by itself; a note shows only when there is no price for these seats. -->
+              @if (plan()?.hasSeatPrices && !seatRange()) {
                 <p class="hint">
-                  @if (seatRange(); as r) {
-                    Seat price for {{ fyLabel(plan()!.priceFiscalYear!) }}, {{ rangeLabel(r) }} seats: every seat is charged {{ inr(r.price) }}.
-                  } @else if (plan()!.seatPrices.length === 0) {
+                  @if (plan()!.seatPrices.length === 0) {
                     This plan has no seat prices for {{ fyLabel(plan()!.priceFiscalYear!) }} yet.
                   } @else { Enter the number of seats to get the seat price. }
                 </p>
@@ -120,7 +119,7 @@
                       <input class="field" name="pEmail" type="email" maxlength="256" [ngModel]="primary().email" (ngModelChange)="setPrimary('email', $event)" />
                     </label>
                     <label class="field-label">Contact number
-                      <input class="field" name="pPhone" type="tel" maxlength="20" [ngModel]="primary().phone" (ngModelChange)="setPrimary('phone', $event)" />
+                      <input class="field" name="pPhone" type="tel" inputmode="numeric" maxlength="10" [ngModel]="primary().phone" (ngModelChange)="setPrimary('phone', $event)" />
                     </label>
                   </div>
                 </div>
@@ -141,7 +140,7 @@
                       <input class="field" name="bEmail" type="email" maxlength="256" [ngModel]="billing().email" (ngModelChange)="setBilling('email', $event)" />
                     </label>
                     <label class="field-label">Contact number
-                      <input class="field" name="bPhone" type="tel" maxlength="20" [ngModel]="billing().phone" (ngModelChange)="setBilling('phone', $event)" />
+                      <input class="field" name="bPhone" type="tel" inputmode="numeric" maxlength="10" [ngModel]="billing().phone" (ngModelChange)="setBilling('phone', $event)" />
                     </label>
                   </div>
                   <p class="hint">Left empty, the order bills the primary contact.</p>
@@ -284,7 +283,7 @@
                 <div class="summary-row"><span class="text-muted">Currency</span><span>{{ currencyText() }}</span></div>
               </div>
               <div class="subcard stack-xs text-sm">
-                <div class="summary-row"><span>Subtotal ({{ quantity() ?? 0 }} × {{ inr(unitPrice()) }}@if (terms() !== 1) { × {{ termsText() }} })@if (seatRange(); as r) { <span class="text-muted"> · {{ fyLabel(plan()!.priceFiscalYear!) }}, {{ rangeLabel(r) }} seats</span> }</span><span>{{ inr(listAmount()) }}</span></div>
+                <div class="summary-row"><span>Subtotal ({{ quantity() ?? 0 }} × {{ inr(unitPrice()) }}@if (terms() !== 1) { × {{ termsText() }} })</span><span>{{ inr(listAmount()) }}</span></div>
                 <div class="summary-row"><span>After {{ discountPercent() ?? 0 }}% discount</span><span>{{ inr(saleAmount()) }}</span></div>
                 <div class="summary-row"><span>Tax ({{ gstPercent() ?? 0 }}% GST)</span><span>{{ inr(taxAmount()) }}</span></div>
                 <div class="summary-row summary-total"><span>Order total</span><span>{{ inr(totalAmount()) }}</span></div>

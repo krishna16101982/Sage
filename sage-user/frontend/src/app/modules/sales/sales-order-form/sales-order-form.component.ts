@@ -19,7 +19,8 @@ import { CustomerPicker } from '../sales-add/customer-picker/customer-picker.com
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const emptyContact = (): OrderContact => ({ name: '', designation: '', email: '', phone: '' });
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE = /^\+?[0-9\s\-()]{7,20}$/;
+/** 10 digits, optionally after +91 or a leading 0 (spaces and dashes are ignored): the same rule as the server. */
+const PHONE = /^(?:\+91|0)?[0-9]{10}$/;
 
 /**
  * /sales/order-form — the New order form: customer, product and pricing (with GST), contacts and bill-to address, order
@@ -223,7 +224,7 @@ export class SalesOrderForm implements OnInit {
     if (!primary.name.trim()) p.push("Enter the primary contact's name.");
     for (const [who, c] of [['primary contact', primary], ['billing contact', this.billing()]] as const) {
       if (c.email.trim() && !EMAIL.test(c.email.trim())) p.push(`Enter a valid email for the ${who}.`);
-      if (c.phone.trim() && !PHONE.test(c.phone.trim())) p.push(`Enter a valid contact number for the ${who}.`);
+      if (c.phone.trim() && !PHONE.test(c.phone.replace(/[\s-]/g, ''))) p.push(`Enter a 10-digit contact number for the ${who}.`);
     }
     if (!this.paidMonthsChoice()) p.push('Choose the paid months (12, 24 or 36).');
     if (!this.startDate()) p.push('Enter the start date.');

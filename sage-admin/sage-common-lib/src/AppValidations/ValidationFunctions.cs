@@ -7,7 +7,8 @@ namespace SageCommonLib.AppValidations;
 public static partial class ValidationFunctions
 {
     [GeneratedRegex(@"^[A-Za-z0-9._-]{3,50}$")] private static partial Regex UsernameRegex();
-    [GeneratedRegex(@"^\+?[0-9][0-9\s-]{6,18}[0-9]$")] private static partial Regex PhoneRegex();
+    /// <summary>A 10-digit number, optionally after +91 or a leading 0; spaces and dashes are ignored.</summary>
+    [GeneratedRegex(@"^(?:\+91|0)?[0-9]{10}$")] private static partial Regex PhoneRegex();
     [GeneratedRegex(@"^[A-Za-z][A-Za-z0-9_-]{1,49}$")] private static partial Regex CodeRegex();
 
     public static bool IsValidEmail(string? email)
@@ -18,7 +19,8 @@ public static partial class ValidationFunctions
     }
 
     public static bool IsValidUsername(string? v) => v is not null && UsernameRegex().IsMatch(v);
-    public static bool IsValidPhone(string? v) => v is not null && PhoneRegex().IsMatch(v);
+    /// <summary>Mobile / phone numbers: exactly 10 digits ("9876543210", "98765 43210", "+91 98765 43210", "098765-43210").</summary>
+    public static bool IsValidPhone(string? v) => v is not null && PhoneRegex().IsMatch(v.Replace(" ", "").Replace("-", ""));
     public static bool IsValidCode(string? v) => v is not null && CodeRegex().IsMatch(v);
 
     /// <summary>Returns a list of policy violations; empty when the password is acceptable.</summary>

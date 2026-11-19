@@ -101,7 +101,7 @@ namespace SageUserApi.AppFunctions
             if (_name != null && _name.Length > 150) _errors.Add($"The {_who}'s name must be 150 characters or fewer.");
             if (_designation != null && _designation.Length > 100) _errors.Add($"The {_who}'s designation must be 100 characters or fewer.");
             if (_email != null && (!ValidationFunctions.IsValidEmail(_email) || _email.Length > 256)) _errors.Add($"Enter a valid email for the {_who}.");
-            if (_phone != null && !ValidationFunctions.IsValidPhone(_phone)) _errors.Add($"Enter a valid contact number for the {_who}.");
+            if (_phone != null && !ValidationFunctions.IsValidPhone(_phone)) _errors.Add($"Enter a 10-digit contact number for the {_who}.");
             if (_name == null && _designation == null && _email == null && _phone == null) return null;
             return new OrderContact { Name = _name, Designation = _designation, Email = _email, Phone = _phone };
         }

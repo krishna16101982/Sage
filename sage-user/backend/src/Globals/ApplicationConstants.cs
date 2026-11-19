@@ -34,7 +34,7 @@ namespace SageUserApi.Globals
             public const string CustomerNameTooLong = "Customer name must be 200 characters or fewer.";
             public const string ContactPersonTooLong = "Contact person must be 150 characters or fewer.";
             public const string InvalidEmail = "Enter a valid email address.";
-            public const string InvalidPhone = "Enter a valid phone number.";
+            public const string InvalidPhone = "Enter a 10-digit phone number (digits only, +91 optional).";
             public const string InvalidGstin = "Enter a valid 15-character GSTIN (e.g. 27AAPFU0939F1ZV).";
             public const string AddressTooLong = "Address must be 500 characters or fewer.";
             public const string PlaceTooLong = "City, state and country must be 100 characters or fewer.";

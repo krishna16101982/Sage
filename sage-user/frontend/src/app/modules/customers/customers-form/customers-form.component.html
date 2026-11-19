@@ -5,7 +5,7 @@
   </label>
   <div class="form-grid-2">
     <label class="field-label">Contact person <input class="field" name="contactPerson" maxlength="150" [(ngModel)]="contactPerson" /></label>
-    <label class="field-label">Phone <input class="field" name="phone" type="tel" maxlength="20" [(ngModel)]="phone" /></label>
+    <label class="field-label">Phone <input class="field" name="phone" type="tel" inputmode="numeric" maxlength="10" [(ngModel)]="phone" /></label>
     <label class="field-label">Email <input class="field" name="email" type="email" maxlength="256" [(ngModel)]="email" /></label>
     <label class="field-label">GSTIN
       <input class="field" name="gstin" maxlength="15" placeholder="e.g. 27AAPFU0939F1ZV" style="text-transform: uppercase" [(ngModel)]="gstin" />
