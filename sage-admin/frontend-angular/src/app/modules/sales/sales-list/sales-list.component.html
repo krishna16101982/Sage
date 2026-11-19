@@ -25,10 +25,6 @@
       <div class="card"><div class="card-body stack-xs">
         <span class="text-xs text-muted">Sale amount (active)</span><span class="font-semibold">{{ inr(d.totalSaleAmount) }}</span>
       </div></div>
-      <div class="card"><div class="card-body stack-xs">
-        <span class="text-xs text-muted">Margin (active)</span>
-        <span class="font-semibold" [class.text-danger]="d.totalMargin < 0">{{ inr(d.totalMargin) }}</span>
-      </div></div>
     </div>
   }
 

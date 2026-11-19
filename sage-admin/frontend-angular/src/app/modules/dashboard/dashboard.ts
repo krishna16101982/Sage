@@ -46,10 +46,6 @@ export class Dashboard implements OnInit {
 
   readonly countChange = computed(() => percentChange(this.thisMonth()?.totalCount ?? 0, this.lastMonth()?.totalCount ?? 0));
   readonly revenueChange = computed(() => percentChange(this.thisMonth()?.totalSaleAmount ?? 0, this.lastMonth()?.totalSaleAmount ?? 0));
-  readonly marginPercent = computed(() => {
-    const m = this.thisMonth();
-    return m && m.totalSaleAmount > 0 ? Math.round((m.totalMargin / m.totalSaleAmount) * 100) : 0;
-  });
   readonly topMax = computed(() => Math.max(1, ...this.topSellers().map((r) => r.saleAmount)));
 
   /** Sale amount per day of this month, up to today (from the month's sales, at most 200). */
