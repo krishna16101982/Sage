@@ -85,7 +85,23 @@ export class SalesOrderForm implements OnInit {
     if (!plan) return 0;
     return plan.hasSeatPrices ? (this.seatRange()?.price ?? 0) : plan.price;
   });
-  readonly listAmount = computed(() => r2(this.unitPrice() * (this.quantity() ?? 0)));
+  /** Months in one plan term (the price is per term): 12 for a 1-year plan. */
+  readonly planMonths = computed(() => {
+    const plan = this.plan();
+    return plan ? (plan.durationUnit === 'Year' ? 12 : plan.durationUnit === 'Quarter' ? 3 : 1) * plan.durationCount : 0;
+  });
+  /** "year" for a 1-year plan, otherwise "12 months" etc. (what the unit price covers). */
+  readonly planTermText = computed(() => (this.planMonths() === 12 ? 'year' : `${this.planMonths()} months`));
+  /** Plan terms paid for: 24 paid months of a 1-year plan = 2 (1 until paid months are chosen). Same rule as the server. */
+  readonly terms = computed(() => (this.planMonths() > 0 && this.paidMonths() > 0 ? this.paidMonths() / this.planMonths() : 1));
+  /** "2 years" (shown in the subtotal when more than one term is paid for). */
+  readonly termsText = computed(() => {
+    const t = Math.round(this.terms() * 100) / 100;
+    return this.planMonths() === 12 ? `${t} year${t === 1 ? '' : 's'}` : `${t} terms`;
+  });
+  /** Unit price for the whole paid term, rounded like the server: price per term × terms. */
+  readonly termUnitPrice = computed(() => r2(this.unitPrice() * this.terms()));
+  readonly listAmount = computed(() => r2(this.termUnitPrice() * (this.quantity() ?? 0)));
   readonly discountAmount = computed(() => r2((this.listAmount() * (this.discountPercent() ?? 0)) / 100));
   readonly saleAmount = computed(() => r2(this.listAmount() - this.discountAmount()));
   readonly taxAmount = computed(() => r2((this.saleAmount() * (this.gstPercent() ?? 0)) / 100));

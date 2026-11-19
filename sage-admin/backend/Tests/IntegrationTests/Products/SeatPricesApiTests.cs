@@ -157,13 +157,14 @@ public class SeatPricesApiTests
         return (seller, customer);
     }
 
-    private async Task<Guid> OrderAsync(long seller, Guid customer, long plan, int seats, decimal? discount = 0m, decimal? saleAmount = null)
+    private async Task<Guid> OrderAsync(long seller, Guid customer, long plan, int seats, decimal? discount = 0m, decimal? saleAmount = null, int? paidYears = null)
     {
         async Task<int> Default(string type) => await _fx.Db.ExecuteScalarAsync<int>("SELECT Id FROM dbo.MasterValues WHERE MasterType = @t AND IsDefault = 1", new[] { TestDb.P("@t", type) });
         return await _fx.Db.ExecuteProcedureScalarAsync<Guid>("dbo.usp_SaleOrder_Create", new[]
         {
             TestDb.P("@SalesUserId", seller), TestDb.P("@CustomerPublicId", customer), TestDb.P("@PlanId", plan), TestDb.P("@Quantity", seats),
             TestDb.P("@SaleAmount", (object?)saleAmount ?? DBNull.Value), TestDb.P("@DiscountAmount", (object?)discount ?? DBNull.Value),
+            TestDb.P("@DurationUnit", paidYears.HasValue ? "Year" : DBNull.Value), TestDb.P("@DurationCount", (object?)paidYears ?? DBNull.Value),
             TestDb.P("@StartDate", DateTime.UtcNow.Date), TestDb.P("@GstPercent", 18m),
             TestDb.P("@BillingFrequencyId", await Default("BillingFrequency")), TestDb.P("@BillingMethodId", await Default("BillingMethod")),
             TestDb.P("@PaymentMethodId", await Default("PaymentMethod")), TestDb.P("@PaymentTermId", await Default("PaymentTerm")),
@@ -226,6 +227,30 @@ public class SeatPricesApiTests
         var ok = await SaleAsync(await OrderAsync(seller, customer, bounded, 9, discount: null, saleAmount: 900m));
         ok.list.ShouldBe(900m);
         ok.discount.ShouldBe(0m);
+    }
+
+    /// <summary>The price is for one plan term (1 year): 24 paid months cost twice, 36 three times, seat-priced or not.</summary>
+    [Theory]
+    [InlineData(true, 2, 12, 107116)]     // seat range 10-19
+    [InlineData(true, 3, 5, 111578)]      // seat range 1-9
+    [InlineData(false, 2, 3, 1000)]       // plan price
+    [InlineData(false, 3, 3, 1000)]
+    public async Task Order_ForSeveralYears_MultipliesThePrice(bool seatPriced, int years, int seats, int pricePerYear)
+    {
+        var plan = await PlanAsync();
+        if (seatPriced)
+        {
+            var token = await TokenAsync("Product.View", "Product.Edit");
+            (await Call(HttpMethod.Put, $"{Base}/plans/{plan}/seat-prices/{CurrentFy()}", token, new { ranges = Ranges() })).Status.ShouldBe(200);
+        }
+        var (seller, customer) = await SellerAndCustomerAsync();
+        var sale = await SaleAsync(await OrderAsync(seller, customer, plan, seats, discount: 100m, paidYears: years));
+        sale.unitPrice.ShouldBe(pricePerYear * (decimal)years);
+        sale.list.ShouldBe(pricePerYear * (decimal)years * seats);
+        sale.sale.ShouldBe(pricePerYear * (decimal)years * seats - 100m);
+        sale.range.ShouldBe(seatPriced ? (seats >= 10 ? "10-19" : "1-9") : null);
+        var renewal = await _fx.Db.ExecuteScalarAsync<DateTime>("SELECT RenewalDate FROM dbo.Sales WHERE PublicId = (SELECT TOP 1 PublicId FROM dbo.Sales ORDER BY Id DESC)");
+        renewal.Date.ShouldBe(DateTime.UtcNow.Date.AddYears(years));
     }
 
     [Fact]

@@ -75,7 +75,7 @@
                 <label class="field-label">Seats
                   <input class="field" name="quantity" type="number" min="1" max="100000" step="1" [ngModel]="quantity()" (ngModelChange)="quantity.set($event)" />
                 </label>
-                <div class="field-label">Unit price (per seat)
+                <div class="field-label">Unit price (per seat / {{ plan() ? planTermText() : 'year' }})
                   <div class="field amount">{{ plan() && (!plan()!.hasSeatPrices || seatRange()) ? inr(unitPrice()) : '-' }}</div>
                 </div>
                 <label class="field-label">Discount %
@@ -284,7 +284,7 @@
                 <div class="summary-row"><span class="text-muted">Currency</span><span>{{ currencyText() }}</span></div>
               </div>
               <div class="subcard stack-xs text-sm">
-                <div class="summary-row"><span>Subtotal ({{ quantity() ?? 0 }} × {{ inr(unitPrice()) }})@if (seatRange(); as r) { <span class="text-muted"> · {{ fyLabel(plan()!.priceFiscalYear!) }}, {{ rangeLabel(r) }} seats</span> }</span><span>{{ inr(listAmount()) }}</span></div>
+                <div class="summary-row"><span>Subtotal ({{ quantity() ?? 0 }} × {{ inr(unitPrice()) }}@if (terms() !== 1) { × {{ termsText() }} })@if (seatRange(); as r) { <span class="text-muted"> · {{ fyLabel(plan()!.priceFiscalYear!) }}, {{ rangeLabel(r) }} seats</span> }</span><span>{{ inr(listAmount()) }}</span></div>
                 <div class="summary-row"><span>After {{ discountPercent() ?? 0 }}% discount</span><span>{{ inr(saleAmount()) }}</span></div>
                 <div class="summary-row"><span>Tax ({{ gstPercent() ?? 0 }}% GST)</span><span>{{ inr(taxAmount()) }}</span></div>
                 <div class="summary-row summary-total"><span>Order total</span><span>{{ inr(totalAmount()) }}</span></div>
