@@ -1,0 +1,4 @@
+{
+  "apiBaseUrl": "",
+  "_help": "apiBaseUrl: address of the User API. Empty = same address as this page with port 8083 (works by localhost and by IP). Or a full address, e.g. http://103.205.65.143:8083 or https://api.example.com. Save, then refresh the page; no rebuild needed."
+}

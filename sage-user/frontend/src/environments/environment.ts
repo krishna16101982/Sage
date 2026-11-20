@@ -1,3 +1,4 @@
+/** LOCAL: your own PC (ng serve). */
 /**
  * Local development (`ng serve`). Other environments replace this file at build time (angular.json → fileReplacements):
  *   environment.dev.ts  → ng build --configuration=dev
