@@ -26,4 +26,8 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <!-- Machine-specific settings stay on each machine: never published, so a server keeps its own appsettings.Local.json. -->
+    <Content Update="appsettings.Local.json;appsettings.Development.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
 </Project>

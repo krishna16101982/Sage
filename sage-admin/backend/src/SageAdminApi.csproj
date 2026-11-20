@@ -17,4 +17,8 @@
     <UserSecretsId>875c9add-6ed8-4d26-b7c7-ea2a286016fd</UserSecretsId>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Machine-specific settings stay on each machine: never published, so a server keeps its own appsettings.Local.json. -->
+    <Content Update="appsettings.Local.json;appsettings.Development.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
 </Project>

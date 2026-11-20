@@ -36,3 +36,6 @@ debug.log
 
 # Order form PDFs saved by order number (OrderFormPdf:StoragePath)
 storage/
+
+# dotnet publish output (copied to the server by hand)
+publish/
