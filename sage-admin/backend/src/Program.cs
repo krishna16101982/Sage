@@ -52,8 +52,10 @@ namespace SageAdminApi
                 .UseSerilog()
                 .ConfigureWebHostDefaults(_webBuilder =>
                 {
+                    // No UseKestrel() here: the defaults pick Kestrel when run on its own (dotnet SageAdminApi.dll) and the
+                    // IIS in-process server when hosted in IIS. Forcing Kestrel makes IIS fail with 500.30. The port is
+                    // only used when run on its own; IIS uses the site's binding.
                     _webBuilder
-                        .UseKestrel()
                         .UseStartup<Startup>()
                         .UseUrls($"http://*:{_serverPort}");
                 });

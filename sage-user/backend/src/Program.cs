@@ -43,7 +43,9 @@ namespace SageUserApi
                 .UseSerilog()
                 .ConfigureWebHostDefaults(_webBuilder =>
                 {
-                    _webBuilder.UseKestrel().UseStartup<Startup>().UseUrls($"http://*:{_serverPort}");
+                    // No UseKestrel(): the defaults pick Kestrel when run on its own and the IIS in-process server when
+                    // hosted in IIS (forcing Kestrel makes IIS fail with 500.30). The port is only used when run on its own.
+                    _webBuilder.UseStartup<Startup>().UseUrls($"http://*:{_serverPort}");
                 });
         }
     }
