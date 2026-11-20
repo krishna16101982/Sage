@@ -48,10 +48,32 @@ function Invoke-SqlScalar([string]$Query) {
 
 function Get-Checksum([string]$Path) { (Get-FileHash -Algorithm SHA256 -Path $Path).Hash.ToLower() }
 
+function Get-BytesChecksum([byte[]]$Bytes) {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { return ([System.BitConverter]::ToString($sha.ComputeHash($Bytes))).Replace('-', '').ToLower() } finally { $sha.Dispose() }
+}
+
+# The same script checked out on Windows (CRLF) or Linux / in a Docker image (LF) must count as unchanged, so a
+# stored checksum may match the file as it is, with CRLF line endings, or with LF line endings.
+function Test-SameScript([string]$Path, [string]$Stored) {
+    if ((Get-Checksum $Path) -eq $Stored) { return $true }
+    $text = [System.IO.File]::ReadAllText($Path)
+    $lf = $text.Replace("`r`n", "`n")
+    $encoding = New-Object System.Text.UTF8Encoding($false)
+    foreach ($variant in @($lf, $lf.Replace("`n", "`r`n"))) {
+        foreach ($bom in @($false, $true)) {
+            $bytes = $encoding.GetBytes($variant)
+            if ($bom) { $bytes = [byte[]](0xEF, 0xBB, 0xBF) + $bytes }
+            if ((Get-BytesChecksum $bytes) -eq $Stored) { return $true }
+        }
+    }
+    return $false
+}
+
 Write-Host "Deploying to [$Server] / [$Database] ($Environment)"
 
-# Bootstrap tracking table (001 is idempotent).
-Invoke-SqlFile (Join-Path $root 'DDL\001_Create_SchemaVersions.sql')
+# Bootstrap tracking table (001 is idempotent). Forward slashes work on Windows and Linux.
+Invoke-SqlFile (Join-Path $root 'DDL/001_Create_SchemaVersions.sql')
 
 function Invoke-Tracked([string]$Folder) {
     $dir = Join-Path $root $Folder
@@ -60,7 +82,7 @@ function Invoke-Tracked([string]$Folder) {
         $sum = Get-Checksum $file.FullName
         $existing = Invoke-SqlScalar "SELECT Checksum FROM dbo.SchemaVersions WHERE ScriptName = N'$name'"
         if ($existing) {
-            if ($existing.Trim() -ne $sum) { throw "Applied script '$name' was modified. Create a new ALTER script instead." }
+            if (-not (Test-SameScript $file.FullName $existing.Trim())) { throw "Applied script '$name' was modified. Create a new ALTER script instead." }
             Write-Host "  skip   $name"
             continue
         }

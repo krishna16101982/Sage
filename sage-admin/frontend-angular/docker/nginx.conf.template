@@ -1,0 +1,27 @@
+# nginx for the Sage Admin Panel (Docker). ${API_UPSTREAM} is filled in when the container starts.
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    client_max_body_size 20m;
+
+    # API calls go to the API container on the same address as the panel (no CORS needed).
+    location /api/ {
+        proxy_pass ${API_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+
+    # Always fetch the newest index.html and settings; the hashed JS / CSS files can be cached.
+    location = /index.html        { add_header Cache-Control "no-store"; }
+    location = /app-settings.json { add_header Cache-Control "no-store"; }
+
+    # Angular routes (e.g. /sales/list after a refresh) get index.html.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

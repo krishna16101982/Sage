@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
@@ -131,6 +132,16 @@ namespace SageUserApi
 
         public void Configure(IApplicationBuilder app, IHostEnvironment env)
         {
+            // Behind the Docker nginx (ReverseProxy:Enabled = true) the client's address comes from X-Forwarded-For, so audit
+            // logs and the sign-in rate limit see the real user, not nginx. Off by default (IIS / direct): the header is ignored.
+            // Only safe because in Docker the API is reachable through nginx alone.
+            if (Configuration.GetValue<bool>("ReverseProxy:Enabled"))
+            {
+                var _forwarded = new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto };
+                _forwarded.KnownIPNetworks.Clear();
+                _forwarded.KnownProxies.Clear();
+                app.UseForwardedHeaders(_forwarded);
+            }
             app.UseMiddleware<ExceptionHandlingMiddleware>();
             app.UseMiddleware<SecurityHeadersMiddleware>();
             if (env.IsDevelopment())

@@ -1,0 +1,87 @@
+# Sage in Docker: Admin API, User API, Admin Panel, User Panel. The database stays on the existing SQL Server.
+#
+#   1. copy .env.example to .env and fill it in (never commit .env)
+#   2. build here:              docker compose up -d --build
+#      or use the CI images:    docker compose pull && docker compose up -d
+#   3. open http://<server>:9082 (Admin Panel) and http://<server>:9081 (User Panel)
+#
+# Each panel's nginx forwards /api to its API, so the APIs are not published on the host and need no CORS.
+name: sage
+
+x-api-env: &api-env
+  ASPNETCORE_ENVIRONMENT: Production
+  DatabaseSettings__ConnectionString: ${DB_CONNECTION:?Set DB_CONNECTION in .env}
+  AuthSettings__RefreshCookieSecure: ${COOKIE_SECURE:-false}
+  ReverseProxy__Enabled: "true"
+  Email__Host: ${EMAIL_HOST:-}
+  Email__Port: ${EMAIL_PORT:-587}
+  Email__EnableSsl: ${EMAIL_ENABLE_SSL:-true}
+  Email__UserName: ${EMAIL_USERNAME:-}
+  Email__Password: ${EMAIL_PASSWORD:-}
+  Email__FromAddress: ${EMAIL_FROM_ADDRESS:-}
+
+services:
+  admin-api:
+    image: ${REGISTRY:-ghcr.io/krishna16101982}/sage-admin-api:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: sage-admin/backend/Dockerfile
+    environment:
+      <<: *api-env
+      JwtIssuerOptions__SecurityKey: ${ADMIN_JWT_KEY:?Set ADMIN_JWT_KEY in .env}
+      AuthSettings__FrontendBaseUrl: ${ADMIN_PANEL_URL:-http://localhost:9082}
+      Email__FromName: Sage Admin
+    volumes:
+      - admin-logs:/app/logs
+      - order-forms:/app/storage/order-forms
+    restart: unless-stopped
+
+  user-api:
+    image: ${REGISTRY:-ghcr.io/krishna16101982}/sage-user-api:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: sage-user/backend/Dockerfile
+    environment:
+      <<: *api-env
+      JwtIssuerOptions__SecurityKey: ${USER_JWT_KEY:?Set USER_JWT_KEY in .env}
+      AuthSettings__FrontendBaseUrl: ${USER_PANEL_URL:-http://localhost:9081}
+      Email__FromName: Sage Sales
+    volumes:
+      - user-logs:/app/logs
+      - order-forms:/app/storage/order-forms
+    restart: unless-stopped
+
+  admin-panel:
+    image: ${REGISTRY:-ghcr.io/krishna16101982}/sage-admin-panel:${IMAGE_TAG:-latest}
+    build:
+      context: ./sage-admin/frontend-angular
+      args:
+        BUILD_CONFIGURATION: ${PANEL_BUILD:-qat}
+    environment:
+      API_UPSTREAM: http://admin-api:8080
+      API_BASE_URL: /
+    ports:
+      - "${ADMIN_PANEL_PORT:-9082}:80"
+    depends_on:
+      - admin-api
+    restart: unless-stopped
+
+  user-panel:
+    image: ${REGISTRY:-ghcr.io/krishna16101982}/sage-user-panel:${IMAGE_TAG:-latest}
+    build:
+      context: ./sage-user/frontend
+      args:
+        BUILD_CONFIGURATION: ${PANEL_BUILD:-qat}
+    environment:
+      API_UPSTREAM: http://user-api:8080
+      API_BASE_URL: /
+    ports:
+      - "${USER_PANEL_PORT:-9081}:80"
+    depends_on:
+      - user-api
+    restart: unless-stopped
+
+volumes:
+  admin-logs:
+  user-logs:
+  order-forms:   # shared: the User API writes order form PDFs, the Admin API reads them

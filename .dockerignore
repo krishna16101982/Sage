@@ -1,0 +1,15 @@
+# Only what the API images copy is needed; keep the build context small.
+.git
+**/node_modules
+**/bin
+**/obj
+**/.artifacts
+**/publish
+**/dist
+**/.angular
+**/logs
+**/TestResults
+storage
+sage.bak
+**/appsettings.Local.json
+**/appsettings.Development.json

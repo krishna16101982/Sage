@@ -5,7 +5,8 @@ namespace SageAdminApi.Tests.Infrastructure;
 /// <summary>
 /// Creates a throw-away database named SageAdmin_Test_{guid}, applies every script in backend/database,
 /// and drops the database afterwards. Refuses to run against anything that looks like production.
-/// Server comes from env SAGE_TEST_SQL_SERVER (default localhost\SQLEXPRESS, Windows authentication).
+/// Server comes from env SAGE_TEST_SQL_SERVER (default localhost\SQLEXPRESS, Windows authentication;
+/// SQL authentication with SAGE_TEST_SQL_USER / SAGE_TEST_SQL_PASSWORD).
 /// </summary>
 public sealed class SqlServerFixture : IAsyncLifetime
 {
@@ -18,12 +19,17 @@ public sealed class SqlServerFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         var server = Environment.GetEnvironmentVariable("SAGE_TEST_SQL_SERVER") ?? @"localhost\SQLEXPRESS";
+        // Windows authentication by default; SQL authentication when SAGE_TEST_SQL_USER is set (CI on Linux, SQL Server in Docker).
+        var user = Environment.GetEnvironmentVariable("SAGE_TEST_SQL_USER");
+        var auth = string.IsNullOrEmpty(user)
+            ? "Integrated Security=true"
+            : $"User Id={user};Password={Environment.GetEnvironmentVariable("SAGE_TEST_SQL_PASSWORD")}";
         if (server.Contains("prod", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Refusing to run destructive tests against a production-looking server.");
 
-        _serverConnection = $"Server={server};Database=master;Integrated Security=true;TrustServerCertificate=true;Encrypt=true;Connect Timeout=15";
+        _serverConnection = $"Server={server};Database=master;{auth};TrustServerCertificate=true;Encrypt=true;Connect Timeout=15";
         await ExecAsync(_serverConnection, $"CREATE DATABASE [{DatabaseName}]");
-        ConnectionString = $"Server={server};Database={DatabaseName};Integrated Security=true;TrustServerCertificate=true;Encrypt=true;Connect Timeout=15";
+        ConnectionString = $"Server={server};Database={DatabaseName};{auth};TrustServerCertificate=true;Encrypt=true;Connect Timeout=15";
         await SqlScriptRunner.ApplyAllAsync(ConnectionString);
     }
 

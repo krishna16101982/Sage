@@ -1,0 +1,124 @@
+# Sage CI/CD (GitHub Actions)
+#   every push and pull request: build and test the APIs (with SQL Server in a service container) and build both panels
+#   push to main (or a manual run): build the 4 Docker images and push them to GitHub's registry:
+#     ghcr.io/<owner>/sage-admin-api, sage-user-api, sage-admin-panel, sage-user-panel  (tags: latest and the commit sha)
+# The server then runs:  docker compose pull && docker compose up -d
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: APIs - build and test
+    runs-on: ubuntu-latest
+    services:
+      sql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          # Throw-away password for the CI database only.
+          MSSQL_SA_PASSWORD: "CiOnly#Sage2026x"
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'CiOnly#Sage2026x' -C -Q 'SELECT 1' -b"
+          --health-interval 10s --health-timeout 5s --health-retries 20 --health-start-period 20s
+    env:
+      SAGE_TEST_SQL_SERVER: localhost,1433
+      SAGE_TEST_SQL_USER: sa
+      SAGE_TEST_SQL_PASSWORD: "CiOnly#Sage2026x"
+      DOTNET_NOLOGO: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Fonts for the order form PDF
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-dejavu-core
+      - name: Common library tests
+        run: dotnet test sage-admin/sage-common-lib/Tests/SageCommonLib.Tests.csproj -c Release
+      - name: Admin API tests
+        run: dotnet test sage-admin/backend/Tests/SageAdminApi.Tests.csproj -c Release
+      - name: User API tests
+        run: dotnet test sage-user/backend/Tests/SageUserApi.Tests.csproj -c Release
+
+  panels:
+    name: ${{ matrix.name }} - build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: Admin Panel
+            dir: sage-admin/frontend-angular
+          - name: User Panel
+            dir: sage-user/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.dir }}/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: ${{ matrix.dir }}
+      - run: npx ng build --configuration qat
+        working-directory: ${{ matrix.dir }}
+
+  images:
+    name: Image ${{ matrix.image }}
+    needs: [backend, panels]
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: sage-admin-api
+            context: .
+            file: sage-admin/backend/Dockerfile
+          - image: sage-user-api
+            context: .
+            file: sage-user/backend/Dockerfile
+          - image: sage-admin-panel
+            context: sage-admin/frontend-angular
+            file: sage-admin/frontend-angular/Dockerfile
+          - image: sage-user-panel
+            context: sage-user/frontend
+            file: sage-user/frontend/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - name: Registry name (lower case)
+        id: reg
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          build-args: |
+            GIT_BUILD_TAG=${{ github.sha }}
+            BUILD_CONFIGURATION=qat
+          tags: |
+            ${{ steps.reg.outputs.name }}/${{ matrix.image }}:latest
+            ${{ steps.reg.outputs.name }}/${{ matrix.image }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
