@@ -16,7 +16,7 @@ export class CustomersAdd {
   private readonly messages = inject(MessageService);
 
   saved(customer: Customer): void {
-    this.messages.success(`Customer ${customer.name} added.`);
+    this.messages.success(`Company ${customer.name} added.`);
     this.router.navigateByUrl('/customers/list');
   }
 }

@@ -9,7 +9,7 @@
       <a class="btn btn-secondary" routerLink="/sales/summary"><app-icon name="bar-chart" /> Sales summary</a>
     }
     @if (canAddCustomer) {
-      <a class="btn btn-primary" routerLink="/customers/add"><app-icon name="plus" /> Add customer</a>
+      <a class="btn btn-primary" routerLink="/customers/add"><app-icon name="plus" /> Add company</a>
     }
   </div>
 
@@ -61,7 +61,7 @@
           <div class="stat-top">
             <span class="stat-icon"><app-icon name="briefcase" /></span>
             <div class="stack-xs">
-              <span class="stat-label">Customers</span>
+              <span class="stat-label">Companies</span>
               <span class="stat-value">{{ customerCount() ?? '…' }}</span>
               <span class="stat-sub">Shared with the User Panel</span>
             </div>
@@ -134,7 +134,7 @@
       <div class="table-wrap">
         <table class="data-table">
           <thead>
-            <tr><th>Sale</th><th>Customer</th><th>Product</th><th>Sales person</th><th class="amount">Amount</th><th>Status</th><th>Sold on</th></tr>
+            <tr><th>Sale</th><th>Company</th><th>Product</th><th>Sales person</th><th class="amount">Amount</th><th>Status</th><th>Sold on</th></tr>
           </thead>
           <tbody>
             @for (s of recent(); track s.id) {

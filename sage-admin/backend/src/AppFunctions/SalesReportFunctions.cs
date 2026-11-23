@@ -87,6 +87,8 @@ namespace SageAdminApi.AppFunctions
                 TaxAmount = _row.GetDecimal("TaxAmount"),
                 TotalAmount = _row.GetDecimal("TotalAmount"),
                 FreeMonths = _row.GetInt("FreeMonths"),
+                TrackingCode = _row.Table.Columns.Contains("TrackingCode") ? _row.GetText("TrackingCode") : null,
+                TrackingName = _row.Table.Columns.Contains("TrackingName") ? _row.GetText("TrackingName") : null,
                 // The single-sale query also returns the order-form details; the list does not.
                 OrderDetails = _row.Table.Columns.Contains("BillingFrequency") && _row.GetText("BillingFrequency") != null
                     ? new AdminOrderDetails
@@ -198,8 +200,11 @@ namespace SageAdminApi.AppFunctions
                 _sqlQuery.Append("        s.GstPercent, s.TaxAmount, s.TotalAmount, s.FreeMonths, ");
                 _sqlQuery.Append("        bf.Name AS BillingFrequency, bm.Name AS BillingMethod, pm.Name AS PaymentMethod, pt.Name AS PaymentTerm, cy.Name AS Currency, ");
                 _sqlQuery.Append("        s.PrimaryContactName, s.PrimaryContactDesignation, s.PrimaryContactEmail, s.PrimaryContactPhone, ");
-                _sqlQuery.Append("        s.BillingContactName, s.BillingContactDesignation, s.BillingContactEmail, s.BillingContactPhone, s.BillToAddress, s.OrderWording, s.PriceFiscalYear, s.PriceSeatRange ");
+                _sqlQuery.Append("        s.BillingContactName, s.BillingContactDesignation, s.BillingContactEmail, s.BillingContactPhone, s.BillToAddress, s.OrderWording, s.PriceFiscalYear, s.PriceSeatRange, ");
+                _sqlQuery.Append("        CASE WHEN s.BillingFrequencyId IS NULL THEN NULL WHEN s.Status = 'Cancelled' THEN 'CANCELLED' ELSE ts.Code END AS TrackingCode, ");
+                _sqlQuery.Append("        CASE WHEN s.BillingFrequencyId IS NULL THEN NULL WHEN s.Status = 'Cancelled' THEN N'Cancelled' ELSE ts.Name END AS TrackingName ");
                 _sqlQuery.Append(" FROM dbo.Sales s ");
+                _sqlQuery.Append(" LEFT JOIN dbo.OrderTrackingStatuses ts ON ts.Id = s.TrackingStatusId ");
                 _sqlQuery.Append(" JOIN dbo.Customers cu ON cu.Id = s.CustomerId ");
                 _sqlQuery.Append(" JOIN dbo.ProductCategories c ON c.Id = s.CategoryId ");
                 _sqlQuery.Append(" JOIN dbo.Products p ON p.Id = s.ProductId ");
@@ -311,7 +316,7 @@ namespace SageAdminApi.AppFunctions
                     return (null, ApplicationCommonFunctions.BadRequest(
                         $"{_count:N0} sales match. An export can hold up to {MaxExportRows:N0}: choose a shorter date range or more filters, then export again.", _methodName));
 
-                var _csv = new CsvBuilder("Sale number", "Sold at (UTC)", "Customer", "Category", "Product", "Plan", "Sales person", "Role", "Manager",
+                var _csv = new CsvBuilder("Sale number", "Sold at (UTC)", "Company", "Category", "Product", "Plan", "Sales person", "Role", "Manager",
                     "Quantity", "Unit price", "List amount", "Discount", "Discount %", "Sale amount", "GST %", "Tax", "Total", "Cost", "Margin", "Duration", "Free months",
                     "Start date", "Renewal date", "Status", "Cancelled at (UTC)", "Cancelled by", "Cancel reason", "Notes");
                 foreach (AdminSaleDto x in _items)

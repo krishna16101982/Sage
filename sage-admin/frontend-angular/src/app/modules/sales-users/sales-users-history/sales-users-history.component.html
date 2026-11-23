@@ -17,7 +17,7 @@
         </tr>
       </thead>
       <tbody>
-        @for (e of entries() ?? []; track $index) {
+        @for (e of data()?.items ?? []; track $index) {
           <tr>
             <td class="date">{{ dateTime(e.atUtc) }}</td>
             @if (!salesUserId()) {
@@ -35,9 +35,12 @@
             <td>{{ e.byName ?? '-' }}<div class="hint">{{ e.byPanel }}</div></td>
           </tr>
         } @empty {
-          <tr><td [attr.colspan]="salesUserId() ? 4 : 5" class="table-empty">{{ entries() ? 'No changes recorded yet.' : 'Loading...' }}</td></tr>
+          <tr><td [attr.colspan]="salesUserId() ? 4 : 5" class="table-empty">{{ data() ? 'No changes recorded yet.' : 'Loading...' }}</td></tr>
         }
       </tbody>
     </table>
   </div>
+  @if (data(); as d) {
+    @if (d.totalPages > 1) { <div class="card-body"><app-pagination [page]="d.page" [totalPages]="d.totalPages" [totalCount]="d.totalCount" (pageChange)="goTo($event)" /></div> }
+  }
 </section>

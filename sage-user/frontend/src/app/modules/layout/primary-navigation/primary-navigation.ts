@@ -12,17 +12,18 @@ export interface NavItem {
 }
 
 /**
- * Menu items, in order, grouped by section. Team sales is shown to sales managers only.
- * The simple "New sale" page (/sales/add) is hidden: sales are recorded with the New order form.
+ * Menu items, in order, grouped by section. Team order forms is shown to sales managers only.
+ * The simple "New sale" page (/sales/add) is hidden: sales are recorded with the New order form, which opens from the
+ * "+ New order form" button on Order forms (and Home, Lead Records > New Order), not from the menu.
  */
 export const NAV_ITEMS: NavItem[] = [
   { href: '/home', label: 'Home', icon: 'home', section: 'Overview', managerOnly: false },
-  { href: '/sales/order-form', label: 'New order form', icon: 'file-text', section: 'Sales', managerOnly: false },
-  { href: '/sales/list', label: 'My sales', icon: 'list', section: 'Sales', managerOnly: false },
-  { href: '/sales/team', label: 'Team sales', icon: 'users', section: 'Sales', managerOnly: true },
+  { href: '/leads', label: 'Lead Records', icon: 'trending-up', section: 'Sales', managerOnly: false },
+  { href: '/sales/list', label: 'Order forms', icon: 'list', section: 'Sales', managerOnly: false },
+  { href: '/sales/team', label: 'Team order forms', icon: 'users', section: 'Sales', managerOnly: true },
   { href: '/team', label: 'My team', icon: 'user-check', section: 'Sales', managerOnly: true },
   { href: '/team/add', label: 'Add sales person', icon: 'user-plus', section: 'Sales', managerOnly: true },
-  { href: '/customers', label: 'Customers', icon: 'briefcase', section: 'Sales', managerOnly: false },
+  { href: '/customers', label: 'Companies', icon: 'briefcase', section: 'Sales', managerOnly: false },
   { href: '/change-password', label: 'Change password', icon: 'lock', section: 'Account', managerOnly: false },
 ];
 

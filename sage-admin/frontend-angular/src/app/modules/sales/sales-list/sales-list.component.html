@@ -12,7 +12,7 @@
     </button>
   </div>
   @if (customerId()) {
-    <p class="text-sm">Showing one customer's sales. <a class="link-button" routerLink="/sales/list">Show all customers</a></p>
+    <p class="text-sm">Showing one company's sales. <a class="link-button" routerLink="/sales/list">Show all companies</a></p>
   }
 
   @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
@@ -34,7 +34,7 @@
         <tr>
           <th appSort [active]="sortBy() === 'saleNumber'" [direction]="sortDirection()" (sort)="sort('saleNumber', $event)">Sale</th>
           <th appSort [active]="sortBy() === 'soldAt'" [direction]="sortDirection()" (sort)="sort('soldAt', $event)">Sold on</th>
-          <th appSort [active]="sortBy() === 'customer'" [direction]="sortDirection()" (sort)="sort('customer', $event)">Customer</th>
+          <th appSort [active]="sortBy() === 'customer'" [direction]="sortDirection()" (sort)="sort('customer', $event)">Company</th>
           <th appSort [active]="sortBy() === 'product'" [direction]="sortDirection()" (sort)="sort('product', $event)">Product / plan</th>
           <th appSort [active]="sortBy() === 'seller'" [direction]="sortDirection()" (sort)="sort('seller', $event)">Sales person</th>
           <th class="amount">Qty</th>
@@ -61,6 +61,9 @@
             <td class="date">{{ date(s.renewalDate) }}</td>
             <td>
               @if (s.status === 'Cancelled') { <span class="badge badge-danger">Cancelled</span> } @else { <span class="badge badge-success">Active</span> }
+              @if (s.trackingName && s.trackingCode !== 'CANCELLED') {
+                <div class="hint" title="Order form tracking status">{{ s.trackingName }}</div>
+              }
             </td>
           </tr>
         } @empty {

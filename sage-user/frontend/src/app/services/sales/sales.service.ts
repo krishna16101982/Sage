@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import type { PagedResult } from '../../shared/interfaces/api.interface';
 import type { CancelRequest, CancelRequestStatus, Sale, SaleInput, SaleQuery, SalesPage, TeamMember } from '../../shared/interfaces/sale.interface';
 import { GlobalRestService, toQuery } from '../rest/global-rest-service';
 
@@ -16,7 +17,9 @@ export class SalesService {
   /** Sales persons allowed by their manager: ask for the sale to be cancelled. */
   requestCancel = (id: string, reason: string) => this.rest.post<CancelRequest>(`${this.base}/${id}/cancel-request`, { reason });
   /** Managers: their team's requests. Sales persons: their own. */
-  cancelRequests = (status?: CancelRequestStatus) => this.rest.get<CancelRequest[]>(`${this.base}/cancel-requests${status ? '?status=' + status : ''}`);
+  /** One page of cancellation requests (paged by the database), waiting ones first. */
+  cancelRequests = (status?: CancelRequestStatus, page = 1, pageSize = 20) =>
+    this.rest.get<PagedResult<CancelRequest>>(`${this.base}/cancel-requests${toQuery({ status, page, pageSize })}`);
   approveCancel = (requestId: string, note?: string) => this.rest.post<CancelRequest>(`${this.base}/cancel-requests/${requestId}/approve`, { note });
   rejectCancel = (requestId: string, note?: string) => this.rest.post<CancelRequest>(`${this.base}/cancel-requests/${requestId}/reject`, { note });
   /** Sales managers only. */

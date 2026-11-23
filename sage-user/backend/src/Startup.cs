@@ -126,6 +126,7 @@ namespace SageUserApi
             services.AddScoped<ICustomerFunctions, CustomerFunctions>();
             services.AddScoped<ISaleFunctions, SaleFunctions>();
             services.AddScoped<IOrderFormFunctions, OrderFormFunctions>();
+            services.AddScoped<ILeadFunctions, LeadFunctions>();
             services.Configure<OrderFormPdfSettings>(Configuration.GetSection(ApplicationConstants.ConfigSettingNames.OrderFormPdf));
             services.AddScoped<IOrderFormPdfFunctions, OrderFormPdfFunctions>();
         }

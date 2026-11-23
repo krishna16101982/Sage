@@ -12,4 +12,6 @@ export class CustomersService {
   list = (q: CustomerQuery) => this.rest.get<PagedResult<Customer>>(`${this.base}${toQuery(q)}`);
   get = (id: string) => this.rest.get<Customer>(`${this.base}/${id}`);
   create = (data: CustomerInput) => this.rest.post<Customer>(this.base, data);
+  /** Contact, GSTIN and address; the name stays as it is. */
+  update = (id: string, data: CustomerInput) => this.rest.put<Customer>(`${this.base}/${id}`, data);
 }

@@ -37,7 +37,7 @@ public class SalesUserHistoryTests
         return (Guid.Parse(res.Data.GetProperty("id").GetString()!), "Hist " + username);
     }
 
-    private static List<JsonElement> Entries(ApiResult r) => r.Data.EnumerateArray().ToList();
+    private static List<JsonElement> Entries(ApiResult r) => r.Data.GetProperty("items").EnumerateArray().ToList();
 
     [Fact]
     public async Task History_ShowsStatusAndManagerChanges_FromBothPanels_NewestFirst()
@@ -78,7 +78,15 @@ public class SalesUserHistoryTests
 
         // Everyone's history includes this person, with their name; managers' own status changes appear too.
         (await Call(HttpMethod.Put, $"{Base}/{managerA}/status", token, new { status = "Inactive" })).Status.ShouldBe(200);
-        var all = Entries(await Call(HttpMethod.Get, $"{Base}/history", token));
+        var allPage = await Call(HttpMethod.Get, $"{Base}/history?pageSize=200", token);
+        allPage.Data.GetProperty("totalCount").GetInt32().ShouldBeGreaterThanOrEqualTo(6);
+        var all = Entries(allPage);
+        // Paged by the database, by audit row: 5 rows (the edit row holds both the manager and the details change);
+        // page size 2 gives the two newest and the total.
+        var firstTwo = await Call(HttpMethod.Get, $"{Base}/history?salesUserId={person}&pageSize=2", token);
+        firstTwo.Data.GetProperty("totalCount").GetInt32().ShouldBe(5);
+        firstTwo.Data.GetProperty("totalPages").GetInt32().ShouldBe(3);
+        Entries(firstTwo).Select(x => x.GetProperty("details").GetString()).ShouldBe(new[] { "Active → Inactive", "Inactive → Active" });
         all.ShouldContain(x => x.GetProperty("salesUserId").GetString() == managerA.ToString() && x.GetProperty("details").GetString() == "Active → Inactive");
         all.ShouldContain(x => x.GetProperty("salesUserId").GetString() == person.ToString() && x.GetProperty("change").GetString() == "Manager");
     }

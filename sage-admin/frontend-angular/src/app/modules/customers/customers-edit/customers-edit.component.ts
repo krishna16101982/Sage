@@ -27,12 +27,12 @@ export class CustomersEdit implements OnInit {
     try {
       this.customer.set(await this.service.get(this.id()));
     } catch (err) {
-      this.error.set(errorText(err, 'Customer not found.'));
+      this.error.set(errorText(err, 'Company not found.'));
     }
   }
 
   saved(customer: Customer): void {
-    this.messages.success(`Customer ${customer.name} saved.`);
+    this.messages.success(`Company ${customer.name} saved.`);
     this.router.navigateByUrl('/customers/list');
   }
 }

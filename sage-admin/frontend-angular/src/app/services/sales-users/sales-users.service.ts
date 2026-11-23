@@ -22,7 +22,9 @@ export class SalesUsersService {
   get = (id: string) => this.rest.get<SalesUser>(`${this.base}/${encodeURIComponent(id)}`);
   managers = () => this.rest.get<SalesManagerOption[]>(`${this.base}/managers`);
   /** Status, manager and role changes (Admin Panel and managers in the User Panel): one person, or everyone. */
-  history = (salesUserId?: string | null) => this.rest.get<SalesUserHistoryEntry[]>(`${this.base}/history${toQuery({ salesUserId })}`);
+  /** One page of changes, newest first (paged by the database). */
+  history = (salesUserId: string | null | undefined, page: number, pageSize: number) =>
+    this.rest.get<PagedResult<SalesUserHistoryEntry>>(`${this.base}/history${toQuery({ salesUserId, page, pageSize })}`);
   create = (data: SalesUserInput & { username: string; password: string; confirmPassword: string }) => this.rest.post<SalesUser>(this.base, data);
   update = (id: string, data: SalesUserInput) => this.rest.put<SalesUser>(`${this.base}/${encodeURIComponent(id)}`, data);
   setStatus = (id: string, status: 'Active' | 'Inactive') => this.rest.put<SalesUser>(`${this.base}/${encodeURIComponent(id)}/status`, { status });

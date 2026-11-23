@@ -7,6 +7,7 @@ using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.Models.Interfaces;
 using SageUserApi.AppFunctions.Interfaces;
 using SageUserApi.Globals;
+using SageUserApi.Models;
 using SageUserApi.Models.HttpPost;
 
 namespace SageUserApi.Controllers
@@ -22,13 +23,15 @@ namespace SageUserApi.Controllers
     {
         private readonly IOrderFormFunctions _orderFormFunctions;
         private readonly IOrderFormPdfFunctions _orderFormPdfFunctions;
+        private readonly ILeadFunctions _leadFunctions;
 
         public OrderFormController(ILoggerFunctions __loggerFunctions, IApiResponse __apiResponse, ISalesUserContextFunctions __userContext, IOrderFormFunctions __orderFormFunctions,
-                                   IOrderFormPdfFunctions __orderFormPdfFunctions)
+                                   IOrderFormPdfFunctions __orderFormPdfFunctions, ILeadFunctions __leadFunctions)
             : base(__loggerFunctions, __apiResponse, __userContext)
         {
             _orderFormFunctions = __orderFormFunctions;
             _orderFormPdfFunctions = __orderFormPdfFunctions;
+            _leadFunctions = __leadFunctions;
         }
 
         /// <summary>Billing / payment lists (active values, defaults marked), default GST, most free months, discount and backdating limits.</summary>
@@ -46,6 +49,47 @@ namespace SageUserApi.Controllers
             var (_sale, _fr) = await _orderFormFunctions.CreateOrderAsync(_params, _user, ClientIp, _ct);
             // The order form PDF is made and saved by order number right away (a failure is logged; it is made again when opened).
             if (_fr.Status && _sale != null) await _orderFormPdfFunctions.CreateAsync(_sale.Id, _ct);
+            if (_fr.Status && _sale != null)
+            {
+                if (_params?.LeadId is Guid _leadId)
+                {
+                    // Made from a lead: the lead now shows this order.
+                    await _leadFunctions.LinkOrderAsync(_leadId, _sale.Id, _user, _ct);
+                }
+                else
+                {
+                    // "No lead": a lead is created for the same company (its other fields are filled in later).
+                    LeadDto _lead = await _leadFunctions.CreateForOrderAsync(_sale.Id, _sale.CustomerId, _params?.PrimaryContact, _user, ClientIp, _ct);
+                    if (_lead != null)
+                    {
+                        _sale.LeadId = _lead.Id;
+                        _sale.LeadNumber = _lead.LeadNumber;
+                    }
+                }
+            }
+            return Result(_sale, _fr);
+        }, _ct);
+
+        /// <summary>
+        /// Edits an order saved with the order form: the seller or their manager, while it is active with no cancellation
+        /// request waiting. Same body and checks as saving one; the sale number stays and the PDF is made again.
+        /// </summary>
+        [HttpPut("{saleId:guid}")]
+        public Task<IActionResult> UpdateOrder(Guid saleId, [FromBody] HttpOrderFormPostParams _params, CancellationToken _ct) => WithUserAsync("C:OrderForm:UpdateOrder", async _user =>
+        {
+            var (_sale, _fr) = await _orderFormFunctions.UpdateOrderAsync(saleId, _params, _user, ClientIp, _ct);
+            if (_fr.Status && _sale != null) await _orderFormPdfFunctions.CreateAsync(_sale.Id, _ct);
+            return Result(_sale, _fr);
+        }, _ct);
+
+        /// <summary>
+        /// Order forms list: changes the tracking status. Cancelled (with reason) cancels the sale for a manager, or sends a
+        /// cancellation request for a sales person their manager allowed.
+        /// </summary>
+        [HttpPut("{saleId:guid}/tracking")]
+        public Task<IActionResult> SetTracking(Guid saleId, [FromBody] HttpOrderTrackingParams _params, CancellationToken _ct) => WithUserAsync("C:OrderForm:SetTracking", async _user =>
+        {
+            var (_sale, _fr) = await _orderFormFunctions.SetTrackingAsync(saleId, _params, _user, ClientIp, _ct);
             return Result(_sale, _fr);
         }, _ct);
 

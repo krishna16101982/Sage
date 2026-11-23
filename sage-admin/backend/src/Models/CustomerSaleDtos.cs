@@ -63,6 +63,9 @@ namespace SageAdminApi.Models
         public decimal TaxAmount { get; set; }
         public decimal TotalAmount { get; set; }
         public int FreeMonths { get; set; }
+        /// <summary>Order form tracking status (DRAFT, SENT_DOCUSIGN, SIGNED, CANCELLED) and its name; null for a simple sale.</summary>
+        public string TrackingCode { get; set; }
+        public string TrackingName { get; set; }
         /// <summary>Order-form details (single-sale view only; null when the sale was not made with the order form).</summary>
         public AdminOrderDetails OrderDetails { get; set; }
     }

@@ -67,6 +67,37 @@ public class SalesApiTests
     }
 
     [Fact]
+    public async Task Company_Edit_ChangesDetails_ButNeverTheName()
+    {
+        var token = await TokenAsync(await SalesData.CreateAsync(_fx.Db));
+        var name = Unique("Indigo Tech ");
+        var created = await Call(HttpMethod.Post, $"{Api}/customers", new { name, city = "Pune", contactPerson = "Ms. Tara Khan" }, token);
+        created.Status.ShouldBe(201, created.Root.ToString());
+        var id = created.Data.GetProperty("id").GetGuid();
+
+        // Any sales user may edit a shared company (contact, GSTIN, address); the name stays.
+        var other = await TokenAsync(await SalesData.CreateAsync(_fx.Db));
+        var gstin = "27AAPFU" + Random.Shared.Next(1000, 9999) + "F1ZV";   // a valid, (almost surely) unused GSTIN
+        var saved = await Call(HttpMethod.Put, $"{Api}/customers/{id}",
+            new { name, contactPerson = "Mr. Rohan Nair", phone = "9876543210", email = "rohan@example.com", gstin, address = "Plot 7", city = "Mumbai", state = "MH" }, other);
+        saved.Status.ShouldBe(200, saved.Root.ToString());
+        saved.Data.GetProperty("name").GetString().ShouldBe(name);
+        saved.Data.GetProperty("contactPerson").GetString().ShouldBe("Mr. Rohan Nair");
+        saved.Data.GetProperty("gstin").GetString().ShouldBe(gstin);
+        saved.Data.GetProperty("city").GetString().ShouldBe("Mumbai");
+
+        // Sending another name is refused; leaving it out keeps it.
+        var renamed = await Call(HttpMethod.Put, $"{Api}/customers/{id}", new { name = "Something Else", city = "Mumbai" }, token);
+        renamed.Status.ShouldBe(400);
+        renamed.FirstMessage.ShouldBe("The company name cannot be changed.");
+        (await Call(HttpMethod.Put, $"{Api}/customers/{id}", new { city = "Pune", phone = "123" }, token)).Status.ShouldBe(400);   // bad phone
+        (await Call(HttpMethod.Put, $"{Api}/customers/{id}", new { city = "Pune" }, token)).Data.GetProperty("name").GetString().ShouldBe(name);
+        (await Call(HttpMethod.Put, $"{Api}/customers/{Guid.NewGuid()}", new { city = "Pune" }, token)).Status.ShouldBe(404);
+        (await _fx.Db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM dbo.AuditLogs WHERE Action = 'Update' AND EntityType = 'Customer' AND EntityId = @id",
+            new[] { TestDb.P("@id", id.ToString()) })).ShouldBe(2);
+    }
+
+    [Fact]
     public async Task Customers_Add_Search_AndRefuseDuplicates()
     {
         var token = await TokenAsync(await SalesData.CreateAsync(_fx.Db));
@@ -301,8 +332,10 @@ public class SalesApiTests
 
         // The manager sees it (and the team page counts it); colleagues cannot decide.
         var pending = await Call(HttpMethod.Get, $"{Api}/sales/cancel-requests?status=Pending", bearer: mt);
-        pending.Data.EnumerateArray().Select(x => x.GetProperty("id").GetGuid()).ShouldContain(r1);
-        (await Call(HttpMethod.Get, $"{Api}/sales/cancel-requests", bearer: at)).Data.GetArrayLength().ShouldBe(1);
+        pending.Data.GetProperty("items").EnumerateArray().Select(x => x.GetProperty("id").GetGuid()).ShouldContain(r1);
+        var own = (await Call(HttpMethod.Get, $"{Api}/sales/cancel-requests", bearer: at)).Data;   // one page from the database
+        own.GetProperty("totalCount").GetInt32().ShouldBe(1);
+        own.GetProperty("items").GetArrayLength().ShouldBe(1);
         (await Call(HttpMethod.Get, $"{Api}/sales/team-members", bearer: mt)).Data.EnumerateArray()
             .Single(x => x.GetProperty("id").GetGuid() == alice.PublicId).GetProperty("pendingRequests").GetInt32().ShouldBe(1);
         (await Call(HttpMethod.Post, $"{Api}/sales/cancel-requests/{r1}/approve", new { }, bt)).Status.ShouldBe(403);
@@ -328,7 +361,7 @@ public class SalesApiTests
         // A manager cancelling directly closes an open request as approved.
         var r3 = (await Call(HttpMethod.Post, $"{Api}/sales/{a2}/cancel-request", new { reason = "Wrong plan" }, at)).Data.GetProperty("id").GetGuid();
         (await Call(HttpMethod.Post, $"{Api}/sales/{a2}/cancel", new { reason = "Wrong plan, confirmed" }, mt)).Status.ShouldBe(200);
-        (await Call(HttpMethod.Get, $"{Api}/sales/cancel-requests", bearer: at)).Data.EnumerateArray()
+        (await Call(HttpMethod.Get, $"{Api}/sales/cancel-requests", bearer: at)).Data.GetProperty("items").EnumerateArray()
             .Single(x => x.GetProperty("id").GetGuid() == r3).GetProperty("status").GetString().ShouldBe("Approved");
 
         // Permission switched off again: asking is refused.

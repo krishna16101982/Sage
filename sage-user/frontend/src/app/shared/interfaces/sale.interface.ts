@@ -36,6 +36,19 @@ export interface Sale {
   cancelReason: string | null;
   /** A cancellation request is waiting for the manager. */
   hasPendingCancelRequest: boolean;
+  /** Saved with the New order form (it can be edited while active). */
+  hasOrderForm: boolean;
+  /** Order form tracking: stored status (1 Draft, 2 Sent to DocuSign, 3 Signed) and the one shown (CANCELLED for a cancelled
+   * sale). Null for a sale from the simple page. */
+  trackingStatusId: number | null;
+  trackingCode: 'DRAFT' | 'SENT_DOCUSIGN' | 'SIGNED' | 'CANCELLED' | null;
+  trackingName: string | null;
+  freeMonths: number;
+  /** Sale amount + GST. */
+  totalAmount: number;
+  /** The lead this order was made from, if any. */
+  leadNumber: string | null;
+  leadId: string | null;
   /** Cancellation requests for this sale, newest first (sale details only). */
   cancelRequests?: CancelRequest[];
 }

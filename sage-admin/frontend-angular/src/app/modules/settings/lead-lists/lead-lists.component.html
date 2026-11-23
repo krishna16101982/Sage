@@ -1,0 +1,73 @@
+<div class="stack max-w-3xl">
+  <div class="page-header">
+    <div class="stack-xs">
+      <a class="link-button text-sm" routerLink="/settings">← Settings</a>
+      <span class="page-eyebrow">Administration</span>
+      <h1 class="page-title">Lead lists</h1>
+    </div>
+  </div>
+  <p class="hint">
+    The Product, Lead Source and Billing Cycle drop-downs of the User Panel's lead form come from these lists. A value
+    already used by leads can be turned off (it stays on those leads) but not removed. Lead status and lead type are fixed.
+    @if (!canEdit) { You can view the lists; changing them needs the Settings · Edit permission. }
+  </p>
+
+  @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
+  @if (notice()) { <app-alert kind="success">{{ notice() }}</app-alert> }
+  @if (!lists() && !error()) { <p class="text-sm text-muted">Loading...</p> }
+
+  @for (list of lists() ?? []; track list.list) {
+    <section class="card">
+      <header class="card-header row">
+        <h2 class="section-title">{{ list.label }}</h2>
+        <span class="spacer"></span>
+        @if (canEdit && !draft()) { <button type="button" class="btn btn-secondary" (click)="add(list)">Add value</button> }
+      </header>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Name</th><th class="amount">Order</th><th>Status</th><th class="amount">Used by</th><th></th></tr>
+          </thead>
+          <tbody>
+            @for (v of list.values; track v.id) {
+              @if (isEditing(list, v)) {
+                <ng-container *ngTemplateOutlet="editRow" />
+              } @else {
+                <tr>
+                  <td class="font-medium">{{ v.name }}</td>
+                  <td class="amount">{{ v.sortOrder }}</td>
+                  <td>@if (v.isActive) { <span class="badge badge-success">On</span> } @else { <span class="badge">Off</span> }</td>
+                  <td class="amount">{{ v.usedBy }}</td>
+                  <td class="amount">@if (canEdit && !draft()) { <button type="button" class="link-button text-sm" (click)="edit(v)">Edit</button> }</td>
+                </tr>
+              }
+            } @empty {
+              @if (!isEditing(list, null)) { <tr><td colspan="5" class="table-empty">No values yet.</td></tr> }
+            }
+            @if (isEditing(list, null)) {
+              <ng-container *ngTemplateOutlet="editRow" />
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+
+  <!-- The row being added or edited (only one at a time). -->
+  <ng-template #editRow>
+    @if (draft(); as d) {
+      <tr>
+        <td><input class="field" name="name" maxlength="100" placeholder="Name" [ngModel]="d.name" (ngModelChange)="setDraft('name', $event)" /></td>
+        <td><input class="field" name="sortOrder" type="number" min="0" max="10000" [ngModel]="d.sortOrder" (ngModelChange)="setDraft('sortOrder', $event)" /></td>
+        <td><label class="checkbox-label"><input type="checkbox" name="isActive" [ngModel]="d.isActive" (ngModelChange)="setDraft('isActive', $event)" /> On</label></td>
+        <td colspan="2" class="amount">
+          <div class="row-tight" style="justify-content: flex-end">
+            <button type="button" class="btn btn-secondary" (click)="draft.set(null)">Cancel</button>
+            <button type="button" class="btn btn-primary" [disabled]="saving() || !d.name.trim()" (click)="save()">{{ saving() ? 'Saving...' : 'Save' }}</button>
+          </div>
+        </td>
+      </tr>
+      @if (draftError()) { <tr><td colspan="5"><app-alert kind="error">{{ draftError() }}</app-alert></td></tr> }
+    }
+  </ng-template>
+</div>

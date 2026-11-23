@@ -34,14 +34,14 @@ namespace SageAdminApi.AppFunctions
 
         internal static class Messages
         {
-            public const string NameRequired = "Customer name is required (up to 200 characters).";
+            public const string NameRequired = "Company name is required (up to 200 characters).";
             public const string ContactPersonTooLong = "Contact person must be 150 characters or fewer.";
             public const string InvalidEmail = "Enter a valid email address.";
             public const string InvalidPhone = "Enter a 10-digit phone number (digits only, +91 optional).";
             public const string InvalidGstin = "Enter a valid 15-character GSTIN (e.g. 27AAPFU0939F1ZV).";
             public const string AddressTooLong = "Address must be 500 characters or fewer.";
             public const string PlaceTooLong = "City, state and country must be 100 characters or fewer.";
-            public const string NotFound = "Customer not found.";
+            public const string NotFound = "Company not found.";
         }
 
         [GeneratedRegex(@"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$")]
@@ -201,7 +201,7 @@ namespace SageAdminApi.AppFunctions
                 CustomerDto _created = await GetRowAsync(_id, _ct);
                 await _auditFunctions.LogAsync(_actorUserId, ApplicationEnumeration.AuditAction.Create.ToString(), ApplicationEnumeration.ObjectType.Customer.ToString(),
                     _id.ToString(), null, Snapshot(_created), _ipAddress, _ct);
-                return (_created, new FunctionReturn { MethodName = _methodName, HttpStatusCode = Constants.HttpStatusCodes.Created, Message = new List<string> { "Customer added." } });
+                return (_created, new FunctionReturn { MethodName = _methodName, HttpStatusCode = Constants.HttpStatusCodes.Created, Message = new List<string> { "Company added." } });
             }
             catch (Exception ex)
             {
@@ -223,7 +223,7 @@ namespace SageAdminApi.AppFunctions
 
                 _parameters.Add(P("@PublicId", _id));
                 _parameters.Add(P("@AdminUserId", _actorUserId));
-                (IFunctionReturn _functionReturn, long _) = await _databaseFunctions.ExecuteProcedureWriteAsync(SP.CustomerUpdate, _parameters, _methodName, "Customer saved.", _ct);
+                (IFunctionReturn _functionReturn, long _) = await _databaseFunctions.ExecuteProcedureWriteAsync(SP.CustomerUpdate, _parameters, _methodName, "Company saved.", _ct);
                 if (!_functionReturn.Status) return (null, _functionReturn);
 
                 CustomerDto _updated = await GetRowAsync(_id, _ct);

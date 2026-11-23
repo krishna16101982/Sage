@@ -30,18 +30,18 @@ namespace SageUserApi.Globals
 
         public static class Messages
         {
-            public const string CustomerNameRequired = "Customer name is required.";
-            public const string CustomerNameTooLong = "Customer name must be 200 characters or fewer.";
+            public const string CustomerNameRequired = "Company name is required.";
+            public const string CustomerNameTooLong = "Company name must be 200 characters or fewer.";
             public const string ContactPersonTooLong = "Contact person must be 150 characters or fewer.";
             public const string InvalidEmail = "Enter a valid email address.";
             public const string InvalidPhone = "Enter a 10-digit phone number (digits only, +91 optional).";
             public const string InvalidGstin = "Enter a valid 15-character GSTIN (e.g. 27AAPFU0939F1ZV).";
             public const string AddressTooLong = "Address must be 500 characters or fewer.";
             public const string PlaceTooLong = "City, state and country must be 100 characters or fewer.";
-            public const string CustomerCreated = "Customer added.";
-            public const string CustomerNotFound = "Customer not found.";
+            public const string CustomerCreated = "Company added.";
+            public const string CustomerNotFound = "Company not found.";
 
-            public const string CustomerRequired = "Choose a customer.";
+            public const string CustomerRequired = "Choose a company.";
             public const string PlanRequired = "Choose a plan.";
             public const string StartDateRequired = "Start date is required.";
             public const string StartDateTooFarAhead = "The start date cannot be more than a year ahead.";
@@ -92,9 +92,17 @@ namespace SageUserApi.Globals
             public const string SalesUserResetPasswordWithToken = "dbo.usp_SalesUser_ResetPasswordWithToken";
             public const string SalesUserRefreshTokenRotate = "dbo.usp_SalesUserRefreshToken_Rotate";
             public const string CustomerCreate = "dbo.usp_Customer_Create";
+            public const string CustomerUpdateDetails = "dbo.usp_Customer_UpdateDetails";
             public const string CustomerGetPaged = "dbo.usp_Customer_GetPaged";
             public const string SaleCreate = "dbo.usp_Sale_Create";
             public const string SaleOrderCreate = "dbo.usp_SaleOrder_Create";
+            public const string SaleOrderUpdate = "dbo.usp_SaleOrder_Update";
+            public const string SaleOrderSetTracking = "dbo.usp_SaleOrder_SetTracking";
+            public const string LeadGetPaged = "dbo.usp_Lead_GetPaged";
+            public const string LeadSummary = "dbo.usp_Lead_Summary";
+            public const string SaleCancelRequestGetPaged = "dbo.usp_SaleCancelRequest_GetPaged";
+            public const string LeadSave = "dbo.usp_Lead_Save";
+            public const string LeadDelete = "dbo.usp_Lead_Delete";
             public const string SaleCancel = "dbo.usp_Sale_Cancel";
             public const string SaleGetPaged = "dbo.usp_Sale_GetPaged";
             public const string SaleCancelRequestCreate = "dbo.usp_SaleCancelRequest_Create";

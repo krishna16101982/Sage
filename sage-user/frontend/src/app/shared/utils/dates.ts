@@ -10,6 +10,12 @@ export function today(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** The date on this computer of a UTC time from the API (e.g. a sale's createdAtUtc), 'yyyy-MM-dd'. */
+export function localDate(utc: string): string {
+  const d = new Date(utc);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 /** First day of this month, 'yyyy-MM-dd'. */
 export function firstOfMonth(): string {
   const d = new Date();

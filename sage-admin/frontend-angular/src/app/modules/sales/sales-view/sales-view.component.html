@@ -22,7 +22,7 @@
     <section class="card">
       <header class="card-header"><h2 class="section-title">What was sold</h2></header>
       <div class="card-body form-grid-2 text-sm">
-        <div><span class="text-muted">Customer</span><div class="font-medium">{{ s.customerName }}</div></div>
+        <div><span class="text-muted">Company</span><div class="font-medium">{{ s.customerName }}</div></div>
         <div>
           <span class="text-muted">Sales person</span>
           <div>
@@ -62,6 +62,10 @@
       <section class="card">
         <header class="card-header row">
           <h2 class="section-title">Order form</h2>
+          @if (s.trackingName) {
+            <span class="badge" [class.badge-success]="s.trackingCode === 'SIGNED'" [class.badge-danger]="s.trackingCode === 'CANCELLED'"
+                  [class.badge-warning]="s.trackingCode === 'DRAFT' || s.trackingCode === 'SENT_DOCUSIGN'" title="Tracking status">{{ s.trackingName }}</span>
+          }
           <span class="spacer"></span>
           <button type="button" class="btn btn-secondary" [disabled]="pdfBusy()" (click)="orderPdf(false)">Preview PDF</button>
           <button type="button" class="btn btn-primary" [disabled]="pdfBusy()" (click)="orderPdf(true)">Download PDF</button>

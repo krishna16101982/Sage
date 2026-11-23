@@ -1,17 +1,23 @@
-import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Alert } from '../../../component/alert/alert';
 import { CatalogService } from '../../../services/catalog/catalog.service';
+import { CustomersService } from '../../../services/customers/customers.service';
+import { LeadsService } from '../../../services/leads/leads.service';
+import { AuthService } from '../../../services/auth/auth.service';
 import { MessageService } from '../../../services/message/message.service';
 import { OrderFormService } from '../../../services/order-form/order-form.service';
 import { errorText } from '../../../services/rest/global-rest-service';
+import { SalesService } from '../../../services/sales/sales.service';
 import { DURATION_UNITS, type CatalogCategory, type DurationUnit } from '../../../shared/interfaces/catalog.interface';
 import type { Customer } from '../../../shared/interfaces/customer.interface';
-import type { MasterOption, OrderContact, OrderFormOptions, OrderWording } from '../../../shared/interfaces/order-form.interface';
+import type { Lead } from '../../../shared/interfaces/lead.interface';
+import { LeadPicker } from './lead-picker/lead-picker.component';
+import { TRACKING_CANCELLED, trackingStatusesOf, type MasterOption, type OrderContact, type OrderFormOptions, type OrderWording } from '../../../shared/interfaces/order-form.interface';
 import { WORDING_SECTIONS, longDate } from '../../../shared/utils/order-wording';
 import { findSeatRange, fyLabel, seatRangeLabel } from '../../../shared/utils/seat-prices';
-import { addDays, addMonths, dmy, formatDate, today } from '../../../shared/utils/dates';
+import { addDays, addMonths, dmy, formatDate, localDate, today } from '../../../shared/utils/dates';
 import { formatDuration, formatInr } from '../../../shared/utils/format';
 import { CustomerPicker } from '../sales-add/customer-picker/customer-picker.component';
 
@@ -26,15 +32,64 @@ const PHONE = /^(?:\+91|0)?[0-9]{10}$/;
  * /sales/order-form — the New order form: customer, product and pricing (with GST), contacts and bill-to address, order
  * terms (free months, billing and payment from the master lists), and a running order summary. Saved through
  * POST /api/user/order-form as an ordinary sale plus its order details. The simple New sale page is separate.
+ *
+ * /sales/:id/edit — the same form filled with a saved order (the seller or their manager, while the order is active with
+ * no cancellation request waiting). Saved through PUT /api/user/order-form/:id: the sale number stays, the price is worked
+ * out again with the seat prices of the order date's financial year, and the order form PDF is made again.
  */
 @Component({
   selector: 'app-sales-order-form',
-  imports: [FormsModule, RouterLink, Alert, CustomerPicker],
+  imports: [FormsModule, RouterLink, Alert, CustomerPicker, LeadPicker],
   templateUrl: './sales-order-form.component.html',
 })
 export class SalesOrderForm implements OnInit {
+  /** From the route (/sales/:id/edit); empty on the New order form. */
+  readonly id = input<string>();
+  /** From the query string (?leadId=, Lead Records > New Order): that lead is chosen in the Lead box. */
+  readonly leadId = input<string>();
+  /** Step 1: the lead this new order is for (company and contact come from it), or null = enter the company manually. */
+  readonly selectedLead = signal<Lead | null>(null);
+  /** Edit: the lead the order was made from (shown, cannot change). */
+  readonly linkedLeadNumber = signal<string | null>(null);
+  /** The company comes from the lead: its search / Add new company are hidden. */
+  readonly companyFromLead = computed(() => (this.editing() ? !!this.linkedLeadNumber() : !!this.selectedLead()));
+  /** The lead whose company and contact are in the form (another choice fills them again; "No lead" clears them). */
+  private filledFromLead: string | null = null;
+  /** From the query string (?copyFrom=): Duplicate — a new order filled from this saved order. */
+  readonly copyFrom = input<string>();
+  /** Duplicate: the sale number copied (shown above the form). */
+  readonly copiedFrom = signal<string | null>(null);
+
+  // ---- Tracking (DDL 036) ----
+  private readonly auth = inject(AuthService);
+  protected readonly trackingCancelled = TRACKING_CANCELLED;
+  /** Draft (1), Sent to DocuSign (2), Signed (3); Cancelled (4) only when editing, and cancels the sale. */
+  readonly trackingStatusId = signal<number>(1);
+  readonly cancelReason = signal('');
+  /** A new order cannot be cancelled; on Edit, Cancelled needs a manager, or a sales person their manager allowed. */
+  readonly trackingChoices = computed(() => {
+    const all = trackingStatusesOf(this.options());
+    const user = this.auth.user();
+    const mayCancel = this.editing() && !!user && (user.isManager || user.canRequestCancellation);
+    return all.filter((t) => t.id !== TRACKING_CANCELLED || mayCancel);
+  });
+  readonly isManager = computed(() => !!this.auth.user()?.isManager);
+  readonly editing = computed(() => !!this.id());
+  /** Edit: the order's sale number (shown in the title). */
+  readonly saleNumber = signal<string | null>(null);
+  /** Edit: a note above the form, e.g. the order's plan is no longer for sale. */
+  readonly editNotice = signal<string | null>(null);
+  /** Edit: the saved start date (the backdating limit applies only when it is changed, as on the server). */
+  private originalStart: string | null = null;
+  /** The customer whose contact and address are already in the form (choosing another one fills them again). */
+  private filledFor: string | null = null;
+  /** Edit: the saved discount, kept to the paisa while the list amount and discount % are unchanged. */
+  private readonly keptDiscount = signal<{ list: number; percent: number; amount: number } | null>(null);
   private readonly catalogService = inject(CatalogService);
   private readonly orderFormService = inject(OrderFormService);
+  private readonly salesService = inject(SalesService);
+  private readonly customersService = inject(CustomersService);
+  private readonly leadsService = inject(LeadsService);
   private readonly router = inject(Router);
   private readonly messages = inject(MessageService);
   protected readonly inr = formatInr;
@@ -45,7 +100,8 @@ export class SalesOrderForm implements OnInit {
   protected readonly spaced = (date: string) => longDate(date).replace(/-/g, ' ');
   protected readonly durationText = formatDuration;
   protected readonly units = DURATION_UNITS;
-  protected readonly orderDate = today();
+  /** Today on a new order; the day it was saved on an edited one. */
+  readonly orderDate = signal(today());
   protected readonly fyLabel = fyLabel;
   protected readonly rangeLabel = seatRangeLabel;
 
@@ -103,7 +159,11 @@ export class SalesOrderForm implements OnInit {
   /** Unit price for the whole paid term, rounded like the server: price per term × terms. */
   readonly termUnitPrice = computed(() => r2(this.unitPrice() * this.terms()));
   readonly listAmount = computed(() => r2(this.termUnitPrice() * (this.quantity() ?? 0)));
-  readonly discountAmount = computed(() => r2((this.listAmount() * (this.discountPercent() ?? 0)) / 100));
+  readonly discountAmount = computed(() => {
+    const kept = this.keptDiscount();
+    if (kept && kept.list === this.listAmount() && kept.percent === this.discountPercent()) return kept.amount;
+    return r2((this.listAmount() * (this.discountPercent() ?? 0)) / 100);
+  });
   readonly saleAmount = computed(() => r2(this.listAmount() - this.discountAmount()));
   readonly taxAmount = computed(() => r2((this.saleAmount() * (this.gstPercent() ?? 0)) / 100));
   readonly totalAmount = computed(() => r2(this.saleAmount() + this.taxAmount()));
@@ -204,7 +264,7 @@ export class SalesOrderForm implements OnInit {
   /** Problems shown under the form; Save stays disabled while there are any. */
   readonly problems = computed(() => {
     const p: string[] = [];
-    if (!this.customer()) p.push('Choose a customer, or add a new one.');
+    if (!this.customer()) p.push('Choose a company, or add a new one.');
     if (!this.plan()) p.push('Choose a category, product and plan.');
     const q = this.quantity();
     if (q === null || q < 1 || q > 100000 || !Number.isInteger(q)) p.push('Seats must be a whole number from 1 to 100000.');
@@ -228,25 +288,55 @@ export class SalesOrderForm implements OnInit {
     }
     if (!this.paidMonthsChoice()) p.push('Choose the paid months (12, 24 or 36).');
     if (!this.startDate()) p.push('Enter the start date.');
-    else if (this.startDate() < this.earliestStart()) p.push('The start date is further back than the company allows.');
+    else if (this.startDate() !== this.originalStart && this.startDate() < this.earliestStart()) p.push('The start date is further back than the company allows.');
     if (!this.billingFrequencyId() || !this.billingMethodId() || !this.paymentMethodId() || !this.paymentTermId() || !this.currencyId())
       p.push('Choose billing frequency, billing method, payment method, payment term and currency.');
+    if (this.trackingStatusId() === TRACKING_CANCELLED && !this.cancelReason().trim()) p.push('Enter the reason for cancelling the order.');
     return p;
   });
 
   constructor() {
     // Choosing a customer fills the primary contact and the bill-to address (the seller can still change them).
+    // On the Edit page the saved order's customer keeps the saved contact and address.
     effect(() => {
       const c = this.customer();
       untracked(() => {
-        if (!c) return;
+        if (!c || c.id === this.filledFor) return;
+        this.filledFor = c.id;
         this.primary.set({ name: c.contactPerson ?? '', designation: '', email: c.email ?? '', phone: c.phone ?? '' });
         this.billToAddress = [c.address, c.city, c.state, c.country].filter((x) => !!x && x.trim()).join('\n');
+      });
+    });
+    // Step 1: choosing a lead fills the company and contact from it; going back to "No lead" clears them.
+    effect(() => {
+      const lead = this.selectedLead();
+      untracked(() => {
+        if (this.editing() || (lead?.id ?? null) === this.filledFromLead) return;
+        const had = this.filledFromLead;
+        this.filledFromLead = lead?.id ?? null;
+        if (lead) {
+          this.fillFromLead(lead).catch((err) => this.saveError.set(errorText(err, 'Unable to load the lead\'s company.')));
+        } else if (had) {
+          this.filledFor = null;
+          this.customer.set(null);
+          this.primary.set(emptyContact());
+          this.billToAddress = '';
+        }
       });
     });
   }
 
   async ngOnInit(): Promise<void> {
+    const id = this.id();
+    if (id) {
+      await this.loadOrder(id, false);
+      return;
+    }
+    const copyFrom = this.copyFrom();
+    if (copyFrom) {
+      await this.loadOrder(copyFrom, true);
+      return;
+    }
     try {
       const [catalog, options] = await Promise.all([this.catalogService.catalog(), this.orderFormService.options()]);
       this.catalog.set(catalog);
@@ -254,8 +344,113 @@ export class SalesOrderForm implements OnInit {
       // Billing, payment and currency start on "Select": the seller chooses each (lists: Admin Panel > Settings > Order form lists).
       this.gstPercent.set(options.defaultGstPercent);
       if (catalog.length === 1) this.chooseCategory(catalog[0].id);
+      // Lead Records > New Order: that lead starts chosen in the Lead box.
+      const leadId = this.leadId();
+      if (leadId) this.selectedLead.set(await this.leadsService.get(leadId));
     } catch (err) {
       this.loadError.set(errorText(err, 'Unable to load the order form.'));
+    }
+  }
+
+  /** A lead was chosen: its company and client become the company and primary contact. */
+  private async fillFromLead(lead: Lead): Promise<void> {
+    const company = await this.customersService.get(lead.companyId);
+    if (this.selectedLead()?.id !== lead.id) return; // another lead was chosen meanwhile
+    this.filledFor = company.id;
+    this.customer.set(company);
+    this.primary.set({
+      name: lead.clientName ?? company.contactPerson ?? '',
+      designation: lead.clientDesignation ?? '',
+      email: lead.clientEmail ?? company.email ?? '',
+      phone: lead.clientPhone ?? company.phone ?? '',
+    });
+    this.billToAddress = [company.address, company.city, company.state, company.country].filter((x) => !!x && x.trim()).join('\n');
+  }
+
+  /**
+   * Fills the form with a saved order.
+   * Edit (copy = false): the order itself, priced with the seat prices of its order date's financial year.
+   * Duplicate (copy = true): a new order with the same company, product, terms, contacts and wording, starting today as
+   * Draft, priced with today's price list.
+   */
+  private async loadOrder(id: string, copy: boolean): Promise<void> {
+    try {
+      const [sale, details, options] = await Promise.all([this.salesService.get(id), this.orderFormService.details(id), this.orderFormService.options()]);
+      if (!copy) this.saleNumber.set(sale.saleNumber);
+      if (!details.hasOrderForm) {
+        this.loadError.set(copy ? 'Only orders saved with the New order form can be duplicated.' : 'Only orders saved with the New order form can be edited.');
+        return;
+      }
+      if (!copy && !details.canEdit) {
+        this.loadError.set(sale.status === 'Cancelled'
+          ? 'A cancelled order cannot be edited.'
+          : 'This order has a cancellation request waiting for the manager. It can be edited once the request is decided.');
+        return;
+      }
+      const [catalog, customer] = await Promise.all([
+        this.catalogService.catalog(copy ? undefined : details.orderFiscalYear), this.customersService.get(sale.customerId)]);
+
+      this.options.set(options);
+      this.catalog.set(catalog);
+      if (copy) this.copiedFrom.set(sale.saleNumber);
+      else {
+        this.linkedLeadNumber.set(sale.leadNumber);
+        this.orderDate.set(localDate(sale.createdAtUtc));
+        this.trackingStatusId.set(details.trackingStatusId ?? 1);
+      }
+
+      this.filledFor = customer.id;
+      this.customer.set(customer);
+      this.categoryId.set(details.categoryId);
+      this.productId.set(details.productId);
+      this.planId.set(details.planId);
+      if (!this.plan()) {
+        this.editNotice.set(`This order's plan (${sale.productName} ${sale.planName}) is no longer for sale. Choose another plan.`);
+        this.categoryId.set(null);
+        this.productId.set(null);
+        this.planId.set(null);
+      }
+      this.includedItemQuantity.set(details.includedItemQuantity ?? this.plan()?.includedItemQuantity ?? null);
+      this.quantity.set(sale.quantity);
+      this.discountPercent.set(sale.discountPercent);
+      if (!copy) this.keptDiscount.set({ list: sale.listAmount, percent: sale.discountPercent, amount: sale.discountAmount });
+      this.gstPercent.set(details.gstPercent);
+
+      const months = (sale.durationUnit === 'Year' ? 12 : sale.durationUnit === 'Quarter' ? 3 : 1) * sale.durationCount;
+      this.paidMonthsChoice.set(months);
+      this.durationUnit.set(sale.durationUnit);
+      this.durationCount.set(sale.durationCount);
+      if (!copy) {
+        this.startDate.set(sale.startDate);
+        this.originalStart = sale.startDate;
+      }
+      this.freeMonths.set(details.freeMonths);
+      this.billingFrequencyId.set(details.billingFrequencyId);
+      this.billingMethodId.set(details.billingMethodId);
+      this.paymentMethodId.set(details.paymentMethodId);
+      this.paymentTermId.set(details.paymentTermId);
+      this.currencyId.set(details.currencyId);
+      this.notes = sale.notes ?? '';
+
+      const contact = (c: OrderContact | null): OrderContact => ({ name: c?.name ?? '', designation: c?.designation ?? '', email: c?.email ?? '', phone: c?.phone ?? '' });
+      this.primary.set(contact(details.primaryContact));
+      this.billing.set(contact(details.billingContact));
+      this.billToAddress = details.billToAddress ?? '';
+
+      // Sections the seller had changed stay changed; the others follow the standard text (and so the edited values).
+      const saved = details.wording;
+      if (saved) {
+        const norm = (text: string | null | undefined) => (text ?? '').replace(/\r\n/g, '\n').trim();
+        const std = this.standardWording();
+        const own: Partial<Record<keyof OrderWording, string>> = {};
+        for (const key of Object.keys(std) as (keyof OrderWording)[]) {
+          if (key === 'freeMonthNote' && details.freeMonths <= 0) continue;
+          if (norm(saved[key]) !== norm(std[key])) own[key] = saved[key] ?? '';
+        }
+        this.wordingOverrides.set(own);
+      }
+    } catch (err) {
+      this.loadError.set(errorText(err, 'Unable to load the order.'));
     }
   }
 
@@ -324,7 +519,7 @@ export class SalesOrderForm implements OnInit {
     this.busy.set(true);
     const trim = (c: OrderContact): OrderContact => ({ name: c.name.trim(), designation: c.designation.trim(), email: c.email.trim(), phone: c.phone.trim() });
     try {
-      const sale = await this.orderFormService.create({
+      const body = {
         customerId: this.customer()!.id,
         planId: this.planId()!,
         quantity: this.quantity()!,
@@ -345,8 +540,17 @@ export class SalesOrderForm implements OnInit {
         billToAddress: this.billToAddress.trim() || undefined,
         wording: { ...this.wording(), freeMonthNote: this.freeMonths() > 0 ? this.wording().freeMonthNote : null },
         includedItemQuantity: this.wording().extraItemTitle && this.includedItemQuantity() ? Number(this.includedItemQuantity()) : undefined,
-      });
-      this.messages.success(`Order ${sale.saleNumber} saved.`);
+        leadId: this.id() ? undefined : this.selectedLead()?.id,
+        trackingStatusId: this.trackingStatusId(),
+        cancelReason: this.trackingStatusId() === TRACKING_CANCELLED ? this.cancelReason().trim() : undefined,
+      };
+      const id = this.id();
+      const sale = id ? await this.orderFormService.update(id, body) : await this.orderFormService.create(body);
+      const cancelled = id && this.trackingStatusId() === TRACKING_CANCELLED;
+      const newLead = !id && !body.leadId && sale.leadNumber ? ` Lead ${sale.leadNumber} was created for ${sale.customerName}; fill in its details in Lead Records.` : '';
+      this.messages.success(!id ? `Order ${sale.saleNumber} saved.${newLead}`
+        : cancelled ? (this.isManager() ? `Order ${sale.saleNumber} updated and cancelled.` : `Order ${sale.saleNumber} updated. Cancellation requested from your manager.`)
+        : `Order ${sale.saleNumber} updated. The order form PDF was made again.`);
       this.router.navigate(['/sales', sale.id]);
     } catch (err) {
       this.saveError.set(errorText(err));

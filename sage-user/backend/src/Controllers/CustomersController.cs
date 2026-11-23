@@ -39,6 +39,14 @@ namespace SageUserApi.Controllers
             return Result(_customer, _fr);
         }, _ct);
 
+        /// <summary>Edit a company: contact, phone, email, GSTIN and address. The name cannot change (shared by every sales user).</summary>
+        [HttpPut("{id:guid}")]
+        public Task<IActionResult> UpdateCustomer(Guid id, [FromBody] HttpCustomerPostParams _params, CancellationToken _ct) => WithUserAsync("C:Customers:UpdateCustomer", async _user =>
+        {
+            var (_customer, _fr) = await _customerFunctions.UpdateCustomerAsync(id, _params, _user, ClientIp, _ct);
+            return Result(_customer, _fr);
+        }, _ct);
+
         [HttpPost]
         public Task<IActionResult> CreateCustomer([FromBody] HttpCustomerPostParams _params, CancellationToken _ct) => WithUserAsync("C:Customers:CreateCustomer", async _user =>
         {

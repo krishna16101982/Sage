@@ -2,15 +2,17 @@
   <div class="stack">
     <div class="page-header">
       <div class="stack-xs">
-        <span class="page-eyebrow">Overview</span>
-        <h1 class="page-title">Welcome, {{ u.firstName }}</h1>
+        <h1 class="page-title">Dashboard</h1>
+        <p class="hint">Your pipeline at a glance, {{ u.firstName }}.</p>
       </div>
       <div class="spacer"></div>
-      <a class="btn btn-secondary" routerLink="/sales/list"><app-icon name="list" /> My sales</a>
+      <div class="scope-switch" role="group" aria-label="Which leads">
+        <button type="button" [class.is-on]="!mine()" [attr.aria-pressed]="!mine()" (click)="setMine(false)">All leads</button>
+        <button type="button" [class.is-on]="mine()" [attr.aria-pressed]="mine()" (click)="setMine(true)">My leads</button>
+      </div>
+      <a class="btn btn-secondary" routerLink="/leads"><app-icon name="trending-up" /> Lead Records</a>
       <a class="btn btn-primary" routerLink="/sales/order-form"><app-icon name="plus" /> New order form</a>
     </div>
-
-    @if (error()) { <p class="hint text-danger">{{ error() }}</p> }
 
     @if (pendingRequests() > 0) {
       <a class="card accent-orange" routerLink="/team">
@@ -23,133 +25,145 @@
       </a>
     }
 
-    <!-- Figures for this month -->
-    <div class="stat-grid">
-      <a class="card stat-card accent-teal" routerLink="/sales/list">
-        <div class="stat-top">
-          <span class="stat-icon"><app-icon name="cart" /></span>
-          <div class="stack-xs">
-            <span class="stat-label">My sales this month</span>
-            <span>
-              <span class="stat-value">{{ mine()?.totalCount ?? '…' }}</span>
-              @if (countChange(); as c) { <span class="stat-change" [class.up]="c >= 0" [class.down]="c < 0">{{ c >= 0 ? '▲' : '▼' }} {{ c >= 0 ? c : -c }}%</span> }
-            </span>
-            <span class="stat-sub">{{ mineLast()?.totalCount ?? 0 }} last month</span>
-          </div>
-        </div>
-      </a>
+    @if (error()) { <p class="hint text-danger">{{ error() }}</p> }
+    @if (loading() && !summary()) { <p class="text-sm text-muted">Loading...</p> }
 
-      <div class="card stat-card accent-blue">
-        <div class="stat-top">
-          <span class="stat-icon"><app-icon name="rupee" /></span>
-          <div class="stack-xs">
-            <span class="stat-label">My revenue this month</span>
-            <span>
-              <span class="stat-value">{{ mine() ? inr(mine()!.totalSaleAmount) : '…' }}</span>
-              @if (revenueChange(); as c) { <span class="stat-change" [class.up]="c >= 0" [class.down]="c < 0">{{ c >= 0 ? '▲' : '▼' }} {{ c >= 0 ? c : -c }}%</span> }
-            </span>
-            <span class="stat-sub">{{ inr(mineLast()?.totalSaleAmount ?? 0) }} last month</span>
-          </div>
+    @if (summary(); as s) {
+      <!-- Leads per status -->
+      <div class="dash-tiles">
+        <a class="card dash-tile" routerLink="/leads" style="--tile: var(--color-primary)">
+          <span class="stat-label">Total leads</span>
+          <span class="stat-value">{{ s.totalLeads }}</span>
+        </a>
+        @for (st of s.statuses; track st.id) {
+          <a class="card dash-tile" routerLink="/leads" [style.--tile]="'var(--series-' + slotOf(st.code) + ')'">
+            <span class="stat-label">{{ st.name }}</span>
+            <span class="stat-value">{{ st.total }}</span>
+          </a>
+        }
+      </div>
+
+      <!-- Conversion and won revenue -->
+      <div class="dash-money">
+        <div class="card dash-tile" style="--tile: var(--series-3)">
+          <span class="stat-label">Conversion rate</span>
+          <span class="stat-value">{{ s.conversionRate }}%</span>
+          <span class="hint">{{ s.wonLeads }} won of {{ s.totalLeads }} leads</span>
+        </div>
+        <div class="card dash-tile" style="--tile: var(--series-1)">
+          <span class="stat-label">Won revenue (monthly)</span>
+          <span class="stat-value">{{ inr(s.wonRevenueMonthly) }}</span>
+          <button type="button" class="link-button dash-link text-left" (click)="showProducts.set(true)">Click for product breakdown ›</button>
+        </div>
+        <div class="card dash-tile" style="--tile: var(--series-1)">
+          <span class="stat-label">Won revenue (annualized)</span>
+          <span class="stat-value">{{ inr(s.wonRevenueAnnualized) }}</span>
+          <button type="button" class="link-button dash-link text-left" (click)="showProducts.set(true)">Click for product breakdown ›</button>
         </div>
       </div>
 
-      @if (u.isManager) {
-        <a class="card stat-card accent-purple" routerLink="/sales/team">
-          <div class="stat-top">
-            <span class="stat-icon"><app-icon name="users" /></span>
-            <div class="stack-xs">
-              <span class="stat-label">Team revenue this month</span>
-              <span class="stat-value">{{ team() ? inr(team()!.totalSaleAmount) : '…' }}</span>
-              <span class="stat-sub">{{ team()?.totalCount ?? 0 }} sale{{ team()?.totalCount === 1 ? '' : 's' }} by your team</span>
-            </div>
-          </div>
-        </a>
-      } @else {
-        <a class="card stat-card accent-purple" routerLink="/customers/list">
-          <div class="stat-top">
-            <span class="stat-icon"><app-icon name="briefcase" /></span>
-            <div class="stack-xs">
-              <span class="stat-label">Customers</span>
-              <span class="stat-value">{{ customerCount() ?? '…' }}</span>
-              <span class="stat-sub">Shared by the whole sales team</span>
-            </div>
-          </div>
-        </a>
-      }
-    </div>
-
-    <div class="grid-main-side">
-      <!-- My sales per day -->
-      <section class="card">
-        <header class="card-header">
-          <div class="stack-xs">
-            <h2 class="section-title">My sales per day</h2>
-            <span class="hint">{{ month }} · active sales</span>
-          </div>
-          <div class="spacer"></div>
-          <span class="stat-value" style="font-size: 1.125rem">{{ mine() ? inr(mine()!.totalSaleAmount) : '' }}</span>
-        </header>
-        <div class="card-body accent-teal">
-          <app-bar-chart [points]="daily()" [summary]="'My sale amount per day in ' + month" />
-        </div>
-      </section>
-
-      <!-- Quick actions and profile -->
-      <section class="card">
-        <header class="card-header"><h2 class="section-title">Quick actions</h2></header>
-        <ul class="activity-list">
-          <li>
-            <span class="stat-icon accent-teal" style="width: 2rem; height: 2rem"><app-icon name="plus-circle" /></span>
-            <div class="activity-text"><a class="link-button" routerLink="/sales/order-form">Record a new order</a><div class="hint">Customer, product and price, terms and the order form PDF</div></div>
-          </li>
-          <li>
-            <span class="stat-icon accent-purple" style="width: 2rem; height: 2rem"><app-icon name="briefcase" /></span>
-            <div class="activity-text"><a class="link-button" routerLink="/customers/add">Add a customer</a><div class="hint">Search first: customers are shared</div></div>
-          </li>
-          <li>
-            <span class="stat-icon accent-blue" style="width: 2rem; height: 2rem"><app-icon name="user-check" /></span>
-            <div class="activity-text">
-              <span class="font-medium">{{ u.isManager ? 'Sales manager' : 'Sales person' }}</span>
-              <div class="hint">{{ u.managerName ? 'Your manager: ' + u.managerName : 'You lead a team' }} · <span class="code">{{ u.username }}</span></div>
-            </div>
-          </li>
-        </ul>
-      </section>
-    </div>
-
-    <!-- My latest sales -->
-    <section class="card">
-      <header class="card-header">
-        <div class="stack-xs">
-          <h2 class="section-title">My recent sales</h2>
-          <span class="hint">Your latest sales</span>
-        </div>
-        <div class="spacer"></div>
-        <a class="btn btn-secondary" routerLink="/sales/list">View all <app-icon name="chevron-right" /></a>
-      </header>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr><th>Sale</th><th>Customer</th><th>Product</th><th class="amount">Amount</th><th>Renewal</th><th>Status</th></tr>
-          </thead>
-          <tbody>
-            @for (s of recent(); track s.id) {
-              <tr>
-                <td><a class="link-button code" style="white-space: nowrap" [routerLink]="['/sales', s.id]">{{ s.saleNumber }}</a></td>
-                <td>{{ s.customerName }}</td>
-                <td>{{ s.productName }} <div class="hint">{{ s.planName }}</div></td>
-                <td class="amount font-medium">{{ inr(s.saleAmount) }}</td>
-                <td class="date">{{ date(s.renewalDate) }}</td>
-                <td>
-                  @if (s.status === 'Cancelled') { <span class="badge badge-danger">Cancelled</span> } @else { <span class="badge badge-success">Active</span> }
-                </td>
-              </tr>
-            } @empty {
-              <tr><td colspan="6" class="table-empty">No sales yet. <a class="link-button" routerLink="/sales/order-form">Record your first order</a>.</td></tr>
+      <div class="dash-charts">
+        <!-- Status breakdown -->
+        <section class="card">
+          <header class="card-header"><h2 class="section-title">Lead Status Breakdown</h2></header>
+          <div class="card-body">
+            @if (slices().length === 0) {
+              <p class="hint">No leads yet.</p>
+            } @else {
+              <div class="pie-wrap">
+                <svg class="pie" viewBox="0 0 200 200" role="img" [attr.aria-label]="'Leads per status, ' + s.totalLeads + ' in all'">
+                  @for (sl of slices(); track sl.item.id) {
+                    <path [attr.d]="sl.path" [class]="'s-' + sl.slot"><title>{{ sl.item.name }}: {{ share(sl.item) }}</title></path>
+                  }
+                </svg>
+                <ul class="legend" aria-label="Leads per status">
+                  @for (st of s.statuses; track st.id) {
+                    <li><span [class]="'swatch s-' + slotOf(st.code)"></span>{{ st.name }}<span class="count">{{ st.total }}</span></li>
+                  }
+                </ul>
+              </div>
             }
-          </tbody>
-        </table>
+          </div>
+        </section>
+
+        <!-- Sources -->
+        <section class="card">
+          <header class="card-header"><h2 class="section-title">Lead Source Summary</h2></header>
+          <div class="card-body">
+            @if (s.sources.length === 0) {
+              <p class="hint">No leads yet.</p>
+            } @else {
+              <div class="hbars" role="list" aria-label="Leads per source">
+                @for (src of s.sources; track src.name) {
+                  <span class="hbar-label" role="listitem">{{ src.name }}</span>
+                  <span class="hbar-track" [title]="src.name + ': ' + share(src) + ', ' + src.won + ' won'">
+                    <span class="hbar" [style.width.%]="(src.total / maxSource()) * 85"></span>
+                    <span class="hbar-value">{{ src.total }}</span>
+                  </span>
+                }
+              </div>
+            }
+          </div>
+        </section>
+
+        <!-- Aging -->
+        <section class="card">
+          <header class="card-header"><h2 class="section-title">Lead Aging Summary</h2></header>
+          <div class="card-body">
+            <div class="cols" role="list" aria-label="Leads by days since created">
+              @for (a of s.aging; track a.id) {
+                <div class="col" role="listitem" [title]="a.name + ': ' + share(a)">
+                  <span class="col-value">{{ a.total }}</span>
+                  <span class="col-bar" [style.height.%]="agingHeight(a.total)"></span>
+                </div>
+              }
+            </div>
+            <div class="col-labels">
+              @for (a of s.aging; track a.id) { <span>{{ a.name }}</span> }
+            </div>
+          </div>
+        </section>
       </div>
-    </section>
+
+      <!-- Self Working vs Passed -->
+      <section class="card">
+        <header class="card-header"><h2 class="section-title">Lead Type: Self Working vs Passed</h2></header>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Lead Type</th><th class="amount">Total</th><th class="amount">Won</th><th class="amount">Win %</th></tr></thead>
+            <tbody>
+              @for (t of s.types; track t.id) {
+                <tr>
+                  <td>{{ t.name }}</td>
+                  <td class="amount">{{ t.total }}</td>
+                  <td class="amount">{{ t.won }}</td>
+                  <td class="amount"><span class="badge badge-warning">{{ winRate(t) }}%</span></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      @if (showProducts()) {
+        <app-modal title="Won revenue by product" (closed)="showProducts.set(false)">
+          <div class="table-wrap" style="padding: 0 1.25rem 1rem">
+            <table class="data-table">
+              <thead><tr><th>Product</th><th class="amount">Won leads</th><th class="amount">Monthly</th><th class="amount">Annualized</th></tr></thead>
+              <tbody>
+                @for (p of s.products; track p.name) {
+                  <tr><td>{{ p.name }}</td><td class="amount">{{ p.won }}</td><td class="amount">{{ inr(p.revenue) }}</td><td class="amount">{{ inr(p.revenue * 12) }}</td></tr>
+                } @empty {
+                  <tr><td colspan="4" class="table-empty">No won leads yet.</td></tr>
+                }
+              </tbody>
+              @if (s.products.length > 0) {
+                <tfoot><tr><th>Total</th><th class="amount">{{ s.wonLeads }}</th><th class="amount">{{ inr(s.wonRevenueMonthly) }}</th><th class="amount">{{ inr(s.wonRevenueAnnualized) }}</th></tr></tfoot>
+              }
+            </table>
+          </div>
+        </app-modal>
+      }
+    }
   </div>
 }

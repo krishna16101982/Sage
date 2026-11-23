@@ -40,7 +40,7 @@ export class CustomersList implements OnInit {
     try {
       this.data.set(await this.service.list({ page: this.page, pageSize: 20, search: this.search.trim() || undefined }));
     } catch (err) {
-      this.error.set(errorText(err, 'Unable to load customers.'));
+      this.error.set(errorText(err, 'Unable to load companies.'));
     } finally {
       this.loading.set(false);
     }

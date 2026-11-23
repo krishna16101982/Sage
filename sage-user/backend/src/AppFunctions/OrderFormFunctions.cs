@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
 using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.AppValidations;
@@ -148,6 +149,10 @@ namespace SageUserApi.AppFunctions
                 foreach ((string _key, Action<OrderWording, string> _set) in WordingSettings)
                     foreach (DataRow _row in _settings.Rows)
                         if (_row.GetText("SettingKey") == _key) _set(_options.Wording, _row.GetText("SettingValue"));
+                (_functionReturn, DataTable _tracking) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                    " SELECT Id, Code, Name FROM dbo.OrderTrackingStatuses ORDER BY SortOrder ", null, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+                _options.TrackingStatuses = _tracking.MapRows(_row => new TrackingStatusOption { Id = _row.GetInt("Id"), Code = _row.GetText("Code"), Name = _row.GetText("Name") });
                 foreach (DataRow _row in _masters.Rows)
                 {
                     var _option = new MasterOption { Id = _row.GetInt("Id"), Code = _row.GetText("Code"), Name = _row.GetText("Name"), IsDefault = _row.GetBool("IsDefault") };
@@ -169,71 +174,169 @@ namespace SageUserApi.AppFunctions
             }
         }
 
+        /// <summary>
+        /// Checks an order (new or edited) and returns the procedure parameters both procedures share, or the problems.
+        /// _currentStartDate: an edit's saved start date; the backdating limit applies only when the start date changes.
+        /// </summary>
+        private async Task<(List<SqlParameter> parameters, List<string> errors)> CheckOrderAsync(HttpOrderFormPostParams _params, DateOnly? _currentStartDate, CancellationToken _ct)
+        {
+            var _errors = new List<string>();
+
+            // The sale: same checks as the simple "New sale" page.
+            if (!_params.CustomerId.HasValue || _params.CustomerId == Guid.Empty) _errors.Add(Msg.CustomerRequired);
+            if (_params.PlanId <= 0) _errors.Add(Msg.PlanRequired);
+            DateOnly _today = DateOnly.FromDateTime(DateTime.UtcNow);
+            if (!_params.StartDate.HasValue) _errors.Add(Msg.StartDateRequired);
+            else if (_params.StartDate != _currentStartDate)
+            {
+                int _maxBack = (await _catalogFunctions.GetSalesRulesAsync(_ct)).MaxBackdateDays;
+                if (_params.StartDate.Value < _today.AddDays(-_maxBack))
+                    _errors.Add(_maxBack == 0 ? "The start date cannot be in the past (company setting)." : $"The start date cannot be more than {_maxBack} days in the past (company setting).");
+                else if (_params.StartDate.Value > _today.AddYears(1)) _errors.Add(Msg.StartDateTooFarAhead);
+            }
+            if (HasMoreThanTwoDecimals(_params.SaleAmount) || HasMoreThanTwoDecimals(_params.DiscountAmount)) _errors.Add(Msg.AmountDecimals);
+            string _notes = Clean(_params.Notes);
+            if (_notes != null && _notes.Length > 1000) _errors.Add(Msg.NotesTooLong);
+
+            // The order form.
+            if (!_params.GstPercent.HasValue || _params.GstPercent < 0 || _params.GstPercent > 28 || HasMoreThanTwoDecimals(_params.GstPercent))
+                _errors.Add("GST must be between 0 and 28 percent.");
+            if (_params.BillingFrequencyId <= 0) _errors.Add("Choose a billing frequency.");
+            if (_params.BillingMethodId <= 0) _errors.Add("Choose a billing method.");
+            if (_params.PaymentMethodId <= 0) _errors.Add("Choose a payment method.");
+            if (_params.PaymentTermId <= 0) _errors.Add("Choose a payment term.");
+            if (_params.CurrencyId <= 0) _errors.Add("Choose a currency.");
+            OrderContact _primary = CleanContact(_params.PrimaryContact, "primary contact", true, _errors);
+            OrderContact _billing = _params.BillingSameAsPrimary ? _primary : CleanContact(_params.BillingContact, "billing contact", false, _errors) ?? _primary;
+            string _address = Clean(_params.BillToAddress);
+            if (_address != null && _address.Length > 500) _errors.Add("The bill-to address must be 500 characters or fewer.");
+            OrderWording _wording = CleanWording(_params.Wording, _errors);
+            // The free-month note only belongs on an order with free months.
+            if (_wording != null && _params.FreeMonths <= 0) _wording.FreeMonthNote = null;
+            if (_params.IncludedItemQuantity.HasValue && (_params.IncludedItemQuantity < 1 || _params.IncludedItemQuantity > 10_000_000))
+                _errors.Add("The Team Link Extend seat quantity must be a whole number from 1 to 10000000.");
+            if (_errors.Count > 0) return (null, _errors);
+
+            // Free months, master values, discount limit, quantity, duration and renewal date are checked by the procedure.
+            var _parameters = new List<SqlParameter>
+            {
+                P("@CustomerPublicId", _params.CustomerId), P("@PlanId", _params.PlanId), P("@Quantity", _params.Quantity),
+                Money("@SaleAmount", _params.SaleAmount), Money("@DiscountAmount", _params.DiscountAmount),
+                P("@DurationUnit", _params.DurationUnit.NullIfWhiteSpace()), P("@DurationCount", _params.DurationCount),
+                Date("@StartDate", _params.StartDate), Date("@RenewalDate", _params.RenewalDate), P("@Notes", _notes),
+                Money("@GstPercent", _params.GstPercent), P("@FreeMonths", _params.FreeMonths),
+                P("@BillingFrequencyId", _params.BillingFrequencyId), P("@BillingMethodId", _params.BillingMethodId),
+                P("@PaymentMethodId", _params.PaymentMethodId), P("@PaymentTermId", _params.PaymentTermId), P("@CurrencyId", _params.CurrencyId),
+                P("@PrimaryContactName", _primary?.Name), P("@PrimaryContactDesignation", _primary?.Designation),
+                P("@PrimaryContactEmail", _primary?.Email), P("@PrimaryContactPhone", _primary?.Phone),
+                P("@BillingContactName", _billing?.Name), P("@BillingContactDesignation", _billing?.Designation),
+                P("@BillingContactEmail", _billing?.Email), P("@BillingContactPhone", _billing?.Phone),
+                P("@BillToAddress", _address),
+                P("@OrderWording", _wording == null ? null : JsonSerializer.Serialize(_wording, JsonOptions)),
+                P("@IncludedItemQuantity", _params.IncludedItemQuantity)
+            };
+            return (_parameters, _errors);
+        }
+
+        private const int TrackingCancelled = 4;
+
+        /// <summary>
+        /// Tracking "Cancelled" cancels the sale: a manager cancels it, a sales person their manager allowed asks for it.
+        /// Checked before anything is saved; null when it may go ahead.
+        /// </summary>
+        private static IFunctionReturn CheckCancel(SalesUserContext _user, string _reason, string _methodName)
+        {
+            if (!_user.IsManager && !_user.CanRequestCancellation)
+                return FunctionReturn.Fail(Constants.ReturnMessageTypes.PermissionDenied, Msg.RequestNotAllowed, Constants.HttpStatusCodes.Forbidden, _methodName);
+            string _clean = Clean(_reason);
+            if (string.IsNullOrEmpty(_clean) || _clean.Length > 500) return Invalid(new List<string> { Msg.CancelReasonRequired }, _methodName);
+            return null;
+        }
+
+        /// <summary>Cancels the sale (manager) or sends the cancellation request (sales person); returns the message to show.</summary>
+        private async Task<(string message, IFunctionReturn functionReturn)> CancelAsync(Guid _saleId, string _reason, SalesUserContext _user, string _ipAddress, CancellationToken _ct)
+        {
+            var _body = new HttpSaleCancelParams { Reason = _reason };
+            if (_user.IsManager)
+            {
+                (_, IFunctionReturn _cancelled) = await _saleFunctions.CancelSaleAsync(_saleId, _body, _user, _ipAddress, _ct);
+                return ("Order cancelled.", _cancelled);
+            }
+            (_, IFunctionReturn _requested) = await _saleFunctions.CreateCancelRequestAsync(_saleId, _body, _user, _ipAddress, _ct);
+            return ("Cancellation requested. Your manager will approve or reject it.", _requested);
+        }
+
+        public async Task<(SaleDto sale, IFunctionReturn functionReturn)> SetTrackingAsync(Guid _saleId, HttpOrderTrackingParams _params, SalesUserContext _user, string _ipAddress, CancellationToken _ct = default)
+        {
+            string _methodName = "F:OrderForm:SetTracking";
+            try
+            {
+                _params ??= new HttpOrderTrackingParams();
+                (SaleDto _before, IFunctionReturn _functionReturn) = await _saleFunctions.GetSaleAsync(_saleId, _user, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+                string _message;
+                if (_params.TrackingStatusId == TrackingCancelled)
+                {
+                    if (_before.Status != "Active") return (null, Invalid(new List<string> { "This order is already cancelled." }, _methodName));
+                    IFunctionReturn _refused = CheckCancel(_user, _params.Reason, _methodName);
+                    if (_refused != null) return (null, _refused);
+                    (_message, _functionReturn) = await CancelAsync(_saleId, Clean(_params.Reason), _user, _ipAddress, _ct);
+                    if (!_functionReturn.Status) return (null, _functionReturn);
+                }
+                else
+                {
+                    try
+                    {
+                        await _databaseFunctions.ExecuteProcedureScalarAsync<Guid>(SP.SaleOrderSetTracking, new[]
+                        {
+                            P("@SalePublicId", _saleId), P("@SalesUserId", _user.Id), P("@TrackingStatusId", _params.TrackingStatusId)
+                        }, _ct);
+                    }
+                    catch (AppException ex)
+                    {
+                        return (null, FunctionReturn.Fail(ex.MessageType, ex.Message, ex.HttpStatusCode, _methodName));
+                    }
+                    _message = "Tracking status saved.";
+                }
+
+                (SaleDto _after, _functionReturn) = await _saleFunctions.GetSaleAsync(_saleId, _user, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+                await SalesAudit.LogAsync(_databaseFunctions, _loggerFunctions, "SetTracking", "Sale", _saleId, _user,
+                    new { _after.SaleNumber, From = _before.TrackingName, To = _after.TrackingName, Requested = _params.TrackingStatusId }, _ipAddress, _ct);
+                return (_after, new FunctionReturn { MethodName = _methodName, Message = new List<string> { _message } });
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
+
+        /// <summary>What the audit log keeps of an order (before / after an edit).</summary>
+        private static object AuditOf(SaleDto _sale, OrderDetailsDto _details) => new
+        {
+            _sale.SaleNumber, _sale.CustomerName, _sale.ProductName, _sale.PlanName, _sale.Quantity,
+            _sale.ListAmount, _sale.SaleAmount, _sale.DiscountAmount, _details?.GstPercent, _details?.TaxAmount, _details?.TotalAmount,
+            _details?.FreeMonths, _sale.StartDate, _sale.RenewalDate, _details?.BillingFrequency, _details?.PaymentTerm
+        };
+
         public async Task<(SaleDto sale, IFunctionReturn functionReturn)> CreateOrderAsync(HttpOrderFormPostParams _params, SalesUserContext _user, string _ipAddress, CancellationToken _ct = default)
         {
             string _methodName = "F:OrderForm:CreateOrder";
             try
             {
                 _params ??= new HttpOrderFormPostParams();
-                var _errors = new List<string>();
-
-                // The sale: same checks as the simple "New sale" page.
-                if (!_params.CustomerId.HasValue || _params.CustomerId == Guid.Empty) _errors.Add(Msg.CustomerRequired);
-                if (_params.PlanId <= 0) _errors.Add(Msg.PlanRequired);
-                DateOnly _today = DateOnly.FromDateTime(DateTime.UtcNow);
-                if (!_params.StartDate.HasValue) _errors.Add(Msg.StartDateRequired);
-                else
-                {
-                    int _maxBack = (await _catalogFunctions.GetSalesRulesAsync(_ct)).MaxBackdateDays;
-                    if (_params.StartDate.Value < _today.AddDays(-_maxBack))
-                        _errors.Add(_maxBack == 0 ? "The start date cannot be in the past (company setting)." : $"The start date cannot be more than {_maxBack} days in the past (company setting).");
-                    else if (_params.StartDate.Value > _today.AddYears(1)) _errors.Add(Msg.StartDateTooFarAhead);
-                }
-                if (HasMoreThanTwoDecimals(_params.SaleAmount) || HasMoreThanTwoDecimals(_params.DiscountAmount)) _errors.Add(Msg.AmountDecimals);
-                string _notes = Clean(_params.Notes);
-                if (_notes != null && _notes.Length > 1000) _errors.Add(Msg.NotesTooLong);
-
-                // The order form.
-                if (!_params.GstPercent.HasValue || _params.GstPercent < 0 || _params.GstPercent > 28 || HasMoreThanTwoDecimals(_params.GstPercent))
-                    _errors.Add("GST must be between 0 and 28 percent.");
-                if (_params.BillingFrequencyId <= 0) _errors.Add("Choose a billing frequency.");
-                if (_params.BillingMethodId <= 0) _errors.Add("Choose a billing method.");
-                if (_params.PaymentMethodId <= 0) _errors.Add("Choose a payment method.");
-                if (_params.PaymentTermId <= 0) _errors.Add("Choose a payment term.");
-                if (_params.CurrencyId <= 0) _errors.Add("Choose a currency.");
-                OrderContact _primary = CleanContact(_params.PrimaryContact, "primary contact", true, _errors);
-                OrderContact _billing = _params.BillingSameAsPrimary ? _primary : CleanContact(_params.BillingContact, "billing contact", false, _errors) ?? _primary;
-                string _address = Clean(_params.BillToAddress);
-                if (_address != null && _address.Length > 500) _errors.Add("The bill-to address must be 500 characters or fewer.");
-                OrderWording _wording = CleanWording(_params.Wording, _errors);
-                // The free-month note only belongs on an order with free months.
-                if (_wording != null && _params.FreeMonths <= 0) _wording.FreeMonthNote = null;
-                if (_params.IncludedItemQuantity.HasValue && (_params.IncludedItemQuantity < 1 || _params.IncludedItemQuantity > 10_000_000))
-                    _errors.Add("The Team Link Extend seat quantity must be a whole number from 1 to 10000000.");
+                (List<SqlParameter> _parameters, List<string> _errors) = await CheckOrderAsync(_params, null, _ct);
+                if (_params.TrackingStatusId == TrackingCancelled) (_errors ??= new List<string>()).Add("A new order cannot be cancelled. Choose Draft, Sent to DocuSign or Signed.");
                 if (_errors.Count > 0) return (null, Invalid(_errors, _methodName));
+                _parameters.Insert(0, P("@SalesUserId", _user.Id));
+                _parameters.Add(P("@TrackingStatusId", _params.TrackingStatusId ?? 1));
 
-                // Free months, master values, discount limit, quantity, duration and renewal date are checked by the procedure.
                 IFunctionReturn _functionReturn;
                 Guid _id;
                 try
                 {
-                    _id = await _databaseFunctions.ExecuteProcedureScalarAsync<Guid>(SP.SaleOrderCreate, new[]
-                    {
-                        P("@SalesUserId", _user.Id), P("@CustomerPublicId", _params.CustomerId), P("@PlanId", _params.PlanId), P("@Quantity", _params.Quantity),
-                        Money("@SaleAmount", _params.SaleAmount), Money("@DiscountAmount", _params.DiscountAmount),
-                        P("@DurationUnit", _params.DurationUnit.NullIfWhiteSpace()), P("@DurationCount", _params.DurationCount),
-                        Date("@StartDate", _params.StartDate), Date("@RenewalDate", _params.RenewalDate), P("@Notes", _notes),
-                        Money("@GstPercent", _params.GstPercent), P("@FreeMonths", _params.FreeMonths),
-                        P("@BillingFrequencyId", _params.BillingFrequencyId), P("@BillingMethodId", _params.BillingMethodId),
-                        P("@PaymentMethodId", _params.PaymentMethodId), P("@PaymentTermId", _params.PaymentTermId), P("@CurrencyId", _params.CurrencyId),
-                        P("@PrimaryContactName", _primary?.Name), P("@PrimaryContactDesignation", _primary?.Designation),
-                        P("@PrimaryContactEmail", _primary?.Email), P("@PrimaryContactPhone", _primary?.Phone),
-                        P("@BillingContactName", _billing?.Name), P("@BillingContactDesignation", _billing?.Designation),
-                        P("@BillingContactEmail", _billing?.Email), P("@BillingContactPhone", _billing?.Phone),
-                        P("@BillToAddress", _address),
-                        P("@OrderWording", _wording == null ? null : JsonSerializer.Serialize(_wording, JsonOptions)),
-                        P("@IncludedItemQuantity", _params.IncludedItemQuantity)
-                    }, _ct);
+                    _id = await _databaseFunctions.ExecuteProcedureScalarAsync<Guid>(SP.SaleOrderCreate, _parameters, _ct);
                 }
                 catch (AppException ex)
                 {
@@ -243,13 +346,65 @@ namespace SageUserApi.AppFunctions
                 (SaleDto _created, _functionReturn) = await _saleFunctions.GetSaleAsync(_id, _user, _ct);
                 if (!_functionReturn.Status) return (null, _functionReturn);
                 (OrderDetailsDto _details, _) = await GetOrderDetailsAsync(_id, _user, _ct);
-                await SalesAudit.LogAsync(_databaseFunctions, _loggerFunctions, "CreateOrder", "Sale", _id, _user, new
-                {
-                    _created.SaleNumber, _created.CustomerName, _created.ProductName, _created.PlanName, _created.Quantity,
-                    _created.ListAmount, _created.SaleAmount, _created.DiscountAmount, _details?.GstPercent, _details?.TaxAmount, _details?.TotalAmount,
-                    _details?.FreeMonths, _created.StartDate, _created.RenewalDate, _details?.BillingFrequency, _details?.PaymentTerm
-                }, _ipAddress, _ct);
+                await SalesAudit.LogAsync(_databaseFunctions, _loggerFunctions, "CreateOrder", "Sale", _id, _user, AuditOf(_created, _details), _ipAddress, _ct);
                 return (_created, new FunctionReturn { MethodName = _methodName, HttpStatusCode = Constants.HttpStatusCodes.Created, Message = new List<string> { "Order saved." } });
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
+
+        public async Task<(SaleDto sale, IFunctionReturn functionReturn)> UpdateOrderAsync(Guid _saleId, HttpOrderFormPostParams _params, SalesUserContext _user, string _ipAddress, CancellationToken _ct = default)
+        {
+            string _methodName = "F:OrderForm:UpdateOrder";
+            try
+            {
+                _params ??= new HttpOrderFormPostParams();
+
+                // The order as it is now (the seller or their manager only); who may edit what is decided by the procedure.
+                (SaleDto _before, IFunctionReturn _functionReturn) = await _saleFunctions.GetSaleAsync(_saleId, _user, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+                (OrderDetailsDto _beforeDetails, _) = await GetOrderDetailsAsync(_saleId, _user, _ct);
+
+                (List<SqlParameter> _parameters, List<string> _errors) = await CheckOrderAsync(_params, _before.StartDate, _ct);
+                if (_errors.Count > 0) return (null, Invalid(_errors, _methodName));
+                // Tracking "Cancelled": save the changes, then cancel (manager) or ask the manager (sales person).
+                bool _cancel = _params.TrackingStatusId == TrackingCancelled;
+                if (_cancel)
+                {
+                    IFunctionReturn _refused = CheckCancel(_user, _params.CancelReason, _methodName);
+                    if (_refused != null) return (null, _refused);
+                }
+                _parameters.Insert(0, P("@SalePublicId", _saleId));
+                _parameters.Insert(1, P("@EditorSalesUserId", _user.Id));
+                _parameters.Add(P("@TrackingStatusId", _cancel ? null : _params.TrackingStatusId));
+
+                try
+                {
+                    await _databaseFunctions.ExecuteProcedureScalarAsync<Guid>(SP.SaleOrderUpdate, _parameters, _ct);
+                }
+                catch (AppException ex)
+                {
+                    return (null, FunctionReturn.Fail(ex.MessageType, ex.Message, ex.HttpStatusCode, _methodName));
+                }
+
+                (SaleDto _after, _functionReturn) = await _saleFunctions.GetSaleAsync(_saleId, _user, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+                (OrderDetailsDto _afterDetails, _) = await GetOrderDetailsAsync(_saleId, _user, _ct);
+                await SalesAudit.LogAsync(_databaseFunctions, _loggerFunctions, "UpdateOrder", "Sale", _saleId, _user,
+                    new { Before = AuditOf(_before, _beforeDetails), After = AuditOf(_after, _afterDetails) }, _ipAddress, _ct);
+                string _message = "Order updated.";
+                if (_cancel)
+                {
+                    (string _cancelMessage, IFunctionReturn _cancelled) = await CancelAsync(_saleId, Clean(_params.CancelReason), _user, _ipAddress, _ct);
+                    // The edits are saved either way; a refused cancellation is reported as the error.
+                    if (!_cancelled.Status) return (null, _cancelled);
+                    _message = "Order updated. " + _cancelMessage;
+                    (_after, _) = await _saleFunctions.GetSaleAsync(_saleId, _user, _ct);
+                }
+                return (_after, new FunctionReturn { MethodName = _methodName, Message = new List<string> { _message } });
             }
             catch (Exception ex)
             {
@@ -268,8 +423,19 @@ namespace SageUserApi.AppFunctions
                 _sqlQuery.Append(" SELECT s.PublicId, s.GstPercent, s.TaxAmount, s.TotalAmount, s.FreeMonths, ");
                 _sqlQuery.Append("        bf.Name AS BillingFrequency, bm.Name AS BillingMethod, pm.Name AS PaymentMethod, pt.Name AS PaymentTerm, cy.Name AS Currency, ");
                 _sqlQuery.Append("        s.PrimaryContactName, s.PrimaryContactDesignation, s.PrimaryContactEmail, s.PrimaryContactPhone, ");
-                _sqlQuery.Append("        s.BillingContactName, s.BillingContactDesignation, s.BillingContactEmail, s.BillingContactPhone, s.BillToAddress, s.OrderWording, s.PriceFiscalYear, s.PriceSeatRange, s.IncludedItemQuantity ");
+                _sqlQuery.Append("        s.BillingContactName, s.BillingContactDesignation, s.BillingContactEmail, s.BillingContactPhone, s.BillToAddress, s.OrderWording, s.PriceFiscalYear, s.PriceSeatRange, s.IncludedItemQuantity, ");
+                _sqlQuery.Append("        s.CategoryId, s.ProductId, s.PlanId, s.BillingFrequencyId, s.BillingMethodId, s.PaymentMethodId, s.PaymentTermId, s.CurrencyId, ");
+                _sqlQuery.Append("        s.TrackingStatusId, ");
+                _sqlQuery.Append("        CASE WHEN s.BillingFrequencyId IS NULL THEN NULL WHEN s.Status = 'Cancelled' THEN 'CANCELLED' ELSE ts.Code END AS TrackingCode, ");
+                _sqlQuery.Append("        CASE WHEN s.BillingFrequencyId IS NULL THEN NULL WHEN s.Status = 'Cancelled' THEN N'Cancelled' ELSE ts.Name END AS TrackingName, ");
+                // Financial year of the order date in India (the year an edit is priced with), as in dbo.usp_SaleOrder_Update.
+                _sqlQuery.Append("        CASE WHEN MONTH(o.OrderDate) >= 4 THEN YEAR(o.OrderDate) + 1 ELSE YEAR(o.OrderDate) END AS OrderFiscalYear, ");
+                _sqlQuery.Append("        CAST(CASE WHEN s.BillingFrequencyId IS NOT NULL AND s.Status = 'Active' ");
+                _sqlQuery.Append("                   AND NOT EXISTS (SELECT 1 FROM dbo.SaleCancelRequests r WHERE r.SaleId = s.Id AND r.Status = 'Pending') ");
+                _sqlQuery.Append("             THEN 1 ELSE 0 END AS BIT) AS CanEdit ");
                 _sqlQuery.Append(" FROM dbo.Sales s ");
+                _sqlQuery.Append(" CROSS APPLY (SELECT CAST(SWITCHOFFSET(CAST(s.CreatedAtUtc AS DATETIMEOFFSET), '+05:30') AS DATE) AS OrderDate) o ");
+                _sqlQuery.Append(" LEFT JOIN dbo.OrderTrackingStatuses ts ON ts.Id = s.TrackingStatusId ");
                 _sqlQuery.Append(" LEFT JOIN dbo.MasterValues bf ON bf.Id = s.BillingFrequencyId ");
                 _sqlQuery.Append(" LEFT JOIN dbo.MasterValues bm ON bm.Id = s.BillingMethodId ");
                 _sqlQuery.Append(" LEFT JOIN dbo.MasterValues pm ON pm.Id = s.PaymentMethodId ");
@@ -325,7 +491,20 @@ namespace SageUserApi.AppFunctions
                 Wording = ReadWording(_row.GetText("OrderWording")),
                 PriceFiscalYear = _row.GetNullableInt("PriceFiscalYear"),
                 PriceSeatRange = _row.GetText("PriceSeatRange"),
-                IncludedItemQuantity = _row.GetNullableInt("IncludedItemQuantity")
+                IncludedItemQuantity = _row.GetNullableInt("IncludedItemQuantity"),
+                CategoryId = _row.GetLong("CategoryId"),
+                ProductId = _row.GetLong("ProductId"),
+                PlanId = _row.GetLong("PlanId"),
+                BillingFrequencyId = _row.GetNullableInt("BillingFrequencyId"),
+                BillingMethodId = _row.GetNullableInt("BillingMethodId"),
+                PaymentMethodId = _row.GetNullableInt("PaymentMethodId"),
+                PaymentTermId = _row.GetNullableInt("PaymentTermId"),
+                CurrencyId = _row.GetNullableInt("CurrencyId"),
+                OrderFiscalYear = _row.GetInt("OrderFiscalYear"),
+                CanEdit = _row.GetBool("CanEdit"),
+                TrackingStatusId = _row.GetNullableInt("TrackingStatusId"),
+                TrackingCode = _row.GetText("TrackingCode"),
+                TrackingName = _row.GetText("TrackingName")
             };
         }
 

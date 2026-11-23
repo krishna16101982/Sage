@@ -38,6 +38,7 @@ export interface OrderFormOptions {
   paymentMethods: MasterOption[];
   paymentTerms: MasterOption[];
   currencies: MasterOption[];
+  trackingStatuses: TrackingStatusOption[];
   /** Standard wording; {freeMonths} and {gstPercent} are filled in by the form. */
   wording: OrderWording;
 }
@@ -72,6 +73,11 @@ export interface OrderInput {
   wording: OrderWording;
   /** Quantity of the plan's included item (e.g. 1000 Team Link Extend seats). */
   includedItemQuantity?: number;
+  /** New order from a Won lead (Lead Records > New Order): the order is linked to the lead. */
+  leadId?: string;
+  /** Draft 1, Sent to DocuSign 2, Signed 3; Cancelled 4 (edit only, with cancelReason) cancels the sale. */
+  trackingStatusId?: number;
+  cancelReason?: string;
 }
 
 /** GET /api/user/order-form/{saleId} */
@@ -96,4 +102,42 @@ export interface OrderDetails {
   priceFiscalYear: number | null;
   priceSeatRange: string | null;
   includedItemQuantity: number | null;
+  /** What the Edit order page needs to fill the form again. */
+  categoryId: number;
+  productId: number;
+  planId: number;
+  billingFrequencyId: number | null;
+  billingMethodId: number | null;
+  paymentMethodId: number | null;
+  paymentTermId: number | null;
+  currencyId: number | null;
+  /** Financial year of the order date (2027 = FY27): an edit is priced with this year's seat prices. */
+  orderFiscalYear: number;
+  /** Saved with the order form, active and no cancellation request waiting. */
+  canEdit: boolean;
+  trackingStatusId: number | null;
+  trackingCode: string | null;
+  trackingName: string | null;
 }
+
+/** One tracking status of an order form (Draft, Sent to DocuSign, Signed, Cancelled). */
+export interface TrackingStatusOption {
+  id: number;
+  code: 'DRAFT' | 'SENT_DOCUSIGN' | 'SIGNED' | 'CANCELLED';
+  name: string;
+}
+
+/** Tracking status id of "Cancelled": choosing it cancels the sale (manager) or asks the manager to (sales person). */
+export const TRACKING_CANCELLED = 4;
+
+/** The fixed tracking statuses (dbo.OrderTrackingStatuses, DDL 036), used when the API sends none (e.g. an older API). */
+export const TRACKING_STATUSES: TrackingStatusOption[] = [
+  { id: 1, code: 'DRAFT', name: 'Draft' },
+  { id: 2, code: 'SENT_DOCUSIGN', name: 'Sent to DocuSign' },
+  { id: 3, code: 'SIGNED', name: 'Signed' },
+  { id: TRACKING_CANCELLED, code: 'CANCELLED', name: 'Cancelled' },
+];
+
+/** The API's tracking statuses, or the fixed ones when it sent none. */
+export const trackingStatusesOf = (options: { trackingStatuses?: TrackingStatusOption[] } | null | undefined): TrackingStatusOption[] =>
+  options?.trackingStatuses?.length ? options.trackingStatuses : TRACKING_STATUSES;

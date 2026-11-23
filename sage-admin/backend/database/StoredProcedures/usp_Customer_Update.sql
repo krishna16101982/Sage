@@ -21,14 +21,14 @@ BEGIN
 
     DECLARE @id BIGINT = (SELECT Id FROM dbo.Customers WITH (UPDLOCK, HOLDLOCK) WHERE PublicId = @PublicId AND IsActive = 1);
     IF @id IS NULL
-        THROW 50404, 'Customer not found', 1;
+        THROW 50404, 'Company not found', 1;
 
     IF @GSTIN IS NOT NULL AND EXISTS (SELECT 1 FROM dbo.Customers WITH (UPDLOCK, HOLDLOCK) WHERE GSTIN = @GSTIN AND Id <> @id)
-        THROW 50409, 'Another customer already has this GSTIN', 1;
+        THROW 50409, 'Another company already has this GSTIN', 1;
 
     IF EXISTS (SELECT 1 FROM dbo.Customers WITH (UPDLOCK, HOLDLOCK)
                WHERE Name = @Name AND ISNULL(City, N'') = ISNULL(@City, N'') AND Id <> @id)
-        THROW 50409, 'Another customer with this name already exists in this city', 1;
+        THROW 50409, 'Another company with this name already exists in this city', 1;
 
     UPDATE dbo.Customers
     SET Name = @Name, ContactPerson = @ContactPerson, Email = @Email, Phone = @Phone, GSTIN = @GSTIN, Address = @Address,

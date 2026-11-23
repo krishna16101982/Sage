@@ -72,7 +72,16 @@ New screens go in `modules/<feature>/` with their own `<feature>.routes.ts` and 
 | `GET /api/user/auth/me` | bearer | user, role (`SalesPerson`/`SalesManager`), `isManager`, `managerName` |
 | `GET /api/user/order-form/options` | bearer | the order-form lists from `dbo.MasterValues` (billing frequency, billing method, payment method, payment term, currency; defaults marked), default GST and most free months (Settings), discount and backdating limits |
 | `POST /api/user/order-form` | bearer | saves an order: a normal sale (`usp_Sale_Create` rules, run inside `usp_SaleOrder_Create`) plus GST, tax, free months (extend the renewal date at the same price), the five list values, primary / billing contact and bill-to address; 201 with the sale |
-| `GET /api/user/order-form/{saleId}` | bearer | the order details of a sale the user may see; `hasOrderForm` is false for a sale from the simple page |
+| `PUT /api/user/order-form/{saleId}/tracking` | bearer | Order forms list: tracking status (`usp_SaleOrder_SetTracking`, DDL 036) Draft / Sent to DocuSign / Signed; Cancelled with `reason` cancels the sale (manager) or sends a cancellation request (sales person allowed by their manager); the order form's POST / PUT body also takes `trackingStatusId` (and `cancelReason` on edit) |
+| `PUT /api/user/order-form/{saleId}` | bearer | edits an order saved with the order form (`usp_SaleOrder_Update`): the seller or their manager, active orders with no cancellation request waiting; same body and checks as POST, everything can change, the sale number stays, seat prices are those of the order date's financial year, the PDF is made again; audit `UpdateOrder` with before / after |
+| `GET /api/user/order-form/{saleId}` | bearer | the order details of a sale the user may see; `hasOrderForm` is false for a sale from the simple page; `canEdit` and the ids the Edit page needs |
+| `GET /api/user/leads` | bearer | Lead Records, one page from `usp_Lead_GetPaged` (search, statusId, productId, assignedId, generatedById, aging lt7/7to30/31to60/gt60, from, to, page, pageSize); every sales user sees every lead; each row has `canEdit` (creator or creator's manager), `canDelete` (and a manager), `canOrder` (Won, no order yet) |
+| `GET /api/user/leads/options` | bearer | product / lead source / billing cycle lists (active values, Admin > Settings > Lead lists), fixed statuses and lead types, sales users |
+| `GET /api/user/leads/{id}` | bearer | one lead |
+| `POST` / `PUT /api/user/leads/{id}` | bearer | add / change a lead (`usp_Lead_Save`, `LD-0001` numbers); change: creator or creator's manager only (403), the company cannot change |
+| `DELETE /api/user/leads/{id}` | bearer | sales managers, own and team leads; the lead is hidden (IsDeleted), never removed |
+| `GET /api/user/sales/cancel-requests` | bearer | one page from `usp_SaleCancelRequest_GetPaged` (status, page, pageSize), waiting requests first |
+| `GET /api/user/catalog?fiscalYear=2027` | bearer | the catalog with that financial year's seat prices (the Edit order page; without it, this year's) |
 | `GET /api/user/status` | anonymous | API and database health |
 | `GET /api/user/catalog` | bearer | active categories > products > plans (price, cost, duration); products without an active plan are left out |
 | `GET /api/user/customers` | bearer | `search`, `page`, `pageSize`, `sortBy` (name/city/createdAtUtc); each with its active sale count |

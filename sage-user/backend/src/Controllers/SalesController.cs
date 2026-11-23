@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.Models.Interfaces;
+using SageCommonLib.Models.Paging;
 using SageUserApi.AppFunctions.Interfaces;
 using SageUserApi.Globals;
 using SageUserApi.Models.Filter;
@@ -87,11 +88,12 @@ namespace SageUserApi.Controllers
             return Result(_request, _fr);
         }, _ct);
 
-        /// <summary>Cancellation requests: a manager sees their team's, a sales person their own. status=Pending|Approved|Rejected.</summary>
+        /// <summary>Cancellation requests: a manager sees their team's, a sales person their own. status=Pending|Approved|Rejected.
+        /// One page at a time (page, pageSize), waiting requests first.</summary>
         [HttpGet("cancel-requests")]
-        public Task<IActionResult> GetCancelRequests([FromQuery] string status, CancellationToken _ct) => WithUserAsync("C:Sales:GetCancelRequests", async _user =>
+        public Task<IActionResult> GetCancelRequests([FromQuery] string status, [FromQuery] HttpPaging _paging, CancellationToken _ct) => WithUserAsync("C:Sales:GetCancelRequests", async _user =>
         {
-            var (_requests, _fr) = await _saleFunctions.GetCancelRequestsAsync(status, _user, _ct);
+            var (_requests, _fr) = await _saleFunctions.GetCancelRequestsAsync(status, _paging, _user, _ct);
             return Result(_requests, _fr);
         }, _ct);
 

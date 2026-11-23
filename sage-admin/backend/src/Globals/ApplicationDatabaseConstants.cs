@@ -67,6 +67,8 @@ namespace SageAdminApi.Globals
             public const string AuditLogGetPaged = "dbo.usp_AuditLog_GetPaged";
             public const string SettingUpdate = "dbo.usp_Setting_Update";
             public const string MasterValueSave = "dbo.usp_MasterValue_Save";
+            public const string LeadListValueSave = "dbo.usp_LeadListValue_Save";
+            public const string SalesUserHistoryGetPaged = "dbo.usp_SalesUserHistory_GetPaged";
         }
 
         public static class ColumnNames

@@ -92,7 +92,7 @@ public class SalesExportApiTests
         bytes.Take(3).ShouldBe(new byte[] { 0xEF, 0xBB, 0xBF });   // UTF-8 BOM so Excel reads ₹ and names correctly
 
         var lines = text.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
-        lines[0].ShouldStartWith("Sale number,Sold at (UTC),Customer,");
+        lines[0].ShouldStartWith("Sale number,Sold at (UTC),Company,");
         text.ShouldContain("\"'=HYPERLINK(\"\"http://x\"\")");          // prefixed with ' and quoted
         text.ShouldContain("\"first, \"\"second\"\"\nthird\"");          // comma, quotes and line break kept inside one field
         text.ShouldContain(",1000.00,100.00,10.00,900.00,0.00,0.00,900.00,400.00,500.00,1 Year,0,");   // simple sale: no GST, no free months

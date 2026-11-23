@@ -37,6 +37,20 @@ namespace SageUserApi.Models.HttpPost
         public OrderWording Wording { get; set; }
         /// <summary>Quantity of the plan's included item on this order (e.g. 1000 Team Link Extend seats); empty = none.</summary>
         public int? IncludedItemQuantity { get; set; }
+        /// <summary>New order from a Won lead (Lead Records > New Order): the saved order is linked to the lead.</summary>
+        public Guid? LeadId { get; set; }
+        /// <summary>Tracking status (DDL 036): Draft 1 (default), Sent to DocuSign 2, Signed 3. Cancelled 4 (edit only) cancels
+        /// the sale (manager) or asks the manager to (sales person), with CancelReason.</summary>
+        public int? TrackingStatusId { get; set; }
+        public string CancelReason { get; set; }
+    }
+
+    /// <summary>Body of PUT api/user/order-form/{saleId}/tracking (the Order forms list).</summary>
+    public class HttpOrderTrackingParams
+    {
+        public int TrackingStatusId { get; set; }
+        /// <summary>Needed for Cancelled.</summary>
+        public string Reason { get; set; }
     }
 
     public class OrderContactParams

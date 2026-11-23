@@ -178,6 +178,9 @@ Customers are shared with the User Panel (sales users add them there; admins add
 | Endpoint | Permission | Notes |
 |----------|------------|-------|
 | `GET /api/admin/masters` | `Setting.View` | the five order-form lists (`dbo.MasterValues`, DDL 028/030): billing frequency, billing method, payment method, payment term, currency, with each value's use count |
+| `GET /api/admin/lead-lists` | `Setting.View` | the lead lists of the User Panel's lead form, one table each (DDL 035): products (`LeadProducts`), lead sources (`LeadSources`), billing cycles (`LeadBillingCycles`), with each value's use count; lead status and lead type are fixed tables |
+| `POST /api/admin/lead-lists` · `PUT /api/admin/lead-lists/{id}` | `Setting.Edit` | add / rename / reorder / turn off a value (`usp_LeadListValue_Save`, body `{ list: Product / Source / BillingCycle, name, sortOrder, isActive }`); names unique per list (409); audited |
+| `GET /api/admin/sales-users/history` | `SalesUser.View` | one page (page, pageSize) of sales-user changes from `usp_SalesUserHistory_GetPaged`, newest first; salesUserId for one person |
 | `POST /api/admin/masters` · `PUT /api/admin/masters/{id}` | `Setting.Edit` | add / change a value (`usp_MasterValue_Save`): making a value the default clears the old default in the same transaction; the default cannot be turned off; a value in use is turned off, never removed; audited |
 
 - Order details live on the same `dbo.Sales` row (DDL 029/030): `GstPercent`, `TaxAmount`, `TotalAmount` (computed: sale amount + tax), `FreeMonths`, the five list ids (foreign keys to `MasterValues`), primary / billing contact and `BillToAddress`. A sale from the simple New sale page keeps GST 0 and no details.

@@ -39,7 +39,7 @@ export class CustomerPicker implements OnDestroy {
     try {
       this.results.set((await this.service.list({ search: term, pageSize: 8 })).items);
     } catch (err) {
-      this.error.set(errorText(err, 'Unable to search customers.'));
+      this.error.set(errorText(err, 'Unable to search companies.'));
     } finally {
       this.searching.set(false);
     }

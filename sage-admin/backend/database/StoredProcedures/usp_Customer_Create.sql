@@ -20,11 +20,11 @@ BEGIN
     BEGIN TRAN;
 
     IF @GSTIN IS NOT NULL AND EXISTS (SELECT 1 FROM dbo.Customers WITH (UPDLOCK, HOLDLOCK) WHERE GSTIN = @GSTIN)
-        THROW 50409, 'A customer with this GSTIN already exists', 1;
+        THROW 50409, 'A company with this GSTIN already exists', 1;
 
     IF EXISTS (SELECT 1 FROM dbo.Customers WITH (UPDLOCK, HOLDLOCK)
                WHERE Name = @Name AND ISNULL(City, N'') = ISNULL(@City, N''))
-        THROW 50409, 'A customer with this name already exists in this city. Search for it instead of adding it again', 1;
+        THROW 50409, 'A company with this name already exists in this city. Search for it instead of adding it again', 1;
 
     DECLARE @publicId UNIQUEIDENTIFIER = NEWID();
 

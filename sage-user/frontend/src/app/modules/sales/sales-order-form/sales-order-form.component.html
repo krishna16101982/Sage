@@ -1,30 +1,58 @@
 <div class="stack">
   <div class="stack-xs">
-    <a class="link-button text-sm" routerLink="/sales/list">← Back to sales</a>
+    @if (editing()) {
+      <a class="link-button text-sm" [routerLink]="['/sales', id()]">← Back to the order</a>
+    } @else {
+      <a class="link-button text-sm" routerLink="/sales/list">← Back to sales</a>
+    }
     <div class="row">
-      <h1 class="page-title">New order form</h1>
+      <h1 class="page-title">{{ editing() ? 'Edit order' + (saleNumber() ? ' ' + saleNumber() : '') : 'New order form' }}</h1>
       <span class="spacer"></span>
       <span class="badge badge-warning"></span>
     </div>
-    <p class="hint">Fill in the sections; the order summary on the right updates as you go. Prices come from the price list.</p>
+    @if (editing()) {
+      <p class="hint">Change any section and save. The sale number stays the same, prices come from the price list of the order's financial year, and the order form PDF is made again.</p>
+    } @else {
+      <p class="hint">Fill in the sections; the order summary on the right updates as you go. Prices come from the price list.</p>
+      @if (copiedFrom()) { <p class="hint">Copy of order <strong>{{ copiedFrom() }}</strong>: check the start date, seats and price, then save it as a new order.</p> }
+    }
   </div>
 
   @if (loadError()) { <app-alert kind="error">{{ loadError() }}</app-alert> }
+  @if (editNotice()) { <app-alert kind="error">{{ editNotice() }}</app-alert> }
   @if ((!catalog() || !options()) && !loadError()) { <p class="text-sm text-muted">Loading...</p> }
 
   @if (catalog(); as categories) {
     @if (options(); as opt) {
       <form class="order-layout" (ngSubmit)="save()">
         <div class="stack">
-          <!-- 1. Customer -->
+          <!-- 1. Lead and company -->
           <section class="card">
             <header class="card-header">
               <div class="step-head"><span class="step-badge">1</span>
-                <div><h2 class="section-title">Customer</h2><p class="hint">Choosing the customer fills the primary contact and the bill-to address.</p></div>
+                <div><h2 class="section-title">Lead and company</h2>
+                  <p class="hint">Pick the lead to fill the company details automatically, or choose No lead and pick the company.</p></div>
               </div>
             </header>
             <div class="card-body stack-sm">
-              <app-customer-picker [(customer)]="customer" />
+              @if (editing()) {
+                @if (linkedLeadNumber()) {
+                  <label class="field-label">Lead
+                    <input class="field" name="lead" [value]="linkedLeadNumber()" disabled title="The order's lead cannot be changed" />
+                  </label>
+                }
+              } @else {
+                <div class="field-label">Lead
+                  <app-lead-picker [(lead)]="selectedLead" />
+                </div>
+                @if (!selectedLead()) {
+                  <p class="hint">No lead: when you save, a lead (status Open) is created for this company and linked to the order. Fill in its other details later in Lead Records → Edit.</p>
+                }
+              }
+              @if (!companyFromLead()) {
+                <div class="field-label">Company</div>
+                <app-customer-picker [(customer)]="customer" />
+              }
               @if (customer(); as c) {
                 <div class="form-grid-3">
                   <label class="field-label">Company
@@ -34,7 +62,7 @@
                     <input class="field" name="gstin" [value]="c.gstin ?? '-'" disabled />
                   </label>
                   <label class="field-label">Order date
-                    <input class="field" name="orderDate" type="date" [value]="orderDate" disabled />
+                    <input class="field" name="orderDate" type="date" [value]="orderDate()" disabled />
                   </label>
                 </div>
               }
@@ -66,7 +94,7 @@
                   <select class="field" name="planId" [disabled]="!product()" [ngModel]="planId()" (ngModelChange)="choosePlan($event)">
                     <option [ngValue]="null">Choose...</option>
                     @for (pl of product()?.plans ?? []; track pl.id) {
-                      <option [ngValue]="pl.id">{{ pl.name }} · {{ durationText(pl.durationCount, pl.durationUnit) }}</option>
+                      <option [ngValue]="pl.id">{{ pl.name }}</option>
                     }
                   </select>
                 </label>
@@ -272,7 +300,7 @@
             <div class="card-body stack-sm">
               <div class="stack-xs">
                 <span class="page-eyebrow">Order summary</span>
-                <span class="font-semibold">{{ customer()?.name ?? 'No customer yet' }}</span>
+                <span class="font-semibold">{{ customer()?.name ?? 'No company yet' }}</span>
                 <span class="text-sm text-muted">{{ plan() ? product()!.name + ' · ' + plan()!.name : 'No product yet' }}</span>
               </div>
               <div class="stack-xs text-sm">
@@ -291,14 +319,37 @@
             </div>
           </section>
 
+          <section class="card">
+            <div class="card-body stack-sm">
+              <h2 class="section-title">Tracking</h2>
+              <label class="field-label">Status
+                <select class="field" name="trackingStatus" [ngModel]="trackingStatusId()" (ngModelChange)="trackingStatusId.set($event)">
+                  @for (t of trackingChoices(); track t.id) { <option [ngValue]="t.id">{{ t.name }}</option> }
+                </select>
+              </label>
+              @if (trackingStatusId() === trackingCancelled) {
+                <label class="field-label">Reason for cancelling *
+                  <textarea class="field" name="cancelReason" rows="2" maxlength="500" [ngModel]="cancelReason()" (ngModelChange)="cancelReason.set($event)"></textarea>
+                </label>
+                <p class="hint">
+                  {{ isManager() ? 'Saving cancels this order (it stays on record as cancelled).' : 'Saving sends a cancellation request to your manager; the order is cancelled when they approve.' }}
+                </p>
+              }
+            </div>
+          </section>
+
           @if (saveError()) { <app-alert kind="error">{{ saveError() }}</app-alert> }
           @if (problems().length > 0) {
             <ul class="hint stack-xs" aria-label="Still needed">
               @for (p of problems(); track p) { <li>• {{ p }}</li> }
             </ul>
           }
-          <button type="submit" class="btn btn-primary btn-block" [disabled]="busy() || problems().length > 0">{{ busy() ? 'Saving...' : 'Save order' }}</button>
-          <a class="btn btn-secondary btn-block" routerLink="/sales/list">Cancel</a>
+          <button type="submit" class="btn btn-primary btn-block" [disabled]="busy() || problems().length > 0">{{ busy() ? 'Saving...' : editing() ? 'Save changes' : 'Save order' }}</button>
+          @if (editing()) {
+            <a class="btn btn-secondary btn-block" [routerLink]="['/sales', id()]">Cancel</a>
+          } @else {
+            <a class="btn btn-secondary btn-block" routerLink="/sales/list">Cancel</a>
+          }
         </aside>
       </form>
     }

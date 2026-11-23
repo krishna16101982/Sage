@@ -18,4 +18,11 @@ export const settingRoutes: Routes = [
     canActivate: [PermissionGuard],
     loadComponent: () => import('./masters-list/masters-list.component').then((m) => m.MastersList),
   },
+  {
+    path: 'lead-lists',
+    title: 'Lead lists - Sage Admin',
+    data: { access_perms: [Perm.SettingView], title: 'Lead lists' },
+    canActivate: [PermissionGuard],
+    loadComponent: () => import('./lead-lists/lead-lists.component').then((m) => m.LeadLists),
+  },
 ];

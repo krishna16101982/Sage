@@ -5,7 +5,7 @@
       <h1 class="page-title">My team</h1>
     </div>
     <div class="spacer"></div>
-    <a class="btn btn-secondary" routerLink="/sales/team">Team sales</a>
+    <a class="btn btn-secondary" routerLink="/sales/team">Team order forms</a>
     <a class="btn btn-primary" routerLink="/team/add">Add sales person</a>
   </div>
   <p class="hint">
@@ -20,7 +20,7 @@
   <section class="card">
     <header class="card-header">
       <h2 class="section-title">Cancellation requests</h2>
-      @if ((requests()?.length ?? 0) > 0) { <span class="badge badge-warning">{{ requests()!.length }} waiting</span> }
+      @if ((requestPage()?.totalCount ?? 0) > 0) { <span class="badge badge-warning">{{ requestPage()!.totalCount }} waiting</span> }
     </header>
     <div class="table-wrap">
       <table class="data-table">
@@ -47,6 +47,9 @@
         </tbody>
       </table>
     </div>
+    @if (requestPage(); as rp) {
+      @if (rp.totalPages > 1) { <div class="card-body"><app-pagination [page]="rp.page" [totalPages]="rp.totalPages" [totalCount]="rp.totalCount" (pageChange)="requestsGoTo($event)" /></div> }
+    }
   </section>
 
   <!-- Team members and their permission -->

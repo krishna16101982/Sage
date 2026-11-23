@@ -1,4 +1,4 @@
-<input class="field field-inline w-64" aria-label="Search sales" placeholder="Sale number, customer or product"
+<input class="field field-inline w-64" aria-label="Search order forms" placeholder="Search company, sale number, lead ID or product"
        [(ngModel)]="search" (ngModelChange)="changed(true)" />
 @if (members().length > 0) {
   <select class="field field-inline" aria-label="Filter by sales person" [(ngModel)]="sellerId" (ngModelChange)="changed(false)">

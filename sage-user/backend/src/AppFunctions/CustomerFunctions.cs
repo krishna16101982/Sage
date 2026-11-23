@@ -150,6 +150,55 @@ namespace SageUserApi.AppFunctions
             }
         }
 
+        public async Task<(CustomerDto customer, IFunctionReturn functionReturn)> UpdateCustomerAsync(Guid _id, HttpCustomerPostParams _params, SalesUserContext _user, string _ipAddress, CancellationToken _ct = default)
+        {
+            string _methodName = "F:Customer:UpdateCustomer";
+            try
+            {
+                _params ??= new HttpCustomerPostParams();
+                // The name cannot change: it is checked against the saved one, never taken from the request.
+                CustomerDto _before = await GetRowAsync(_id, _ct);
+                if (_before == null) return (null, ApplicationCommonFunctions.NotFound(Msg.CustomerNotFound, _methodName));
+                if (!string.IsNullOrWhiteSpace(_params.Name) && Clean(_params.Name) != _before.Name)
+                    return (null, ApplicationCommonFunctions.BadRequest("The company name cannot be changed.", _methodName));
+
+                string _email = _params.Email.NullIfWhiteSpace();
+                string _phone = _params.Phone.NullIfWhiteSpace();
+                string _gstin = _params.Gstin.NullIfWhiteSpace()?.ToUpperInvariant();
+                List<string> _errors = Validate(_params, _before.Name, _email, _phone, _gstin);
+                if (_errors.Count > 0)
+                    return (null, new FunctionReturn { Status = false, MessageType = Constants.ReturnMessageTypes.ValidationError, Message = _errors, HttpStatusCode = Constants.HttpStatusCodes.BadRequest, MethodName = _methodName });
+
+                try
+                {
+                    await _databaseFunctions.ExecuteProcedureScalarAsync<Guid>(SP.CustomerUpdateDetails, new[]
+                    {
+                        P("@PublicId", _id), P("@ContactPerson", Clean(_params.ContactPerson)), P("@Email", _email), P("@Phone", _phone), P("@GSTIN", _gstin),
+                        P("@Address", Clean(_params.Address)), P("@City", Clean(_params.City)), P("@State", Clean(_params.State)),
+                        P("@Country", Clean(_params.Country) ?? "India"), P("@SalesUserId", _user.Id)
+                    }, _ct);
+                }
+                catch (AppException ex)
+                {
+                    return (null, FunctionReturn.Fail(ex.MessageType, ex.Message, ex.HttpStatusCode, _methodName));
+                }
+
+                CustomerDto _after = await GetRowAsync(_id, _ct);
+                await SalesAudit.LogAsync(_databaseFunctions, _loggerFunctions, "Update", "Customer", _id, _user, new
+                {
+                    _after.Name,
+                    Before = new { _before.ContactPerson, _before.Email, _before.Phone, _before.Gstin, _before.Address, _before.City, _before.State, _before.Country },
+                    After = new { _after.ContactPerson, _after.Email, _after.Phone, _after.Gstin, _after.Address, _after.City, _after.State, _after.Country }
+                }, _ipAddress, _ct);
+                return (_after, new FunctionReturn { MethodName = _methodName, Message = new List<string> { "Company saved." } });
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
+
         public async Task<(CustomerDto customer, IFunctionReturn functionReturn)> CreateCustomerAsync(HttpCustomerPostParams _params, SalesUserContext _user, string _ipAddress, CancellationToken _ct = default)
         {
             string _methodName = "F:Customer:CreateCustomer";

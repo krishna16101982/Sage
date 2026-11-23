@@ -1,6 +1,6 @@
 <form class="form" (ngSubmit)="submit()">
   @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
-  <label class="field-label">Company / customer name
+  <label class="field-label">Company name
     <input class="field" name="name" required maxlength="200" [(ngModel)]="name" />
   </label>
   <div class="form-grid-2">
@@ -17,9 +17,9 @@
     <label class="field-label">State <input class="field" name="state" maxlength="100" [(ngModel)]="state" /></label>
     <label class="field-label">Country <input class="field" name="country" maxlength="100" [(ngModel)]="country" /></label>
   </div>
-  <p class="hint">Customers are shared with the User Panel. The same GSTIN, or the same name in the same city, cannot be used twice.</p>
+  <p class="hint">Companies are shared with the User Panel. The same GSTIN, or the same name in the same city, cannot be used twice.</p>
   <div class="modal-footer">
     <a class="btn btn-secondary" routerLink="/customers/list">Cancel</a>
-    <button type="submit" class="btn btn-primary" [disabled]="busy()">{{ busy() ? 'Please wait...' : customer() ? 'Save changes' : 'Add customer' }}</button>
+    <button type="submit" class="btn btn-primary" [disabled]="busy()">{{ busy() ? 'Please wait...' : customer() ? 'Save changes' : 'Add company' }}</button>
   </div>
 </form>

@@ -89,7 +89,15 @@ namespace SageUserApi.AppFunctions
                 CancelledAtUtc = _row.GetNullableUtc("CancelledAtUtc"),
                 CancelledByName = _row.GetText("CancelledByName"),
                 CancelReason = _row.GetText("CancelReason"),
-                HasPendingCancelRequest = _row.GetBool("HasPendingCancelRequest")
+                HasPendingCancelRequest = _row.GetBool("HasPendingCancelRequest"),
+                HasOrderForm = _row.GetBool("HasOrderForm"),
+                TrackingStatusId = _row.GetNullableInt("TrackingStatusId"),
+                TrackingCode = _row.GetText("TrackingCode"),
+                TrackingName = _row.GetText("TrackingName"),
+                FreeMonths = _row.GetInt("FreeMonths"),
+                TotalAmount = _row.GetDecimal("TotalAmount"),
+                LeadNumber = _row.GetText("LeadNumber"),
+                LeadId = _row.GetNullableGuid("LeadPublicId")
             };
         }
 
@@ -105,8 +113,15 @@ namespace SageUserApi.AppFunctions
             _sqlQuery.Append("        s.DurationUnit, s.DurationCount, s.StartDate, s.RenewalDate, s.Status, s.Notes, s.CreatedAtUtc, s.CancelledAtUtc, ");
             _sqlQuery.Append("        CASE WHEN cb.Id IS NULL THEN NULL ELSE CONCAT(cb.FirstName, N' ', cb.LastName) END AS CancelledByName, s.CancelReason, ");
             _sqlQuery.Append("        CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.SaleCancelRequests r WHERE r.SaleId = s.Id AND r.Status = 'Pending') ");
-            _sqlQuery.Append("             THEN 1 ELSE 0 END AS BIT) AS HasPendingCancelRequest ");
+            _sqlQuery.Append("             THEN 1 ELSE 0 END AS BIT) AS HasPendingCancelRequest, ");
+            _sqlQuery.Append("        CAST(CASE WHEN s.BillingFrequencyId IS NOT NULL THEN 1 ELSE 0 END AS BIT) AS HasOrderForm, ");
+            _sqlQuery.Append("        s.TrackingStatusId, ");
+            _sqlQuery.Append("        CASE WHEN s.BillingFrequencyId IS NULL THEN NULL WHEN s.Status = 'Cancelled' THEN 'CANCELLED' ELSE ts.Code END AS TrackingCode, ");
+            _sqlQuery.Append("        CASE WHEN s.BillingFrequencyId IS NULL THEN NULL WHEN s.Status = 'Cancelled' THEN N'Cancelled' ELSE ts.Name END AS TrackingName, ");
+            _sqlQuery.Append("        s.FreeMonths, s.TotalAmount, ld.LeadNumber, ld.PublicId AS LeadPublicId ");
             _sqlQuery.Append(" FROM dbo.Sales s ");
+            _sqlQuery.Append(" LEFT JOIN dbo.OrderTrackingStatuses ts ON ts.Id = s.TrackingStatusId ");
+            _sqlQuery.Append(" OUTER APPLY (SELECT TOP 1 l.LeadNumber, l.PublicId FROM dbo.Leads l WHERE l.SaleId = s.Id) ld ");
             _sqlQuery.Append(" JOIN dbo.Customers cu ON cu.Id = s.CustomerId ");
             _sqlQuery.Append(" JOIN dbo.ProductCategories c ON c.Id = s.CategoryId ");
             _sqlQuery.Append(" JOIN dbo.Products p ON p.Id = s.ProductId ");
@@ -483,17 +498,25 @@ namespace SageUserApi.AppFunctions
             }
         }
 
-        public async Task<(List<CancelRequestDto> requests, IFunctionReturn functionReturn)> GetCancelRequestsAsync(string _status, SalesUserContext _user, CancellationToken _ct = default)
+        public async Task<(PagedResult<CancelRequestDto> result, IFunctionReturn functionReturn)> GetCancelRequestsAsync(string _status, HttpPaging _paging, SalesUserContext _user, CancellationToken _ct = default)
         {
             string _methodName = "F:Sale:GetCancelRequests";
             try
             {
                 string _filter = _status == "Pending" || _status == "Approved" || _status == "Rejected" ? _status : null;
-                // A manager sees the requests on their team's sales; a sales person sees their own requests.
-                string _scope = _user.IsManager ? " s.ManagerId = @u " : " r.RequestedBySalesUserId = @u ";
-                List<CancelRequestDto> _requests = await ReadRequestsAsync(_scope, " CASE WHEN r.Status = 'Pending' THEN 0 ELSE 1 END, r.RequestedAtUtc DESC ",
-                    new[] { P("@status", _filter), P("@u", _user.Id) }, _ct);
-                return (_requests, new FunctionReturn { MethodName = _methodName });
+                // A manager sees the requests on their team's sales; a sales person sees their own. One page from the database.
+                PaginationParams _page = new Pagination().GetPagingParams(_paging ?? new HttpPaging(), new[] { "requestedAt" }, "requestedAt");
+                var _totalCount = IntOut("@TotalCount");
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteProcedureDataTableAsync(SP.SaleCancelRequestGetPaged, new[]
+                {
+                    P("@SalesUserId", _user.Id), P("@IsManager", _user.IsManager), P("@Status", _filter),
+                    P("@Offset", _page.Offset), P("@PageSize", _page.PageSize), _totalCount
+                }, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+                return (new PagedResult<CancelRequestDto>
+                {
+                    Items = _dataTable.MapRows(MapRequest), Page = _page.Page, PageSize = _page.PageSize, TotalCount = OutInt(_totalCount)
+                }, _functionReturn);
             }
             catch (Exception ex)
             {

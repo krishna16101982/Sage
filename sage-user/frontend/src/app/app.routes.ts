@@ -30,6 +30,7 @@ export const routes: Routes = [
     children: [
       { path: 'home', title: 'Home - Sage Sales', loadComponent: () => import('./modules/home/home').then((m) => m.Home) },
       { path: 'sales', loadChildren: () => import('./modules/sales/sales.routes').then((m) => m.saleRoutes) },
+      { path: 'leads', loadChildren: () => import('./modules/leads/leads.routes').then((m) => m.leadRoutes) },
       { path: 'customers', loadChildren: () => import('./modules/customers/customers.routes').then((m) => m.customerRoutes) },
       { path: 'team', loadChildren: () => import('./modules/team/team.routes').then((m) => m.teamRoutes) },
       { path: 'change-password', title: 'Change password - Sage Sales', loadComponent: () => import('./modules/changepassword/changepassword').then((m) => m.Changepassword) },

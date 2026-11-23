@@ -123,6 +123,20 @@ namespace SageUserApi.Models
         public string CancelReason { get; set; }
         /// <summary>A cancellation request is waiting for the manager.</summary>
         public bool HasPendingCancelRequest { get; set; }
+        /// <summary>Saved with the New order form (such an order can be edited while active).</summary>
+        public bool HasOrderForm { get; set; }
+        /// <summary>Order form tracking (DDL 036): the stored status (Draft 1, Sent to DocuSign 2, Signed 3), and the status shown
+        /// (DRAFT, SENT_DOCUSIGN, SIGNED or CANCELLED when the sale is cancelled). Null for a sale from the simple page.</summary>
+        public int? TrackingStatusId { get; set; }
+        public string TrackingCode { get; set; }
+        public string TrackingName { get; set; }
+        /// <summary>Free months of the order form (0 for a simple sale).</summary>
+        public int FreeMonths { get; set; }
+        /// <summary>SaleAmount + GST.</summary>
+        public decimal TotalAmount { get; set; }
+        /// <summary>The lead this order was made from (Lead Records > New Order), if any.</summary>
+        public string LeadNumber { get; set; }
+        public Guid? LeadId { get; set; }
         /// <summary>Cancellation requests for this sale, newest first (single-sale view only).</summary>
         public List<CancelRequestDto> CancelRequests { get; set; }
     }

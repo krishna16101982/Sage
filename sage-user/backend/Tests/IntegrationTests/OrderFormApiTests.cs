@@ -241,6 +241,227 @@ public class OrderFormApiTests
     }
 
     [Fact]
+    public async Task EditOrder_ByTheManager_ChangesEverything_KeepsTheSaleNumber_AndMakesThePdfAgain()
+    {
+        var manager = await SalesData.CreateAsync(_fx.Db);
+        var person = await SalesData.CreateAsync(_fx.Db, "SalesPerson", manager);
+        var token = await TokenAsync(person);
+        var options = (await Call(HttpMethod.Get, $"{Api}/order-form/options", bearer: token)).Data;
+        var created = await Call(HttpMethod.Post, $"{Api}/order-form", Order(await CustomerAsync(token), await PlanAsync(price: 1000m), options), token);
+        created.Status.ShouldBe(201, created.Root.ToString());
+        var id = created.Data.GetProperty("id").GetGuid();
+        var saleNumber = created.Data.GetProperty("saleNumber").GetString()!;
+        var pdfPath = Path.Combine(UserApiFixture.OrderFormsPath, saleNumber, saleNumber + ".pdf");
+        var pdfBefore = await File.ReadAllBytesAsync(pdfPath);
+
+        // The list and the details say it can be edited.
+        var listed = (await Call(HttpMethod.Get, $"{Api}/sales?scope=mine", bearer: token)).Data.GetProperty("items").EnumerateArray()
+            .Single(s => s.GetProperty("id").GetGuid() == id);
+        listed.GetProperty("hasOrderForm").GetBoolean().ShouldBeTrue();
+        var before = (await Call(HttpMethod.Get, $"{Api}/order-form/{id}", bearer: token)).Data;
+        before.GetProperty("canEdit").GetBoolean().ShouldBeTrue();
+        before.GetProperty("billingFrequencyId").GetInt32().ShouldBe(DefaultId(options, "billingFrequencies"));
+
+        // The manager changes customer, plan, seats, price, term, GST, free months, terms and contacts.
+        var managerToken = await TokenAsync(manager);
+        var newPlan = await PlanAsync(price: 2000m, cost: 500m);
+        var newCustomer = await CustomerAsync(managerToken);
+        var start = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(10);
+        var edited = await Call(HttpMethod.Put, $"{Api}/order-form/{id}", Order(newCustomer, newPlan, options, b =>
+        {
+            b["quantity"] = 20; b["discountAmount"] = 0m; b["durationUnit"] = "Year"; b["durationCount"] = 2;
+            b["startDate"] = start.ToString("yyyy-MM-dd"); b["gstPercent"] = 0m; b["freeMonths"] = 0;
+            b["paymentTermId"] = IdOf(options, "paymentTerms", "Net 15");
+            b["primaryContact"] = new { name = "Ms. Priya Shah", email = "priya@example.com", phone = "+91 98765-43210" };
+        }), managerToken);
+        edited.Status.ShouldBe(200, edited.Root.ToString());
+        edited.FirstMessage.ShouldBe("Order updated.");
+        var sale = edited.Data;
+        sale.GetProperty("id").GetGuid().ShouldBe(id);
+        sale.GetProperty("saleNumber").GetString().ShouldBe(saleNumber);
+        sale.GetProperty("sellerId").GetGuid().ShouldBe(person.PublicId);           // still the seller's order
+        sale.GetProperty("customerId").GetGuid().ShouldBe(newCustomer);
+        // 20 seats x 2000 per year x 2 years = 80000, no discount.
+        sale.GetProperty("unitPrice").GetDecimal().ShouldBe(4000m);
+        sale.GetProperty("listAmount").GetDecimal().ShouldBe(80000m);
+        sale.GetProperty("saleAmount").GetDecimal().ShouldBe(80000m);
+        sale.GetProperty("costAmount").GetDecimal().ShouldBe(20000m);
+        sale.GetProperty("startDate").GetString().ShouldBe(start.ToString("yyyy-MM-dd"));
+        sale.GetProperty("renewalDate").GetString().ShouldBe(start.AddYears(2).ToString("yyyy-MM-dd"));
+
+        var d = (await Call(HttpMethod.Get, $"{Api}/order-form/{id}", bearer: token)).Data;
+        d.GetProperty("planId").GetInt64().ShouldBe(newPlan);
+        d.GetProperty("taxAmount").GetDecimal().ShouldBe(0m);
+        d.GetProperty("totalAmount").GetDecimal().ShouldBe(80000m);
+        d.GetProperty("freeMonths").GetInt32().ShouldBe(0);
+        d.GetProperty("paymentTerm").GetString().ShouldBe("Net 15");
+        d.GetProperty("primaryContact").GetProperty("name").GetString().ShouldBe("Ms. Priya Shah");
+        d.GetProperty("wording").GetProperty("freeMonthNote").ValueKind.ShouldBe(JsonValueKind.Null);   // no free months now
+
+        // Same file name, new content.
+        (await File.ReadAllBytesAsync(pdfPath)).ShouldNotBe(pdfBefore);
+        // The change is in the audit log with before and after.
+        (await _fx.Db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM dbo.AuditLogs WHERE Action = 'UpdateOrder' AND EntityId = @id",
+            new[] { TestDb.P("@id", id.ToString()) })).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task EditOrder_IsRefused_ForOthers_SimpleSales_CancelledOrders_RequestsWaiting_AndWrongValues()
+    {
+        var person = await SalesData.CreateAsync(_fx.Db);
+        var token = await TokenAsync(person);
+        var options = (await Call(HttpMethod.Get, $"{Api}/order-form/options", bearer: token)).Data;
+        var plan = await PlanAsync();
+        var customer = await CustomerAsync(token);
+        async Task<Guid> NewOrderAsync()
+        {
+            var res = await Call(HttpMethod.Post, $"{Api}/order-form", Order(customer, plan, options), token);
+            res.Status.ShouldBe(201, res.Root.ToString());
+            return res.Data.GetProperty("id").GetGuid();
+        }
+        Task<ApiResult> Edit(Guid id, Action<Dictionary<string, object?>>? change = null, string? bearer = null)
+            => Call(HttpMethod.Put, $"{Api}/order-form/{id}", Order(customer, plan, options, change), bearer ?? token);
+
+        // Someone else's order: not found. Unknown id: not found.
+        var id = await NewOrderAsync();
+        (await Edit(id, bearer: await TokenAsync(await SalesData.CreateAsync(_fx.Db)))).Status.ShouldBe(404);
+        (await Edit(Guid.NewGuid())).Status.ShouldBe(404);
+
+        // Wrong values change nothing.
+        (await Edit(id, b => b["gstPercent"] = 30m)).Status.ShouldBe(400);
+        var tooMany = await Edit(id, b => b["freeMonths"] = 13);
+        tooMany.Status.ShouldBe(400);
+        tooMany.FirstMessage.ShouldContain("between 0 and 12");
+        (await Edit(id, b => b["discountAmount"] = 999999m)).Status.ShouldBe(400);
+        (await _fx.Db.ExecuteScalarAsync<decimal>("SELECT GstPercent FROM dbo.Sales WHERE PublicId = @id", new[] { TestDb.P("@id", id) })).ShouldBe(18m);
+
+        // An old start date is kept as it is, but cannot be moved further back than the company allows.
+        await _fx.Db.ExecuteNonQueryAsync("UPDATE dbo.Sales SET StartDate = DATEADD(DAY, -400, StartDate), RenewalDate = DATEADD(DAY, -400, RenewalDate) WHERE PublicId = @id", new[] { TestDb.P("@id", id) });
+        var oldStart = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-400).ToString("yyyy-MM-dd");
+        (await Edit(id, b => b["startDate"] = oldStart)).Status.ShouldBe(200);
+        (await Edit(id, b => b["startDate"] = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-401).ToString("yyyy-MM-dd"))).Status.ShouldBe(400);
+
+        // A cancellation request waiting: refused until decided.
+        await _fx.Db.ExecuteNonQueryAsync(
+            "INSERT dbo.SaleCancelRequests (SaleId, RequestedBySalesUserId, Reason) SELECT Id, SalesUserId, N'Duplicate' FROM dbo.Sales WHERE PublicId = @id",
+            new[] { TestDb.P("@id", id) });
+        var waiting = await Edit(id);
+        waiting.Status.ShouldBe(400);
+        waiting.FirstMessage.ShouldContain("cancellation request waiting");
+        (await Call(HttpMethod.Get, $"{Api}/order-form/{id}", bearer: token)).Data.GetProperty("canEdit").GetBoolean().ShouldBeFalse();
+
+        // Cancelled: refused.
+        var cancelledId = await NewOrderAsync();
+        await _fx.Db.ExecuteNonQueryAsync("UPDATE dbo.Sales SET Status = 'Cancelled', CancelledAtUtc = SYSUTCDATETIME() WHERE PublicId = @id", new[] { TestDb.P("@id", cancelledId) });
+        (await Edit(cancelledId)).FirstMessage.ShouldBe("A cancelled order cannot be edited");
+
+        // A sale from the simple New sale page: refused.
+        var simple = await Call(HttpMethod.Post, $"{Api}/sales",
+            new { customerId = customer, planId = plan, quantity = 1, saleAmount = 1000m, startDate = DateTime.UtcNow.ToString("yyyy-MM-dd") }, token);
+        var simpleEdit = await Edit(simple.Data.GetProperty("id").GetGuid());
+        simpleEdit.Status.ShouldBe(400);
+        simpleEdit.FirstMessage.ShouldBe("Only orders saved with the New order form can be edited");
+    }
+
+    [Fact]
+    public async Task EditOrder_KeepsTheSeatPricesOfTheOrderDatesFinancialYear()
+    {
+        var token = await TokenAsync(await SalesData.CreateAsync(_fx.Db));
+        var options = (await Call(HttpMethod.Get, $"{Api}/order-form/options", bearer: token)).Data;
+        var plan = await PlanAsync(price: 1000m, cost: 600m);
+        var india = DateTime.UtcNow.AddMinutes(330);
+        int fy = india.Month >= 4 ? india.Year + 1 : india.Year;
+        // Last year 1-9 at 100 / 10+ at 90; this year 1-9 at 200 / 10+ at 180.
+        await _fx.Db.ExecuteNonQueryAsync(
+            "INSERT dbo.ProductPlanSeatPrices (PlanId, FiscalYear, MinSeats, MaxSeats, Price, Cost) VALUES " +
+            "(@p, @fy - 1, 1, 9, 100, NULL), (@p, @fy - 1, 10, NULL, 90, NULL), (@p, @fy, 1, 9, 200, NULL), (@p, @fy, 10, NULL, 180, NULL)",
+            new[] { TestDb.P("@p", plan), TestDb.P("@fy", fy) });
+        var customer = await CustomerAsync(token);
+        var created = await Call(HttpMethod.Post, $"{Api}/order-form", Order(customer, plan, options, b => { b["quantity"] = 5; b["discountAmount"] = 0m; }), token);
+        created.Status.ShouldBe(201, created.Root.ToString());
+        created.Data.GetProperty("listAmount").GetDecimal().ShouldBe(1000m);   // 5 x 200 (this year)
+        var id = created.Data.GetProperty("id").GetGuid();
+
+        // Pretend the order was saved last financial year.
+        await _fx.Db.ExecuteNonQueryAsync("UPDATE dbo.Sales SET CreatedAtUtc = DATEADD(YEAR, -1, CreatedAtUtc) WHERE PublicId = @id", new[] { TestDb.P("@id", id) });
+        var d = (await Call(HttpMethod.Get, $"{Api}/order-form/{id}", bearer: token)).Data;
+        d.GetProperty("orderFiscalYear").GetInt32().ShouldBe(fy - 1);
+
+        // The Edit page asks for that year's catalog.
+        var lastYearPlan = (await Call(HttpMethod.Get, $"{Api}/catalog?fiscalYear={fy - 1}", bearer: token)).Data.EnumerateArray()
+            .SelectMany(c => c.GetProperty("products").EnumerateArray()).SelectMany(p => p.GetProperty("plans").EnumerateArray())
+            .Single(p => p.GetProperty("id").GetInt64() == plan);
+        lastYearPlan.GetProperty("priceFiscalYear").GetInt32().ShouldBe(fy - 1);
+        lastYearPlan.GetProperty("seatPrices")[1].GetProperty("price").GetDecimal().ShouldBe(90m);
+
+        // 12 seats, priced with last year's 10+ range: 12 x 90.
+        var edited = await Call(HttpMethod.Put, $"{Api}/order-form/{id}", Order(customer, plan, options, b => { b["quantity"] = 12; b["discountAmount"] = 0m; }), token);
+        edited.Status.ShouldBe(200, edited.Root.ToString());
+        edited.Data.GetProperty("listAmount").GetDecimal().ShouldBe(1080m);
+        var after = (await Call(HttpMethod.Get, $"{Api}/order-form/{id}", bearer: token)).Data;
+        after.GetProperty("priceFiscalYear").GetInt32().ShouldBe(fy - 1);
+        after.GetProperty("priceSeatRange").GetString().ShouldBe("10+");
+    }
+
+    [Fact]
+    public async Task Tracking_IsSavedWithTheOrder_ChangedFromTheList_AndCancelledCancelsTheSale()
+    {
+        var manager = await SalesData.CreateAsync(_fx.Db);
+        var person = await SalesData.CreateAsync(_fx.Db, "SalesPerson", manager);
+        var token = await TokenAsync(person);
+        var mt = await TokenAsync(manager);
+        var options = (await Call(HttpMethod.Get, $"{Api}/order-form/options", bearer: token)).Data;
+        options.GetProperty("trackingStatuses").EnumerateArray().Select(t => t.GetProperty("name").GetString())
+            .ShouldBe(new[] { "Draft", "Sent to DocuSign", "Signed", "Cancelled" });
+        var plan = await PlanAsync();
+        var customer = await CustomerAsync(token);
+
+        // A new order is Draft unless chosen; it can never start Cancelled.
+        (await Call(HttpMethod.Post, $"{Api}/order-form", Order(customer, plan, options, b => b["trackingStatusId"] = 4), token)).Status.ShouldBe(400);
+        var created = await Call(HttpMethod.Post, $"{Api}/order-form", Order(customer, plan, options, b => b["trackingStatusId"] = 3), token);
+        created.Status.ShouldBe(201, created.Root.ToString());
+        created.Data.GetProperty("trackingCode").GetString().ShouldBe("SIGNED");
+        var id = created.Data.GetProperty("id").GetGuid();
+        var listed = (await Call(HttpMethod.Get, $"{Api}/sales?scope=mine", bearer: token)).Data.GetProperty("items").EnumerateArray()
+            .Single(s => s.GetProperty("id").GetGuid() == id);
+        listed.GetProperty("trackingName").GetString().ShouldBe("Signed");
+        listed.GetProperty("totalAmount").GetDecimal().ShouldBe(11682m);     // 9900 + 18% GST
+        listed.GetProperty("freeMonths").GetInt32().ShouldBe(2);
+
+        // Changed from the list; the details show it too.
+        var sent = await Call(HttpMethod.Put, $"{Api}/order-form/{id}/tracking", new { trackingStatusId = 2 }, token);
+        sent.Status.ShouldBe(200, sent.Root.ToString());
+        sent.Data.GetProperty("trackingCode").GetString().ShouldBe("SENT_DOCUSIGN");
+        (await Call(HttpMethod.Get, $"{Api}/order-form/{id}", bearer: token)).Data.GetProperty("trackingStatusId").GetInt32().ShouldBe(2);
+        // Someone else's order: not found.
+        (await Call(HttpMethod.Put, $"{Api}/order-form/{id}/tracking", new { trackingStatusId = 3 }, await TokenAsync(await SalesData.CreateAsync(_fx.Db)))).Status.ShouldBe(404);
+
+        // Cancelled: a sales person their manager did not allow is refused, and nothing changes.
+        (await Call(HttpMethod.Put, $"{Api}/order-form/{id}/tracking", new { trackingStatusId = 4, reason = "Customer backed out" }, token)).Status.ShouldBe(403);
+        // Once allowed, it becomes a cancellation request for the manager.
+        (await Call(HttpMethod.Put, $"{Api}/sales/team-members/{person.PublicId}/cancel-permission", new { canRequestCancellation = true }, mt)).Status.ShouldBe(200);
+        token = await TokenAsync(person);
+        (await Call(HttpMethod.Put, $"{Api}/order-form/{id}/tracking", new { trackingStatusId = 4 }, token)).Status.ShouldBe(400);   // reason needed
+        var requested = await Call(HttpMethod.Put, $"{Api}/order-form/{id}/tracking", new { trackingStatusId = 4, reason = "Customer backed out" }, token);
+        requested.Status.ShouldBe(200, requested.Root.ToString());
+        requested.FirstMessage.ShouldContain("Cancellation requested");
+        requested.Data.GetProperty("status").GetString().ShouldBe("Active");
+        requested.Data.GetProperty("hasPendingCancelRequest").GetBoolean().ShouldBeTrue();
+
+        // A manager choosing Cancelled while editing saves the changes and cancels the sale.
+        var other = await Call(HttpMethod.Post, $"{Api}/order-form", Order(customer, plan, options), mt);
+        var otherId = other.Data.GetProperty("id").GetGuid();
+        var editedAndCancelled = await Call(HttpMethod.Put, $"{Api}/order-form/{otherId}",
+            Order(customer, plan, options, b => { b["quantity"] = 4; b["trackingStatusId"] = 4; b["cancelReason"] = "Duplicate order"; }), mt);
+        editedAndCancelled.Status.ShouldBe(200, editedAndCancelled.Root.ToString());
+        editedAndCancelled.Data.GetProperty("quantity").GetInt32().ShouldBe(4);
+        editedAndCancelled.Data.GetProperty("status").GetString().ShouldBe("Cancelled");
+        editedAndCancelled.Data.GetProperty("trackingCode").GetString().ShouldBe("CANCELLED");
+        editedAndCancelled.Data.GetProperty("cancelReason").GetString().ShouldBe("Duplicate order");
+        (await Call(HttpMethod.Put, $"{Api}/order-form/{otherId}/tracking", new { trackingStatusId = 1 }, mt)).Status.ShouldBe(400);
+    }
+
+    [Fact]
     public async Task SimpleSale_IsUnchanged_AndHasNoOrderForm()
     {
         var token = await TokenAsync(await SalesData.CreateAsync(_fx.Db));

@@ -25,6 +25,8 @@ namespace SageUserApi.Models
         public List<MasterOption> PaymentMethods { get; set; } = new List<MasterOption>();
         public List<MasterOption> PaymentTerms { get; set; } = new List<MasterOption>();
         public List<MasterOption> Currencies { get; set; } = new List<MasterOption>();
+        /// <summary>Tracking statuses (DDL 036): Draft, Sent to DocuSign, Signed, Cancelled (Cancelled cancels the sale).</summary>
+        public List<TrackingStatusOption> TrackingStatuses { get; set; } = new List<TrackingStatusOption>();
         /// <summary>Standard wording (placeholders {freeMonths} and {gstPercent} are filled in by the form).</summary>
         public OrderWording Wording { get; set; } = new OrderWording();
     }
@@ -51,6 +53,14 @@ namespace SageUserApi.Models
         public string SignatureClauses { get; set; }
         /// <summary>One line per row.</summary>
         public string Footer { get; set; }
+    }
+
+    /// <summary>One tracking status of an order form. Code: DRAFT, SENT_DOCUSIGN, SIGNED or CANCELLED.</summary>
+    public class TrackingStatusOption
+    {
+        public int Id { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
     }
 
     /// <summary>A contact on an order form.</summary>
@@ -88,5 +98,23 @@ namespace SageUserApi.Models
         public string PriceSeatRange { get; set; }
         /// <summary>Quantity of the included item (e.g. 1000 Team Link Extend seats), or null.</summary>
         public int? IncludedItemQuantity { get; set; }
+
+        // What the Edit page needs to fill the order form again.
+        public long CategoryId { get; set; }
+        public long ProductId { get; set; }
+        public long PlanId { get; set; }
+        public int? BillingFrequencyId { get; set; }
+        public int? BillingMethodId { get; set; }
+        public int? PaymentMethodId { get; set; }
+        public int? PaymentTermId { get; set; }
+        public int? CurrencyId { get; set; }
+        /// <summary>Financial year of the order date (India time; 2027 = FY27). An edit is priced with this year's seat prices.</summary>
+        public int OrderFiscalYear { get; set; }
+        /// <summary>The order can be edited: saved with the order form, active, no cancellation request waiting.</summary>
+        public bool CanEdit { get; set; }
+        /// <summary>Stored tracking status (1-3) and the one shown (CANCELLED when the sale is cancelled).</summary>
+        public int? TrackingStatusId { get; set; }
+        public string TrackingCode { get; set; }
+        public string TrackingName { get; set; }
     }
 }

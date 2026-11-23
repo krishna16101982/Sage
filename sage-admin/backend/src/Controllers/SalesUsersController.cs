@@ -43,17 +43,17 @@ namespace SageAdminApi.Controllers
         /// <summary>
         /// History of sales users, newest first: created, activated / deactivated, manager and role changes, edits and
         /// cancellation-request permission, made in the Admin Panel or by the sales manager in the User Panel.
-        /// salesUserId = one person; empty = everyone (latest 500 changes).
+        /// salesUserId = one person; empty = everyone. One page at a time (page, pageSize), newest first.
         /// </summary>
         [HttpGet]
         [Route("history")]
         [RequirePermission(PermissionConstants.SalesUserView)]
-        public Task<IActionResult> GetHistory([FromQuery] Guid? salesUserId, [FromServices] ISalesUserHistoryFunctions _history, CancellationToken _ct)
+        public Task<IActionResult> GetHistory([FromQuery] Guid? salesUserId, [FromQuery] HttpPaging _paging, [FromServices] ISalesUserHistoryFunctions _history, CancellationToken _ct)
         {
             //*************************************************************
             // Required Permission: SalesUser.View
             //*************************************************************
-            return RunAsync<List<SalesUserHistoryEntry>>("C:SalesUsers:GetHistory", () => _history.GetHistoryAsync(salesUserId, _ct));
+            return RunAsync<PagedResult<SalesUserHistoryEntry>>("C:SalesUsers:GetHistory", () => _history.GetHistoryAsync(salesUserId, _paging, _ct));
         }
 
         /// <summary>Active sales managers, for the manager drop-down.</summary>

@@ -29,10 +29,11 @@ namespace SageUserApi.Controllers
             return Result(_rules, new SageCommonLib.Models.FunctionReturn { MethodName = "C:Catalog:GetRules" });
         }, _ct);
 
+        /// <summary>What can be sold. fiscalYear (e.g. 2027 = FY27): seat prices of that year instead of this one (the Edit order page).</summary>
         [HttpGet]
-        public Task<IActionResult> GetCatalog(CancellationToken _ct) => WithUserAsync("C:Catalog:GetCatalog", async _ =>
+        public Task<IActionResult> GetCatalog([FromQuery] int? fiscalYear, CancellationToken _ct) => WithUserAsync("C:Catalog:GetCatalog", async _ =>
         {
-            var (_catalog, _fr) = await _catalogFunctions.GetCatalogAsync(_ct);
+            var (_catalog, _fr) = await _catalogFunctions.GetCatalogAsync(fiscalYear is >= 2000 and <= 2100 ? fiscalYear : null, _ct);
             return Result(_catalog, _fr);
         }, _ct);
     }

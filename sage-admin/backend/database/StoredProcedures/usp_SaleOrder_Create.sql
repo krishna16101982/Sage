@@ -38,7 +38,8 @@ CREATE OR ALTER PROCEDURE dbo.usp_SaleOrder_Create
     @BillingContactPhone        NVARCHAR(20)   = NULL,
     @BillToAddress              NVARCHAR(500)  = NULL,
     @OrderWording               NVARCHAR(MAX)  = NULL,  -- JSON: the order form's wording sections (DDL 031)
-    @IncludedItemQuantity       INT            = NULL   -- quantity of the plan's included item, e.g. Team Link Extend seats (DDL 034)
+    @IncludedItemQuantity       INT            = NULL,  -- quantity of the plan's included item, e.g. Team Link Extend seats (DDL 034)
+    @TrackingStatusId           INT            = 1      -- Draft / Sent to DocuSign / Signed (DDL 036); a new order is never Cancelled
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -72,6 +73,8 @@ BEGIN
         THROW 50400, 'The Team Link Extend seat quantity must be between 1 and 10000000', 1;
     IF NULLIF(LTRIM(RTRIM(@PrimaryContactName)), N'') IS NULL
         THROW 50400, 'Enter the primary contact''s name', 1;
+    IF NOT EXISTS (SELECT 1 FROM dbo.OrderTrackingStatuses WHERE Id = ISNULL(@TrackingStatusId, 1) AND Code <> 'CANCELLED')
+        THROW 50400, 'Choose Draft, Sent to DocuSign or Signed for a new order', 1;
 
     -- Price of one plan term (per unit): the seat range's for seat-priced plans (financial year of the order date, India
     -- time; FY27 = Apr 2026 - Mar 2027), otherwise the plan's own. The paid term may be several plan terms: 24 paid months
@@ -168,7 +171,8 @@ BEGIN
         BillingContactEmail = @BillingContactEmail, BillingContactPhone = @BillingContactPhone,
         BillToAddress = @BillToAddress,
         OrderWording = @OrderWording,
-        IncludedItemQuantity = @IncludedItemQuantity
+        IncludedItemQuantity = @IncludedItemQuantity,
+        TrackingStatusId = ISNULL(@TrackingStatusId, 1)
     WHERE PublicId = @publicId;
 
     COMMIT;

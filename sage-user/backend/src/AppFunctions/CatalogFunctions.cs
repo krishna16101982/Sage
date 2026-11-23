@@ -49,7 +49,7 @@ namespace SageUserApi.AppFunctions
             return _rules;
         }
 
-        public async Task<(List<CatalogCategory> catalog, IFunctionReturn functionReturn)> GetCatalogAsync(CancellationToken _ct = default)
+        public async Task<(List<CatalogCategory> catalog, IFunctionReturn functionReturn)> GetCatalogAsync(int? _fiscalYear = null, CancellationToken _ct = default)
         {
             string _methodName = "F:Catalog:GetCatalog";
             try
@@ -110,7 +110,7 @@ namespace SageUserApi.AppFunctions
                     }).ToList()
                 }).ToList();
 
-                await AddSeatPricesAsync(_rows.Select(x => x.Plan).ToList(), _ct);
+                await AddSeatPricesAsync(_rows.Select(x => x.Plan).ToList(), _fiscalYear, _ct);
                 return (_catalog, _functionReturn);
             }
             catch (Exception ex)
@@ -121,22 +121,23 @@ namespace SageUserApi.AppFunctions
         }
 
         /// <summary>
-        /// Seat prices (DDL 032) for the financial year of today in India, the same year dbo.usp_SaleOrder_Create uses.
+        /// Seat prices (DDL 032) for the financial year of today in India, the same year dbo.usp_SaleOrder_Create uses, or
+        /// for _fiscalYear (an edited order is priced with its order date's year by dbo.usp_SaleOrder_Update).
         /// A plan that has seat prices but none for this year gets HasSeatPrices = true and an empty list (it cannot be sold
         /// on the order form until the admin adds them).
         /// </summary>
-        private async Task AddSeatPricesAsync(List<CatalogPlan> _plans, CancellationToken _ct)
+        private async Task AddSeatPricesAsync(List<CatalogPlan> _plans, int? _fiscalYear, CancellationToken _ct)
         {
             StringBuilder _sqlQuery = new StringBuilder();
             _sqlQuery.Append(" DECLARE @today DATE = CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '+05:30') AS DATE); ");
-            _sqlQuery.Append(" DECLARE @fy INT = CASE WHEN MONTH(@today) >= 4 THEN YEAR(@today) + 1 ELSE YEAR(@today) END; ");
+            _sqlQuery.Append(" DECLARE @fy INT = ISNULL(CAST(@fiscalYear AS INT), CASE WHEN MONTH(@today) >= 4 THEN YEAR(@today) + 1 ELSE YEAR(@today) END); ");
             _sqlQuery.Append(" SELECT @fy AS FiscalYear, pl.Id AS PlanId, sp.MinSeats, sp.MaxSeats, sp.Price, ISNULL(sp.Cost, pl.Cost) AS Cost ");
             _sqlQuery.Append(" FROM dbo.ProductPlans pl ");
             _sqlQuery.Append(" LEFT JOIN dbo.ProductPlanSeatPrices sp ON sp.PlanId = pl.Id AND sp.FiscalYear = @fy ");
             _sqlQuery.Append(" WHERE pl.IsActive = 1 AND EXISTS (SELECT 1 FROM dbo.ProductPlanSeatPrices x WHERE x.PlanId = pl.Id) ");
             _sqlQuery.Append(" ORDER BY pl.Id, sp.MinSeats ");
 
-            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(_sqlQuery.ToString(), null, "F:Catalog:SeatPrices", _ct);
+            (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(_sqlQuery.ToString(), new[] { P("@fiscalYear", _fiscalYear) }, "F:Catalog:SeatPrices", _ct);
             EnsureRead(_functionReturn);
 
             Dictionary<long, CatalogPlan> _byId = _plans.ToDictionary(p => p.Id);

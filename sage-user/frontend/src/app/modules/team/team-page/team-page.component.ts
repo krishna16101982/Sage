@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Alert } from '../../../component/alert/alert';
 import { initials } from '../../../component/icon/icon';
+import { Pagination } from '../../../component/pagination/pagination';
 import { MessageService } from '../../../services/message/message.service';
 import { errorText } from '../../../services/rest/global-rest-service';
 import { SalesService } from '../../../services/sales/sales.service';
@@ -17,7 +18,7 @@ import { CancelDecisionModal } from '../../sales/cancel-decision-modal/cancel-de
  */
 @Component({
   selector: 'app-team-page',
-  imports: [RouterLink, Alert, CancelDecisionModal],
+  imports: [RouterLink, Alert, Pagination, CancelDecisionModal],
   templateUrl: './team-page.component.html',
 })
 export class TeamPage implements OnInit {
@@ -27,6 +28,9 @@ export class TeamPage implements OnInit {
 
   readonly members = signal<TeamMember[] | null>(null);
   readonly requests = signal<CancelRequest[] | null>(null);
+  /** Waiting requests: one page at a time from the database. */
+  readonly requestPage = signal<{ page: number; totalPages: number; totalCount: number } | null>(null);
+  requestsPageNo = 1;
   readonly saving = signal<string | null>(null);
   readonly error = signal<string | null>(null);
   readonly notice = signal<string | null>(inject(MessageService).take());
@@ -38,12 +42,18 @@ export class TeamPage implements OnInit {
 
   async load(): Promise<void> {
     try {
-      const [members, requests] = await Promise.all([this.service.teamMembers(), this.service.cancelRequests('Pending')]);
+      const [members, requests] = await Promise.all([this.service.teamMembers(), this.service.cancelRequests('Pending', this.requestsPageNo, 20)]);
       this.members.set(members);
-      this.requests.set(requests);
+      this.requests.set(requests.items);
+      this.requestPage.set({ page: requests.page, totalPages: requests.totalPages, totalCount: requests.totalCount });
     } catch (err) {
       this.error.set(errorText(err, 'Unable to load your team.'));
     }
+  }
+
+  async requestsGoTo(page: number): Promise<void> {
+    this.requestsPageNo = page;
+    await this.load();
   }
 
   initialsOf(name: string): string {

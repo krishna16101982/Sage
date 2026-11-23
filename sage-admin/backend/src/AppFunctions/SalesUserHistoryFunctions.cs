@@ -12,6 +12,8 @@ using SageCommonLib.AppFunctions;
 using SageCommonLib.AppFunctions.Interfaces;
 using SageCommonLib.Models;
 using SageCommonLib.Models.Interfaces;
+using SageCommonLib.Models.Paging;
+using SP = SageAdminApi.Globals.ApplicationDatabaseConstants.StoredProcedures;
 using static SageCommonLib.AppFunctions.Sql;
 
 namespace SageAdminApi.AppFunctions
@@ -34,8 +36,8 @@ namespace SageAdminApi.AppFunctions
 
     public interface ISalesUserHistoryFunctions
     {
-        /// <summary>Changes to sales users, newest first: one user (salesUserId) or everyone (at most 500).</summary>
-        Task<(List<SalesUserHistoryEntry> entries, IFunctionReturn functionReturn)> GetHistoryAsync(Guid? _salesUserId, CancellationToken _ct = default);
+        /// <summary>Changes to sales users, newest first: one user (salesUserId) or everyone, one page at a time (dbo.usp_SalesUserHistory_GetPaged).</summary>
+        Task<(PagedResult<SalesUserHistoryEntry> result, IFunctionReturn functionReturn)> GetHistoryAsync(Guid? _salesUserId, HttpPaging _paging, CancellationToken _ct = default);
     }
 
     /// <summary>
@@ -54,25 +56,18 @@ namespace SageAdminApi.AppFunctions
             _databaseFunctions = __databaseFunctions;
         }
 
-        public async Task<(List<SalesUserHistoryEntry> entries, IFunctionReturn functionReturn)> GetHistoryAsync(Guid? _salesUserId, CancellationToken _ct = default)
+        public async Task<(PagedResult<SalesUserHistoryEntry> result, IFunctionReturn functionReturn)> GetHistoryAsync(Guid? _salesUserId, HttpPaging _paging, CancellationToken _ct = default)
         {
             string _methodName = "F:SalesUserHistory:Get";
             try
             {
-                StringBuilder _sqlQuery = new StringBuilder();
-                _sqlQuery.Append(" SELECT TOP (500) a.CreatedAtUtc, a.Action, a.EntityId, a.OldValues, a.NewValues, a.ActorUserId, ");
-                _sqlQuery.Append("        CONCAT(au.FirstName, N' ', au.LastName) AS AdminName, ");
-                _sqlQuery.Append("        su.PublicId AS SalesUserId, CONCAT(su.FirstName, N' ', su.LastName) AS SalesUserName, su.Username ");
-                _sqlQuery.Append(" FROM dbo.AuditLogs a ");
-                _sqlQuery.Append(" LEFT JOIN dbo.AdminUsers au ON au.Id = a.ActorUserId ");
-                _sqlQuery.Append(" LEFT JOIN dbo.SalesUsers su ON su.PublicId = TRY_CAST(a.EntityId AS UNIQUEIDENTIFIER) ");
-                _sqlQuery.Append(" WHERE a.EntityType = 'SalesUser' ");
-                _sqlQuery.Append("   AND a.Action IN ('Create', 'Update', 'StatusChange', 'CreateTeamMember', 'TeamMemberStatus', 'CancelPermission') ");
-                if (_salesUserId.HasValue) _sqlQuery.Append(" AND a.EntityId = @id ");
-                _sqlQuery.Append(" ORDER BY a.Id DESC ");
-
-                SqlParameter[] _parameters = _salesUserId.HasValue ? new[] { P("@id", _salesUserId.Value.ToString()) } : null;
-                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(_sqlQuery.ToString(), _parameters, _methodName, _ct);
+                // One page of audit rows, newest first; an audit row may record more than one change (e.g. manager and role).
+                PaginationParams _page = new Pagination().GetPagingParams(_paging ?? new HttpPaging(), new[] { "atUtc" }, "atUtc");
+                SqlParameter _totalCount = IntOut("@TotalCount");
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteProcedureDataTableAsync(SP.SalesUserHistoryGetPaged, new[]
+                {
+                    P("@SalesUserPublicId", _salesUserId), P("@Offset", _page.Offset), P("@PageSize", _page.PageSize), _totalCount
+                }, _methodName, _ct);
                 if (!_functionReturn.Status) return (null, _functionReturn);
 
                 var _entries = new List<SalesUserHistoryEntry>();
@@ -104,7 +99,7 @@ namespace SageAdminApi.AppFunctions
                         });
                     }
                 }
-                return (_entries, _functionReturn);
+                return (new PagedResult<SalesUserHistoryEntry> { Items = _entries, Page = _page.Page, PageSize = _page.PageSize, TotalCount = OutInt(_totalCount) }, _functionReturn);
             }
             catch (Exception ex)
             {

@@ -41,6 +41,9 @@ export interface Sale {
   taxAmount: number;
   totalAmount: number;
   freeMonths: number;
+  /** Order form tracking status (DRAFT, SENT_DOCUSIGN, SIGNED, CANCELLED) and its name; null for a sale from the simple page. */
+  trackingCode: string | null;
+  trackingName: string | null;
   /** Order-form details (single-sale view only; null for a sale from the simple page). */
   orderDetails?: AdminOrderDetails | null;
 }

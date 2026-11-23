@@ -1,11 +1,11 @@
 <div class="stack">
-  <h1 class="page-title">Customers</h1>
-  <p class="hint">Customers are shared by the whole sales team. Search before adding one.</p>
+  <h1 class="page-title">Companies</h1>
+  <p class="hint">Companies are shared by the whole sales team. Search before adding one.</p>
 
   <div class="toolbar">
     <app-customers-filter (searchChange)="onSearch($event)" />
     <div class="toolbar-spacer"></div>
-    <a class="btn btn-primary" routerLink="/customers/add">Add customer</a>
+    <a class="btn btn-primary" routerLink="/customers/add">Add company</a>
   </div>
 
   @if (error()) { <app-alert kind="error">{{ error() }}</app-alert> }
@@ -14,7 +14,7 @@
   <div class="table-wrap">
     <table class="data-table">
       <thead>
-        <tr><th>Customer</th><th>Contact</th><th>GSTIN</th><th>City</th><th class="amount">Active sales</th><th>Added by</th></tr>
+        <tr><th>Company</th><th>Contact</th><th>GSTIN</th><th>City</th><th class="amount">Active sales</th><th>Added by</th><th>Actions</th></tr>
       </thead>
       <tbody>
         @for (c of data()?.items ?? []; track c.id) {
@@ -28,9 +28,15 @@
             <td>{{ c.city ?? '-' }}{{ c.state ? ', ' + c.state : '' }}</td>
             <td class="amount">{{ c.saleCount }}</td>
             <td>{{ c.createdByName ?? '-' }}</td>
+            <td>
+              <div class="row-actions" style="justify-content: flex-start">
+                <a class="link-button text-sm" [routerLink]="['/customers', c.id]">View</a>
+                <a class="link-button text-sm" [routerLink]="['/customers', c.id, 'edit']">Edit</a>
+              </div>
+            </td>
           </tr>
         } @empty {
-          <tr><td colspan="6" class="table-empty">{{ loading() ? 'Loading...' : 'No customers match.' }}</td></tr>
+          <tr><td colspan="7" class="table-empty">{{ loading() ? 'Loading...' : 'No companies match.' }}</td></tr>
         }
       </tbody>
     </table>

@@ -17,7 +17,8 @@ namespace SageAdminApi.Globals
             SalesUser,
             Customer,
             Sale,
-            MasterValue
+            MasterValue,
+            LeadListValue
         }
 
         public enum AuditAction

@@ -53,8 +53,12 @@ BEGIN
            CASE WHEN mg.Id IS NULL THEN NULL ELSE CONCAT(mg.FirstName, N' ', mg.LastName) END AS ManagerName,
            s.Quantity, s.UnitPrice, s.UnitCost, s.ListAmount, s.SaleAmount, s.DiscountAmount, s.CostAmount,
            s.DurationUnit, s.DurationCount, s.StartDate, s.RenewalDate, s.Status, s.Notes, s.CreatedAtUtc,
-           s.CancelledAtUtc, CASE WHEN cb.Id IS NULL THEN NULL ELSE CONCAT(cb.FirstName, N' ', cb.LastName) END AS CancelledByName, s.CancelReason, s.GstPercent, s.TaxAmount, s.TotalAmount, s.FreeMonths
+           s.CancelledAtUtc, CASE WHEN cb.Id IS NULL THEN NULL ELSE CONCAT(cb.FirstName, N' ', cb.LastName) END AS CancelledByName, s.CancelReason, s.GstPercent, s.TaxAmount, s.TotalAmount, s.FreeMonths,
+           -- Order form tracking status (DDL 036): a cancelled order shows Cancelled; NULL for a sale from the simple page.
+           CASE WHEN s.BillingFrequencyId IS NULL THEN NULL WHEN s.Status = 'Cancelled' THEN 'CANCELLED' ELSE ts.Code END AS TrackingCode,
+           CASE WHEN s.BillingFrequencyId IS NULL THEN NULL WHEN s.Status = 'Cancelled' THEN N'Cancelled' ELSE ts.Name END AS TrackingName
     FROM dbo.Sales s
+    LEFT JOIN dbo.OrderTrackingStatuses ts ON ts.Id = s.TrackingStatusId
     JOIN dbo.Customers cu ON cu.Id = s.CustomerId
     JOIN dbo.ProductCategories c ON c.Id = s.CategoryId
     JOIN dbo.Products p ON p.Id = s.ProductId
