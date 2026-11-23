@@ -59,16 +59,33 @@ The images are Linux images, so Windows Server runs them through **WSL2** (Docke
 Windows Server). The server is a virtual machine, so its host must allow **nested virtualization**.
 
 1. Admin PowerShell: `wsl --install -d Ubuntu-24.04`, reboot, create the Ubuntu user.
-2. In Ubuntu: `curl -fsSL https://get.docker.com | sudo sh`, then `sudo usermod -aG docker $USER` and log in again.
-3. Copy `docker-compose.yml` and your `.env` into a folder in Ubuntu (e.g. `~/sage`), `docker login ghcr.io`,
-   then `docker compose pull && docker compose up -d`.
-4. Reach the containers from other machines. Either use mirrored networking (Windows Server 2025 / Windows 11):
-   create `C:\Users\<you>\.wslconfig` with
+2. Networking (Windows Server 2025 / Windows 11): create `C:\Users\<you>\.wslconfig` with
    ```
    [wsl2]
    networkingMode=mirrored
+
+   [experimental]
+   hostAddressLoopback=true
    ```
-   then `wsl --shutdown` and start Ubuntu again; or forward the ports with `netsh interface portproxy` to the WSL IP.
-   Allow TCP 9081-9082 in the Windows firewall (and in the network NAT for the public IP, as for 8081-8084).
+   then `wsl --shutdown`. Mirrored mode puts the containers' ports on the server's own address;
+   `hostAddressLoopback` lets the containers reach SQL Server on the server's own IP. Allow the ports in the
+   Hyper-V firewall that guards WSL and in the Windows firewall (and in the network NAT for the public IP, as for 8081-8084):
+   ```powershell
+   New-NetFirewallHyperVRule -Name SageDocker -DisplayName "Sage Docker" -Direction Inbound -VMCreatorId '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' -Protocol TCP -LocalPorts 9081,9082
+   New-NetFirewallRule -DisplayName "Sage Docker 9081-9082" -Direction Inbound -Protocol TCP -LocalPort 9081,9082 -Action Allow
+   ```
+   Older Windows Server (2019 / 2022) has no mirrored mode: forward the ports with `netsh interface portproxy` to the WSL IP.
+3. SQL Server: fixed TCP port 1433 (see `DB_CONNECTION` above) and the Windows firewall open for TCP 1433. In `.env`
+   use the server's own IP: `Server=10.10.61.100,1433;...` (`host.docker.internal` exists only in Docker Desktop).
+4. In Ubuntu: `curl -fsSL https://get.docker.com | sudo sh`, then `sudo usermod -aG docker $USER` and log in again.
+5. Copy `docker-compose.yml` and your `.env` into a folder in Ubuntu (e.g. `~/sage`), `docker login ghcr.io`,
+   then `docker compose pull && docker compose up -d --no-build` (the server has no source code to build from).
+6. WSL stops when nobody uses it. Keep it running and start it after a reboot with a scheduled task that runs as
+   the Ubuntu-owning Windows user, "whether the user is logged on or not", at startup:
+   `wsl.exe -d Ubuntu-24.04 -- sleep infinity`. Docker then starts the containers (`restart: unless-stopped`).
 
 IIS keeps running on 8081-8084, so the IIS and Docker versions can run side by side until you switch.
+
+If the server cannot reach ghcr.io, move the images by file instead: on a machine that has them,
+`docker save -o sage-images.tar ghcr.io/krishna16101982/sage-admin-api:latest ghcr.io/krishna16101982/sage-user-api:latest ghcr.io/krishna16101982/sage-admin-panel:latest ghcr.io/krishna16101982/sage-user-panel:latest`,
+copy the file to the server (e.g. `C:\sage`), then in Ubuntu `docker load -i /mnt/c/sage/sage-images.tar`.

@@ -1,17 +1,15 @@
 /**
- * PUBLIC: the server opened by its public address (now http://103.205.65.143:8081, later a domain).
+ * LIVE: the panel on its domain, http(s)://userpanel.new.ocpwebserver.com
  * Build: ng build --configuration=production
- * apiBaseUrl: the User API on the same address, port 8083 (http://103.205.65.143:8083).
- * When a domain is ready, put its API address here, e.g. 'https://sales-api.example.com'.
+ * apiBaseUrl: the User API on its own domain, userapi.new.ocpwebserver.com, with the same http / https as the
+ * page (so it keeps working when the sites move to https).
  * app-settings.json (next to index.html on the server) can override apiBaseUrl without a rebuild.
  * The User API must allow the panel's address in Cors:AllowedOrigins.
  */
-/** The API on the same machine the panel is opened from (localhost, IP or server name), port 8083. */
-const sameHost = (port: number) =>
-  typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:${port}` : `http://localhost:${port}`;
+const API_HOST = 'userapi.new.ocpwebserver.com';
 
 export const environment = {
   name: 'prod',
   production: true,
-  apiBaseUrl: sameHost(8083),
+  apiBaseUrl: typeof window !== 'undefined' ? `${window.location.protocol}//${API_HOST}` : `https://${API_HOST}`,
 };
