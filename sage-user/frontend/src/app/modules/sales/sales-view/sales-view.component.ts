@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Alert } from '../../../component/alert/alert';
+import { RichTextView } from '../../../component/rich-text-view/rich-text-view';
 import { AuthService } from '../../../services/auth/auth.service';
 import { MessageService } from '../../../services/message/message.service';
 import { errorText } from '../../../services/rest/global-rest-service';
@@ -21,7 +22,7 @@ import { SalesCancelModal } from './sales-cancel-modal/sales-cancel-modal.compon
  */
 @Component({
   selector: 'app-sales-view',
-  imports: [RouterLink, Alert, SalesCancelModal, CancelDecisionModal],
+  imports: [RouterLink, Alert, SalesCancelModal, CancelDecisionModal, RichTextView],
   templateUrl: './sales-view.component.html',
 })
 export class SalesView implements OnInit {
@@ -43,6 +44,21 @@ export class SalesView implements OnInit {
   /** Order form PDF: busy while it is fetched; its error shows on the card. */
   readonly pdfBusy = signal(false);
   readonly pdfError = signal<string | null>(null);
+
+  /** The saved order as a Word file ({saleNumber}.docx). */
+  async orderWord(): Promise<void> {
+    const s = this.sale();
+    if (!s) return;
+    this.pdfError.set(null);
+    this.pdfBusy.set(true);
+    try {
+      await this.orderFormService.downloadWord(s.id, s.saleNumber);
+    } catch (err) {
+      this.pdfError.set(errorText(err, 'The Word file could not be made.'));
+    } finally {
+      this.pdfBusy.set(false);
+    }
+  }
 
   /** Opens (preview) or saves (download) the order form PDF saved by order number. */
   async orderPdf(download: boolean): Promise<void> {

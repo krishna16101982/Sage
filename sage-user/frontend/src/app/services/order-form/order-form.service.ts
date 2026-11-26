@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import type { OrderDetails, OrderFormOptions, OrderInput } from '../../shared/interfaces/order-form.interface';
+import type { OrderDetails, OrderFormOptions, OrderInput, OrderPreviewInput } from '../../shared/interfaces/order-form.interface';
 import type { Sale } from '../../shared/interfaces/sale.interface';
 import { GlobalRestService } from '../rest/global-rest-service';
 
@@ -19,4 +19,10 @@ export class OrderFormService {
   /** The order form PDF saved by order number: opened in a new tab (preview) or saved as {saleNumber}.pdf. */
   previewPdf = (saleId: string) => this.rest.open(`/api/user/order-form/${saleId}/pdf`);
   downloadPdf = (saleId: string, saleNumber: string) => this.rest.download(`/api/user/order-form/${saleId}/pdf?download=true`, `${saleNumber}.pdf`);
+  /** The saved order as a Word file ({saleNumber}.docx), to change in Word. */
+  downloadWord = (saleId: string, saleNumber: string) => this.rest.download(`/api/user/order-form/${saleId}/word`, `${saleNumber}.docx`);
+  /** The form as filled in, not saved: Preview PDF (new tab), Download PDF or Download Word. */
+  previewDraft = (body: OrderPreviewInput) => this.rest.open('/api/user/order-form/preview?format=pdf', body);
+  downloadDraft = (body: OrderPreviewInput, format: 'pdf' | 'word') =>
+    this.rest.download(`/api/user/order-form/preview?format=${format}&download=true`, `OrderForm.${format === 'word' ? 'docx' : 'pdf'}`, body);
 }

@@ -1,0 +1,68 @@
+/* Admin lead dashboard (same as the User Panel Home). Status colours: validated categorical slots (light and dark stepped separately); the legend,
+   counts and 2px gaps between slices keep identity readable without colour. */
+:host {
+  --surface: var(--color-surface);
+  --series-1: #2a78d6; /* Open */
+  --series-2: #eda100; /* Warm */
+  --series-3: #008300; /* Won */
+  --series-4: #e34948; /* Lost */
+  --series-5: #6250d6; /* Hold */
+  --series-6: #1baf7a; /* Disqualified */
+  --bar: #2a78d6;
+  --grid: var(--color-border);
+  display: block;
+}
+:host-context(html[data-theme="dark"]) {
+  --series-1: #3987e5;
+  --series-2: #c98500;
+  --series-3: #199e70;
+  --series-4: #e66767;
+  --series-5: #9085e9;
+  --series-6: #0ca30c;
+  --bar: #3987e5;
+}
+
+.dash-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); gap: 0.875rem; }
+.dash-tile { display: flex; flex-direction: column; gap: 0.375rem; padding: 0.875rem 1rem; border-left: 3px solid var(--tile, var(--color-border)); }
+.dash-tile .stat-value { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--color-text); }
+.dash-money { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.875rem; }
+.dash-money .dash-tile { padding: 1rem 1.25rem; }
+.dash-link { font-size: 0.75rem; }
+.dash-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 0.875rem; }
+.dash-charts .card-body { min-height: 15rem; }
+
+/* Status: pie + legend with counts (the legend is the table view). */
+.pie-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 1.25rem; justify-content: center; }
+.pie { width: 11rem; height: 11rem; flex: none; }
+.pie path { stroke: var(--surface); stroke-width: 2; cursor: default; }
+.pie path:hover { opacity: 0.85; }
+.legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; font-size: 0.8125rem; color: var(--color-text); }
+.legend li { display: flex; align-items: center; gap: 0.5rem; }
+.legend .count { margin-left: auto; padding-left: 0.75rem; font-variant-numeric: tabular-nums; color: var(--color-text-muted); }
+.swatch { width: 0.625rem; height: 0.625rem; border-radius: 2px; flex: none; }
+.s-1 { fill: var(--series-1); background: var(--series-1); }
+.s-2 { fill: var(--series-2); background: var(--series-2); }
+.s-3 { fill: var(--series-3); background: var(--series-3); }
+.s-4 { fill: var(--series-4); background: var(--series-4); }
+.s-5 { fill: var(--series-5); background: var(--series-5); }
+.s-6 { fill: var(--series-6); background: var(--series-6); }
+
+/* Sources: horizontal bars, one series, value at the end of each bar. */
+.hbars { display: grid; grid-template-columns: max-content 1fr; gap: 0.45rem 0.75rem; align-items: center; font-size: 0.8125rem; }
+.hbar-label { color: var(--color-text-muted); text-align: right; }
+.hbar-track { display: flex; align-items: center; gap: 0.5rem; }
+.hbar { height: 1rem; border-radius: 0 4px 4px 0; background: var(--bar); min-width: 2px; }
+.hbar-value { font-variant-numeric: tabular-nums; color: var(--color-text); }
+
+/* Aging: columns on a baseline, value above each column. */
+.cols { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; align-items: end; height: 11rem;
+        border-bottom: 1px solid var(--grid); padding-top: 1.25rem; }
+.col { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+.col-bar { width: 70%; max-width: 4rem; border-radius: 4px 4px 0 0; background: var(--bar); }
+.col-value { font-size: 0.8125rem; font-variant-numeric: tabular-nums; color: var(--color-text); margin-bottom: 0.25rem; }
+.col-labels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-top: 0.375rem; font-size: 0.75rem;
+              color: var(--color-text-muted); text-align: center; }
+
+.scope-switch { display: inline-flex; border: 1px solid var(--color-border); border-radius: 999px; overflow: hidden; }
+.scope-switch button { border: 0; background: transparent; padding: 0.35rem 0.9rem; font-size: 0.8125rem; color: var(--color-text-muted); cursor: pointer; }
+.scope-switch button.is-on { background: var(--color-primary); color: var(--color-on-primary); }

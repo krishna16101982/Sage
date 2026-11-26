@@ -40,8 +40,8 @@ export class GlobalRestService {
   }
 
   /** Downloads a file (e.g. the order form PDF) and saves it; the name comes from Content-Disposition, or fallbackName. */
-  async download(path: string, fallbackName: string): Promise<void> {
-    const file = await this.file(path);
+  async download(path: string, fallbackName: string, body?: unknown): Promise<void> {
+    const file = await this.file(path, body);
     const url = URL.createObjectURL(file.blob);
     const a = document.createElement('a');
     a.href = url;
@@ -56,10 +56,10 @@ export class GlobalRestService {
    * Opens a file (e.g. a PDF preview) in a new browser tab. The tab is opened at once (so pop-up blockers allow it)
    * and shows the file when it has arrived.
    */
-  async open(path: string): Promise<void> {
+  async open(path: string, body?: unknown): Promise<void> {
     const tab = window.open('', '_blank');
     try {
-      const file = await this.file(path);
+      const file = await this.file(path, body);
       const url = URL.createObjectURL(file.blob);
       if (tab) tab.location.href = url;
       else window.location.href = url;
@@ -71,22 +71,23 @@ export class GlobalRestService {
   }
 
   /** A file from the API (with the usual one silent refresh on 401); errors are the JSON envelope, thrown as ApiError. */
-  private async file(path: string): Promise<{ blob: Blob; fileName: string | null }> {
-    let r = await this.sendForFile(path);
+  private async file(path: string, body?: unknown): Promise<{ blob: Blob; fileName: string | null }> {
+    let r = await this.sendForFile(path, body);
     if (r.status === 401) {
-      if (await this.refreshSession()) r = await this.sendForFile(path);
+      if (await this.refreshSession()) r = await this.sendForFile(path, body);
       else this.onSessionExpired?.();
     }
     if (!r.ok || !r.blob) throw new ApiError(r.status, r.envelope?.messageType ?? 'SYSTEM_ERROR', r.envelope?.message ?? ['The file could not be opened. Please try again.']);
     return { blob: r.blob, fileName: r.fileName };
   }
 
-  private async sendForFile(path: string): Promise<{ ok: boolean; status: number; blob: Blob | null; fileName: string | null; envelope: ApiResponse<unknown> | null }> {
-    let headers = new HttpHeaders({ Accept: 'application/pdf, application/json' });
+  /** GET a file, or POST body for one (a file made from the page's values). */
+  private async sendForFile(path: string, body?: unknown): Promise<{ ok: boolean; status: number; blob: Blob | null; fileName: string | null; envelope: ApiResponse<unknown> | null }> {
+    let headers = new HttpHeaders({ Accept: 'application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/json' });
     if (this.accessToken) headers = headers.set('Authorization', `Bearer ${this.accessToken}`);
     try {
       const res = await firstValueFrom(
-        this.http.get(`${environment.apiBaseUrl}${path}`, { headers, withCredentials: true, observe: 'response', responseType: 'blob' }),
+        this.http.request(body === undefined ? 'GET' : 'POST', `${environment.apiBaseUrl}${path}`, { body, headers, withCredentials: true, observe: 'response', responseType: 'blob' }),
       );
       return { ok: true, status: res.status, blob: res.body, fileName: fileNameOf(res.headers.get('Content-Disposition')), envelope: null };
     } catch (err) {

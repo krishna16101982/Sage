@@ -1,94 +1,122 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { BarChart, type BarPoint } from '../../component/bar-chart/bar-chart';
 import { Icon } from '../../component/icon/icon';
+import { Modal } from '../../component/modal/modal';
 import { AuthService } from '../../services/auth/auth.service';
-import { CustomersService } from '../../services/customers/customers.service';
+import { LeadsService } from '../../services/leads/leads.service';
 import { PermissionService } from '../../services/permission/permission.service';
+import { errorText } from '../../services/rest/global-rest-service';
 import { SalesService } from '../../services/sales/sales.service';
 import { Perm } from '../../shared/enumarations/permission-codes';
-import type { Sale, SalesPage, SalesSummaryRow } from '../../shared/interfaces/sale.interface';
-import { formatDate, monthBounds, monthName, percentChange, today } from '../../shared/utils/dates';
-import { formatDateTime, formatInr } from '../../shared/utils/format';
+import type { LeadSummary, LeadSummaryItem } from '../../shared/interfaces/lead-summary.interface';
+import type { SellerOption } from '../../shared/interfaces/sale.interface';
+import { formatInr } from '../../shared/utils/format';
+
+/** One slice of the status pie: an SVG path, its colour slot and its share. */
+interface Slice {
+  item: LeadSummaryItem;
+  path: string;
+  slot: number;
+  percent: number;
+}
 
 /**
- * /dashboard — this month at a glance: sales, revenue, margin, customers, sales per day, top sales persons and the
- * latest sales. Each block is shown only when the user may see that data (Sales.View, Customer.View).
+ * /dashboard — the lead pipeline at a glance, the same as the User Panel's Home: leads per status, conversion rate, won
+ * revenue (monthly and annualized, with a per-product breakdown), status / source / aging charts and Self Working vs
+ * Passed. Every figure comes from one database call (dbo.usp_Lead_Summary): all leads, or one sales person's (the leads
+ * they created, generated or are assigned to). Needs Sales.View.
  */
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, Icon, BarChart],
+  imports: [RouterLink, Icon, Modal],
   templateUrl: './dashboard.html',
+  styleUrl: './dashboard.css',
 })
 export class Dashboard implements OnInit {
   protected readonly auth = inject(AuthService);
+  private readonly leads = inject(LeadsService);
   private readonly sales = inject(SalesService);
-  private readonly customers = inject(CustomersService);
   private readonly permissions = inject(PermissionService);
   protected readonly inr = formatInr;
-  protected readonly date = formatDate;
-  protected readonly dateTime = formatDateTime;
-  protected readonly perm = Perm;
 
   readonly canSales = this.permissions.has(Perm.SalesView);
-  readonly canCustomers = this.permissions.has(Perm.CustomerView);
   readonly canAddCustomer = this.permissions.has(Perm.CustomerAdd);
-  /** Colours for the top sales persons, in rank order. */
-  protected readonly accents = ['accent-teal', 'accent-blue', 'accent-orange', 'accent-purple', 'accent-green'];
-  readonly month = monthName();
 
-  readonly thisMonth = signal<SalesPage | null>(null);
-  readonly lastMonth = signal<SalesPage | null>(null);
-  readonly topSellers = signal<SalesSummaryRow[]>([]);
-  readonly recent = signal<Sale[]>([]);
-  readonly customerCount = signal<number | null>(null);
+  /** Sales users for the filter; '' = all leads. */
+  readonly sellers = signal<SellerOption[]>([]);
+  readonly sellerId = signal('');
+  readonly summary = signal<LeadSummary | null>(null);
+  readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly showProducts = signal(false);
 
-  readonly countChange = computed(() => percentChange(this.thisMonth()?.totalCount ?? 0, this.lastMonth()?.totalCount ?? 0));
-  readonly revenueChange = computed(() => percentChange(this.thisMonth()?.totalSaleAmount ?? 0, this.lastMonth()?.totalSaleAmount ?? 0));
-  readonly topMax = computed(() => Math.max(1, ...this.topSellers().map((r) => r.saleAmount)));
+  readonly sellerName = computed(() => this.sellers().find((s) => s.id === this.sellerId())?.name ?? null);
 
-  /** Sale amount per day of this month, up to today (from the month's sales, at most 200). */
-  readonly daily = computed<BarPoint[]>(() => {
-    const items = this.thisMonth()?.items ?? [];
-    const days = Number(today().slice(8, 10));
-    const sums = new Array<number>(days).fill(0);
-    const counts = new Array<number>(days).fill(0);
-    for (const s of items) {
-      const d = new Date(s.createdAtUtc).getDate() - 1;
-      if (d >= 0 && d < days) {
-        sums[d] += s.saleAmount;
-        counts[d]++;
-      }
-    }
-    const monthShort = new Date().toLocaleDateString('en-IN', { month: 'short' });
-    return sums.map((v, i) => ({
-      label: i === 0 || (i + 1) % 5 === 0 ? String(i + 1) : '',
-      value: v,
-      title: `${i + 1} ${monthShort}: ${formatInr(v)} (${counts[i]} sale${counts[i] === 1 ? '' : 's'})`,
-    }));
-  });
-
-  async ngOnInit(): Promise<void> {
-    const month = monthBounds(0);
-    const previous = monthBounds(-1);
-    const jobs: Promise<unknown>[] = [];
-    if (this.canSales) {
-      jobs.push(
-        this.sales.list({ soldFrom: month.from, soldTo: month.to, status: 'Active', pageSize: 200 }).then((p) => this.thisMonth.set(p)),
-        this.sales.list({ soldFrom: previous.from, soldTo: previous.to, status: 'Active', pageSize: 1 }).then((p) => this.lastMonth.set(p)),
-        this.sales.summary({ groupBy: 'seller', soldFrom: month.from, soldTo: month.to })
-          .then((rows) => this.topSellers.set(rows.filter((r) => r.saleAmount > 0).slice(0, 5))),
-        this.sales.list({ pageSize: 6 }).then((p) => this.recent.set(p.items)),
-      );
-    }
-    if (this.canCustomers) jobs.push(this.customers.list({ pageSize: 1 }).then((p) => this.customerCount.set(p.totalCount)));
-    const results = await Promise.allSettled(jobs);
-    if (results.some((r) => r.status === 'rejected')) this.error.set('Some figures could not be loaded. Refresh the page to try again.');
+  /** Colour slot per status code (validated categorical palette; legend + counts carry identity too). */
+  private readonly statusSlot: Record<string, number> = { OPEN: 1, WARM: 2, WON: 3, LOST: 4, HOLD: 5, DISQUALIFIED: 6 };
+  slotOf(code: string | null): number {
+    return this.statusSlot[code ?? ''] ?? 5;
   }
 
-  initialsOf(name: string): string {
-    const parts = name.trim().split(/\s+/);
-    return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
+  /** Pie slices of the status breakdown (statuses with leads only), starting at 12 o'clock, clockwise. */
+  readonly slices = computed<Slice[]>(() => {
+    const items = (this.summary()?.statuses ?? []).filter((x) => x.total > 0);
+    const total = items.reduce((sum, x) => sum + x.total, 0);
+    if (!total) return [];
+    const r = 80;
+    const point = (angle: number) => `${(100 + r * Math.sin(angle)).toFixed(2)} ${(100 - r * Math.cos(angle)).toFixed(2)}`;
+    let start = 0;
+    return items.map((item) => {
+      const sweep = (item.total / total) * Math.PI * 2;
+      const end = start + sweep;
+      const path = items.length === 1
+        ? `M 100 20 A ${r} ${r} 0 1 1 99.99 20 Z`
+        : `M 100 100 L ${point(start)} A ${r} ${r} 0 ${sweep > Math.PI ? 1 : 0} 1 ${point(end)} Z`;
+      start = end;
+      return { item, path, slot: this.slotOf(item.code), percent: Math.round((item.total / total) * 1000) / 10 };
+    });
+  });
+
+  /** Longest bar of each chart = 100%. */
+  readonly maxSource = computed(() => Math.max(1, ...(this.summary()?.sources ?? []).map((x) => x.total)));
+  readonly maxAging = computed(() => Math.max(1, ...(this.summary()?.aging ?? []).map((x) => x.total)));
+  /** Column heights in % of the plot. */
+  agingHeight(n: number): number {
+    return n > 0 ? Math.max(2, (n / this.maxAging()) * 100) : 0;
+  }
+
+  winRate(item: LeadSummaryItem): number {
+    return item.total > 0 ? Math.round((item.won / item.total) * 1000) / 10 : 0;
+  }
+
+  /** "17 leads (35.4%)". */
+  share(item: LeadSummaryItem): string {
+    const total = this.summary()?.totalLeads ?? 0;
+    const pct = total > 0 ? Math.round((item.total / total) * 1000) / 10 : 0;
+    return `${item.total} lead${item.total === 1 ? '' : 's'} (${pct}%)`;
+  }
+
+  async ngOnInit(): Promise<void> {
+    if (!this.canSales) return;
+    this.sales.sellers().then((s) => this.sellers.set(s), () => this.sellers.set([]));
+    await this.load();
+  }
+
+  async setSeller(id: string): Promise<void> {
+    if (this.sellerId() === id) return;
+    this.sellerId.set(id);
+    await this.load();
+  }
+
+  private async load(): Promise<void> {
+    this.loading.set(true);
+    this.error.set(null);
+    try {
+      this.summary.set(await this.leads.summary(this.sellerId() || undefined));
+    } catch (err) {
+      this.error.set(errorText(err, 'Unable to load the dashboard.'));
+    } finally {
+      this.loading.set(false);
+    }
   }
 }

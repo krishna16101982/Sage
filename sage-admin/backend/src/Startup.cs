@@ -228,6 +228,7 @@ namespace SageAdminApi
             services.AddScoped<ISettingFunctions, SettingFunctions>();
             services.AddScoped<IMasterValueFunctions, MasterValueFunctions>();
             services.AddScoped<ILeadListFunctions, LeadListFunctions>();
+            services.AddScoped<ILeadSummaryFunctions, LeadSummaryFunctions>();
         }
 
         /// <summary>

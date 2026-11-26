@@ -101,7 +101,7 @@
             <div class="card-body stack-sm text-sm">
               @for (section of wordingSections; track section.key) {
                 @if (w[section.key]) {
-                  <div><span class="text-muted">{{ section.label }}</span><div style="white-space: pre-line">{{ w[section.key] }}</div></div>
+                  <div><span class="text-muted">{{ section.label }}</span><div><app-rich-text-view [value]="w[section.key]" /></div></div>
                 }
               }
             </div>

@@ -5,7 +5,8 @@ using PdfSharp.Fonts;
 namespace SageUserApi.AppFunctions
 {
     /// <summary>
-    /// Fonts for the order form PDF. Every family the document asks for maps to one regular and one bold face that has
+    /// Fonts for the order form PDF. Every family the document asks for maps to one regular and one bold face (italic is
+    /// simulated) that has
     /// the rupee sign: Roboto from the configured fonts folder when present, else Segoe UI (Windows) or DejaVu Sans
     /// (Linux). PDFsharp allows one resolver per process, so it is set once.
     /// </summary>
@@ -51,8 +52,9 @@ namespace SageUserApi.AppFunctions
             throw new InvalidOperationException("No font found for the order form PDF: put Roboto-Regular.ttf and Roboto-Bold.ttf in the OrderFormPdf:FontsPath folder.");
         }
 
+        /// <summary>Italic (order form wording) is the same face slanted, so it works with any of the fonts above.</summary>
         public FontResolverInfo ResolveTypeface(string familyName, bool bold, bool italic)
-            => new FontResolverInfo(bold ? BoldFace : RegularFace);
+            => new FontResolverInfo(bold ? BoldFace : RegularFace, false, italic);
 
         public byte[] GetFont(string faceName)
             => File.ReadAllBytes(faceName == BoldFace ? _bold : _regular);

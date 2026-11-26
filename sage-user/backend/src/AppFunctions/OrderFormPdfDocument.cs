@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -115,14 +116,16 @@ namespace SageUserApi.AppFunctions
             OrderWording _w = _d.Wording;
             if (Has(_w.SignReturnLine))
             {
-                Paragraph _sign = _s.AddParagraph(_w.SignReturnLine);
+                Paragraph _sign = _s.AddParagraph();
+                AddRich(_sign, _w.SignReturnLine);
                 _sign.Format.Alignment = ParagraphAlignment.Center;
                 _sign.Format.Font.Bold = true;
                 _sign.Format.SpaceAfter = Unit.FromPoint(3);
             }
             if (Has(_w.SignReturnInstruction))
             {
-                Paragraph _how = _s.AddParagraph(_w.SignReturnInstruction);
+                Paragraph _how = _s.AddParagraph();
+                AddRich(_how, _w.SignReturnInstruction);
                 _how.Format.Alignment = ParagraphAlignment.Center;
                 _how.Format.Font.Size = 8.5;
                 _how.Format.Font.Color = Muted;
@@ -167,8 +170,9 @@ namespace SageUserApi.AppFunctions
                 _notes.Format.LeftIndent = Unit.FromCentimeter(0.2);
                 _notes.Format.Font.Size = 9;
                 _notes.AddFormattedText("Order Notes: ", TextFormat.Bold);
-                if (Has(_w2.OrderNotes)) _notes.AddText(_w2.OrderNotes.Trim() + " ");
-                if (_d.FreeMonths > 0 && Has(_w2.FreeMonthNote)) _notes.AddFormattedText(System.Text.RegularExpressions.Regex.Replace(_w2.FreeMonthNote.Trim(), @"\b1 free months\b", "1 free month"), TextFormat.Bold);
+                if (Has(_w2.OrderNotes)) { AddRich(_notes, _w2.OrderNotes, _shade: false); _notes.AddText(" "); }
+                if (_d.FreeMonths > 0 && Has(_w2.FreeMonthNote))
+                    AddRich(_notes, System.Text.RegularExpressions.Regex.Replace(_w2.FreeMonthNote, @"\b1 free months\b", "1 free month"), _allBold: true, _shade: false);
             }
         }
 
@@ -244,7 +248,8 @@ namespace SageUserApi.AppFunctions
 
             if (Has(_d.Wording.TaxInformation))
             {
-                Paragraph _tax = _s.AddParagraph(_d.Wording.TaxInformation.Trim());
+                Paragraph _tax = _s.AddParagraph();
+                AddRich(_tax, _d.Wording.TaxInformation);
                 _tax.Format.Font.Size = 7.5;
                 _tax.Format.Font.Color = Muted;
                 _tax.Format.SpaceBefore = Unit.FromPoint(10);
@@ -254,7 +259,7 @@ namespace SageUserApi.AppFunctions
 
         private static void AddSignatures(Section _s, OrderFormPdfData _d, OrderFormPdfSettings _settings)
         {
-            string[] _clauses = Lines(_d.Wording.SignatureClauses);
+            List<List<RichText.Run>> _clauses = RichText.Lines(_d.Wording.SignatureClauses);
             Table _band = _s.AddTable();
             _band.AddColumn(Unit.FromCentimeter(ContentWidthCm));
             _band.Borders.Color = Line;
@@ -268,12 +273,12 @@ namespace SageUserApi.AppFunctions
             Paragraph _tp = _title.Cells[0].AddParagraph("Authorized Signatures");
             _tp.Format.Font.Color = Colors.White;
             _tp.Format.Font.Size = 11.5;
-            if (_clauses.Length > 0)
+            if (_clauses.Count > 0)
             {
                 Row _body = _band.AddRow();
                 _body.TopPadding = Unit.FromPoint(6);
                 _body.BottomPadding = Unit.FromPoint(4);
-                for (int i = 0; i < _clauses.Length; i++)
+                for (int i = 0; i < _clauses.Count; i++)
                 {
                     Paragraph _p = _body.Cells[0].AddParagraph();
                     _p.Format.Font.Size = 8.5;
@@ -284,14 +289,11 @@ namespace SageUserApi.AppFunctions
                     _p.AddText($"{i + 1}.");
                     _p.AddTab();
                     // "Order Cancellation: ..." - a short lead-in before the first colon is bold.
-                    string _clause = _clauses[i];
+                    string _clause = string.Concat(_clauses[i].Select(r => r.Text));
                     int _colon = _clause.IndexOf(':');
-                    if (_colon > 0 && _colon <= 30 && !_clause[.._colon].Contains("http", StringComparison.OrdinalIgnoreCase))
-                    {
-                        _p.AddFormattedText(_clause[..(_colon + 1)], TextFormat.Bold);
-                        _p.AddText(_clause[(_colon + 1)..]);
-                    }
-                    else _p.AddText(_clause);
+                    bool _leadIn = _colon > 0 && _colon <= 30 && !_clause[.._colon].Contains("http", StringComparison.OrdinalIgnoreCase);
+                    AddRuns(_p, _clauses[i], _leadIn ? _colon + 1 : 0);
+                    ShadeIfHighlighted(_p, _clauses[i]);
                 }
             }
 
@@ -305,13 +307,15 @@ namespace SageUserApi.AppFunctions
             SignatureBox(_row.Cells[0], "Customer Signature", "[Authorized Signatory Name]", "[Designation]", "[Date]");
             SignatureBox(_row.Cells[2], $"{_settings.SignatureName} Signature", "[Authorized Signatory]", _settings.CompanyName, $"[{LongDate(_d.OrderDate, " ")}]");
 
-            string[] _footer = Lines(_d.Wording.Footer);
-            if (_footer.Length > 0)
+            List<List<RichText.Run>> _footer = RichText.Lines(_d.Wording.Footer);
+            if (_footer.Count > 0)
             {
                 HRule(_s, 0.5, Line, 10, 6);
-                foreach (string _line in _footer)
+                foreach (List<RichText.Run> _line in _footer)
                 {
-                    Paragraph _p = _s.AddParagraph(_line);
+                    Paragraph _p = _s.AddParagraph();
+                    AddRuns(_p, _line);
+                    ShadeIfHighlighted(_p, _line);
                     _p.Format.Alignment = ParagraphAlignment.Center;
                     _p.Format.Font.Size = 8.5;
                     _p.Format.Font.Color = Muted;
@@ -338,18 +342,21 @@ namespace SageUserApi.AppFunctions
         {
             if (Has(_title))
             {
-                Paragraph _t = _cell.AddParagraph(_title.Trim());
+                Paragraph _t = _cell.AddParagraph();
+                AddRich(_t, _title);
                 _t.Format.Font.Size = 10.5;
                 _t.Format.SpaceAfter = Unit.FromPoint(2);
             }
             if (Has(_description))
             {
-                Paragraph _d = _cell.AddParagraph(_description.Trim());
+                Paragraph _d = _cell.AddParagraph();
+                AddRich(_d, _description);
                 _d.Format.Font.Size = 9;
             }
             if (Has(_period))
             {
-                Paragraph _p = _cell.AddParagraph(_period.Trim());
+                Paragraph _p = _cell.AddParagraph();
+                AddRich(_p, _period);
                 _p.Format.Font.Size = 9;
                 _p.Format.Font.Bold = true;
                 _p.Format.SpaceBefore = Unit.FromPoint(4);
@@ -405,12 +412,66 @@ namespace SageUserApi.AppFunctions
             _text.Underline = Underline.Single;
         }
 
+        /// <summary>
+        /// A wording section with its formatting (see RichText): bold, italic, underline and colour per word, new lines as
+        /// line breaks. MigraDoc cannot shade part of a line, so a highlight shows only when the whole paragraph is
+        /// highlighted in one colour (_shade); then the paragraph gets that background.
+        /// </summary>
+        private static void AddRich(Paragraph _p, string _markup, bool _allBold = false, bool _shade = true)
+        {
+            List<List<RichText.Run>> _lines = RichText.Parse(RichText.Clean(_markup));
+            for (int i = 0; i < _lines.Count; i++)
+            {
+                if (i > 0) _p.AddLineBreak();
+                AddRuns(_p, _lines[i], _allBold ? int.MaxValue : 0);
+            }
+            if (_shade) ShadeIfHighlighted(_p, _lines.SelectMany(l => l));
+        }
+
+        /// <summary>Adds the runs of one line; the first _boldChars characters are bold as well.</summary>
+        private static void AddRuns(Paragraph _p, IEnumerable<RichText.Run> _runs, int _boldChars = 0)
+        {
+            int _at = 0;
+            foreach (RichText.Run _run in _runs)
+            {
+                string _text = _run.Text;
+                // Split a run where the forced bold stops.
+                if (_boldChars > _at && _boldChars < _at + _text.Length)
+                {
+                    int _cut = _boldChars - _at;
+                    AddRun(_p, _run with { Text = _text[.._cut], Bold = true });
+                    AddRun(_p, _run with { Text = _text[_cut..] });
+                }
+                else AddRun(_p, _at < _boldChars ? _run with { Bold = true } : _run);
+                _at += _text.Length;
+            }
+        }
+
+        private static void AddRun(Paragraph _p, RichText.Run _run)
+        {
+            FormattedText _t = _p.AddFormattedText(_run.Text);
+            if (_run.Bold) _t.Bold = true;
+            if (_run.Italic) _t.Italic = true;
+            if (_run.Underline) _t.Underline = Underline.Single;
+            if (_run.Color != null)
+            {
+                (byte _r, byte _g, byte _b) = RichText.Rgb(_run.Color);
+                _t.Color = new Color(_r, _g, _b);
+            }
+        }
+
+        /// <summary>The paragraph's background when every word in it has the same highlight.</summary>
+        private static void ShadeIfHighlighted(Paragraph _p, IEnumerable<RichText.Run> _runs)
+        {
+            var _words = _runs.Where(r => r.Text.Trim().Length > 0).ToList();
+            if (_words.Count == 0 || _words[0].Background == null || _words.Any(r => r.Background != _words[0].Background)) return;
+            (byte _r, byte _g, byte _b) = RichText.Rgb(_words[0].Background);
+            _p.Format.Shading.Color = new Color(_r, _g, _b);
+        }
+
         // ---------------- formats ----------------
 
-        private static bool Has(string _value) => !string.IsNullOrWhiteSpace(_value);
-
-        private static string[] Lines(string _text)
-            => (_text ?? string.Empty).Replace("\r\n", "\n").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToArray();
+        private static bool Has(string _value) => !string.IsNullOrWhiteSpace(_value) && RichText.Plain(_value).Trim().Length > 0;
 
         /// <summary>16-11-2026</summary>
         public static string Dmy(DateOnly _date) => _date.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);

@@ -1,0 +1,29 @@
+<div class="rte" #wrap>
+  <div class="rte-toolbar" role="toolbar" [attr.aria-label]="'Format ' + label()">
+    <button type="button" class="rte-btn rte-b" title="Bold (Ctrl+B)" aria-label="Bold" [class.is-on]="active().bold" [attr.aria-pressed]="active().bold"
+            (mousedown)="keepSelection($event)" (click)="format('bold')">B</button>
+    <button type="button" class="rte-btn rte-i" title="Italic (Ctrl+I)" aria-label="Italic" [class.is-on]="active().italic" [attr.aria-pressed]="active().italic"
+            (mousedown)="keepSelection($event)" (click)="format('italic')">I</button>
+    <button type="button" class="rte-btn rte-u" title="Underline (Ctrl+U)" aria-label="Underline" [class.is-on]="active().underline" [attr.aria-pressed]="active().underline"
+            (mousedown)="keepSelection($event)" (click)="format('underline')">U</button>
+    <span class="rte-sep" aria-hidden="true"></span>
+    <button type="button" class="rte-btn rte-colour" title="Text colour" aria-label="Text colour" aria-haspopup="true" [attr.aria-expanded]="palette() === 'color'"
+            (mousedown)="keepSelection($event)" (click)="togglePalette('color')">A</button>
+    <button type="button" class="rte-btn rte-highlight" title="Highlight" aria-label="Highlight" aria-haspopup="true" [attr.aria-expanded]="palette() === 'background'"
+            (mousedown)="keepSelection($event)" (click)="togglePalette('background')">ab</button>
+    <span class="rte-sep" aria-hidden="true"></span>
+    <button type="button" class="rte-btn rte-clear" title="Clear the formatting of the selected words" (mousedown)="keepSelection($event)" (click)="format('removeFormat')">Clear</button>
+
+    @if (palette(); as p) {
+      <div class="rte-palette" role="menu" [attr.aria-label]="p === 'color' ? 'Text colours' : 'Highlight colours'">
+        @for (c of (p === 'color' ? textColours : highlights); track c.hex) {
+          <button type="button" class="rte-swatch" role="menuitem" [title]="c.name" [attr.aria-label]="c.name" [style.background]="c.hex"
+                  (mousedown)="keepSelection($event)" (click)="colour(c.hex)"></button>
+        }
+      </div>
+    }
+  </div>
+  <div #box class="rte-box" contenteditable="true" role="textbox" spellcheck="true"
+       [attr.aria-label]="label()" [attr.aria-multiline]="multiline()" [style.min-height.rem]="rows() * 1.35 + 0.9"
+       (input)="onInput()" (keydown)="onKeydown($event)" (paste)="onPaste($event)"></div>
+</div>

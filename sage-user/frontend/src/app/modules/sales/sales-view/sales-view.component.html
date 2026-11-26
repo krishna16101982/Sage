@@ -98,6 +98,7 @@
             <span class="spacer"></span>
             <button type="button" class="btn btn-secondary" [disabled]="pdfBusy()" (click)="orderPdf(false)">Preview PDF</button>
             <button type="button" class="btn btn-primary" [disabled]="pdfBusy()" (click)="orderPdf(true)">Download PDF</button>
+            <button type="button" class="btn btn-secondary" [disabled]="pdfBusy()" (click)="orderWord()">Download Word</button>
           </header>
           <div class="card-body stack-sm text-sm">
             @if (pdfError()) { <app-alert kind="error">{{ pdfError() }}</app-alert> }
@@ -139,7 +140,7 @@
               <div class="card-body stack-sm text-sm">
                 @for (section of wordingSections; track section.key) {
                   @if (w[section.key]) {
-                    <div><span class="text-muted">{{ section.label }}</span><div style="white-space: pre-line">{{ w[section.key] }}</div></div>
+                    <div><span class="text-muted">{{ section.label }}</span><div><app-rich-text-view [value]="w[section.key]" /></div></div>
                   }
                 }
               </div>

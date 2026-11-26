@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Text.Json;
 using SageUserApi.Tests.Infrastructure;
 using Shouldly;
@@ -57,7 +58,7 @@ public class OrderFormApiTests
             ["wording"] = new
             {
                 signReturnLine = "Sign and return to i2k2 Networks Pvt Ltd",
-                orderNotes = "Custom note <b>for this order</b> only.",
+                orderNotes = "Custom note <b>for this order</b> <span style=\"color:#C62828\">only</span>. <script>alert(1)</script>",
                 freeMonthNote = "This order includes 2 free months at no cost as a one-time offering.",
                 productTitle = "Sales Navigator Advanced",
                 taxInformation = "Tax Information: 18% GST will be applicable.",
@@ -129,9 +130,9 @@ public class OrderFormApiTests
         d.GetProperty("primaryContact").GetProperty("designation").GetString().ShouldBe("Founder & CEO");
         d.GetProperty("billingContact").GetProperty("email").GetString().ShouldBe("abhi@absoft.example.com");   // same as primary
         d.GetProperty("billToAddress").GetString()!.ShouldStartWith("Floor 2, WeWork");
-        // The wording is kept as sent for this order (tags removed, lines kept).
+        // The wording is kept as sent for this order: the editor's formatting stays, any other tag becomes plain text.
         var w = d.GetProperty("wording");
-        w.GetProperty("orderNotes").GetString().ShouldBe("Custom note for this order only.");
+        w.GetProperty("orderNotes").GetString().ShouldBe("Custom note <b>for this order</b> <span style=\"color:#c62828\">only</span>. &lt;script&gt;alert(1)&lt;/script&gt;");
         w.GetProperty("freeMonthNote").GetString()!.ShouldContain("2 free months");
         w.GetProperty("signatureClauses").GetString().ShouldBe("Clause one.\nClause two.");
         w.GetProperty("extraItemTitle").ValueKind.ShouldBe(JsonValueKind.Null);
@@ -201,6 +202,98 @@ public class OrderFormApiTests
         using var other = new HttpRequestMessage(HttpMethod.Get, $"{Api}/order-form/{saleId}/pdf");
         other.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", await TokenAsync(await SalesData.CreateAsync(_fx.Db)));
         (await _fx.CreateClient().SendAsync(other)).StatusCode.ShouldBe(System.Net.HttpStatusCode.NotFound);
+
+        // The same order as a Word file ({saleNumber}.docx), made now: a valid document with the order's words.
+        using var wordRequest = new HttpRequestMessage(HttpMethod.Get, $"{Api}/order-form/{saleId}/word");
+        wordRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        using var word = await _fx.CreateClient().SendAsync(wordRequest);
+        word.StatusCode.ShouldBe(System.Net.HttpStatusCode.OK);
+        word.Content.Headers.ContentType!.MediaType.ShouldBe(WordType);
+        word.Content.Headers.ContentDisposition!.FileName!.Trim('"').ShouldBe(saleNumber + ".docx");
+        string text = WordText(await word.Content.ReadAsByteArrayAsync());
+        text.ShouldContain("Order form for:");
+        text.ShouldContain("Estimated Order Total (INR):");
+        text.ShouldContain("Custom note for this order only.");
+    }
+
+    private const string WordType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+    /// <summary>Opens a .docx, checks it against the Word schema (so Word opens it) and returns its text.</summary>
+    private static string WordText(byte[] _docx)
+    {
+        using var ms = new MemoryStream(_docx);
+        using var doc = DocumentFormat.OpenXml.Packaging.WordprocessingDocument.Open(ms, false);
+        var errors = new DocumentFormat.OpenXml.Validation.OpenXmlValidator().Validate(doc).Select(e => $"{e.Path?.XPath}: {e.Description}").ToList();
+        errors.ShouldBeEmpty(string.Join("\n", errors));
+        return string.Join(" ", doc.MainDocumentPart!.Document.Body!.Descendants<DocumentFormat.OpenXml.Wordprocessing.Paragraph>().Select(p => p.InnerText));
+    }
+
+    private static object Preview(Action<Dictionary<string, object?>>? change = null)
+    {
+        var body = new Dictionary<string, object?>
+        {
+            ["customerName"] = "Glacier Solutions Pvt Ltd", ["productCode"] = "LinkedIn",
+            ["orderDate"] = "2026-11-24", ["startDate"] = "2026-11-24", ["endDate"] = "2027-12-23", ["termMonths"] = 13, ["freeMonths"] = 1,
+            ["primaryContact"] = new { name = "Mr. Vihaan Mishra", designation = "IT Head", email = "vihaan@glacier.example.com", phone = "9999910161" },
+            ["billingFrequency"] = "Annual", ["billingMethod"] = "Pay Upfront", ["paymentMethod"] = "Invoice", ["paymentTerm"] = "Net 15", ["currency"] = "INR",
+            ["quantity"] = 10, ["unitPrice"] = 100m, ["listAmount"] = 1000m, ["discountAmount"] = 50m, ["saleAmount"] = 950m,
+            ["gstPercent"] = 18m, ["taxAmount"] = 171m, ["totalAmount"] = 1121m, ["includedItemQuantity"] = 1000,
+            ["wording"] = new
+            {
+                signReturnLine = "<b>Sign and return</b> to i2k2 Networks Pvt Ltd",
+                freeMonthNote = "This order includes 1 free months.",
+                extraItemTitle = "Sales Navigator Team Link Extend Seat",
+                productTitle = "Sales Navigator Advanced",
+                periodLine = "24th-November-2026 to 23rd-December-2027",
+                signatureClauses = "<span style=\"background-color:#fff176\">I acknowledge</span> and confirm.\nOrder Cancellation: not allowed.",
+                footer = "Thank you."
+            }
+        };
+        change?.Invoke(body);
+        return body;
+    }
+
+    [Fact]
+    public async Task Preview_PrintsTheUnsavedForm_AsPdfOrWord_AndSavesNothing()
+    {
+        var token = await TokenAsync(await SalesData.CreateAsync(_fx.Db));
+        int salesBefore = await _fx.Db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM dbo.Sales");
+
+        async Task<HttpResponseMessage> Post(string query, object body, string? bearer)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, $"{Api}/order-form/preview{query}") { Content = JsonContent.Create(body) };
+            if (bearer != null) request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", bearer);
+            return await _fx.CreateClient().SendAsync(request);
+        }
+
+        using var pdf = await Post("?format=pdf&download=true", Preview(), token);
+        pdf.StatusCode.ShouldBe(System.Net.HttpStatusCode.OK, await pdf.Content.ReadAsStringAsync());
+        pdf.Content.Headers.ContentType!.MediaType.ShouldBe("application/pdf");
+        pdf.Content.Headers.ContentDisposition!.FileName!.Trim('"').ShouldBe("OrderForm_Glacier_Solutions_Pvt_Ltd_2026-11-24.pdf");
+        System.Text.Encoding.ASCII.GetString(await pdf.Content.ReadAsByteArrayAsync(), 0, 5).ShouldBe("%PDF-");
+
+        // Preview PDF (no download) opens in the browser.
+        using var inline = await Post("?format=pdf", Preview(), token);
+        inline.Content.Headers.ContentDisposition!.DispositionType.ShouldBe("inline");
+
+        using var word = await Post("?format=word&download=true", Preview(), token);
+        word.StatusCode.ShouldBe(System.Net.HttpStatusCode.OK, await word.Content.ReadAsStringAsync());
+        word.Content.Headers.ContentType!.MediaType.ShouldBe(WordType);
+        word.Content.Headers.ContentDisposition!.FileName!.Trim('"').ShouldBe("OrderForm_Glacier_Solutions_Pvt_Ltd_2026-11-24.docx");
+        string text = WordText(await word.Content.ReadAsByteArrayAsync());
+        foreach (var expected in new[] { "Order form for: Glacier Solutions Pvt Ltd", "Sign and return to i2k2 Networks Pvt Ltd", "Mr. Vihaan Mishra",
+                                         "Term: 13 months", "Sales Navigator Team Link Extend Seat", "After 5% Discount", "1,121.00",
+                                         "I acknowledge and confirm.", "1 free month.", "Thank you." })
+            text.ShouldContain(expected);
+
+        // Wrong values are refused; signed out is refused; nothing was saved.
+        using var noCompany = await Post("?format=pdf", Preview(b => b["customerName"] = " "), token);
+        noCompany.StatusCode.ShouldBe(System.Net.HttpStatusCode.BadRequest);
+        (await noCompany.Content.ReadAsStringAsync()).ShouldContain("Choose a company first.");
+        (await Post("?format=xls", Preview(), token)).StatusCode.ShouldBe(System.Net.HttpStatusCode.BadRequest);
+        (await Post("?format=pdf", Preview(b => b["quantity"] = 0), token)).StatusCode.ShouldBe(System.Net.HttpStatusCode.BadRequest);
+        (await Post("?format=pdf", Preview(), null)).StatusCode.ShouldBe(System.Net.HttpStatusCode.Unauthorized);
+        (await _fx.Db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM dbo.Sales")).ShouldBe(salesBefore);
     }
 
     [Fact]

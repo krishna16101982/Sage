@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -14,6 +16,7 @@ using SageCommonLib.Models.Interfaces;
 using SageUserApi.AppFunctions.Interfaces;
 using SageUserApi.AppValidations;
 using SageUserApi.Models;
+using SageUserApi.Models.HttpPost;
 using static SageCommonLib.AppFunctions.Sql;
 
 namespace SageUserApi.AppFunctions
@@ -85,6 +88,117 @@ namespace SageUserApi.AppFunctions
             Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
             await File.WriteAllBytesAsync(_path, _content, _ct);
             return _content;
+        }
+
+        /// <summary>The saved order as a Word file ({SaleNumber}.docx), made now from the database (not stored).</summary>
+        public async Task<(OrderFormPdfFile file, IFunctionReturn functionReturn)> GetWordAsync(Guid _saleId, SalesUserContext _user, CancellationToken _ct = default)
+        {
+            string _methodName = "F:OrderFormPdf:GetWord";
+            try
+            {
+                OrderFormPdfData _data = await ReadAsync(_saleId, _user.Id, _ct);
+                if (_data == null) return (null, ApplicationCommonFunctions.NotFound("Sale not found, or it was not saved with the order form.", _methodName));
+                byte[] _content = OrderFormWordDocument.Render(_data, _settings, _assets);
+                return (new OrderFormPdfFile { Content = _content, FileName = $"{_data.SaleNumber}.docx" }, new FunctionReturn { MethodName = _methodName });
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
+
+        /// <summary>
+        /// The order form as filled in on the page, not saved: a PDF (_format "pdf") or Word file ("word") named
+        /// OrderForm_{Company}_{order date}. The POC is the user's manager (or the user, for a manager), as on a saved order.
+        /// </summary>
+        public async Task<(OrderFormPdfFile file, IFunctionReturn functionReturn)> PreviewAsync(HttpOrderFormPreviewParams _params, string _format, SalesUserContext _user, CancellationToken _ct = default)
+        {
+            string _methodName = "F:OrderFormPdf:Preview";
+            try
+            {
+                string _kind = (_format ?? "pdf").Trim().ToLowerInvariant();
+                if (_kind != "pdf" && _kind != "word") return (null, ApplicationCommonFunctions.BadRequest("Format must be pdf or word.", _methodName));
+                (OrderFormPdfData _data, List<string> _errors) = CleanPreview(_params);
+                if (_errors.Count > 0) return (null, OrderFormFunctions.Invalid(_errors, _methodName));
+
+                (IFunctionReturn _functionReturn, DataTable _dataTable) = await _databaseFunctions.ExecuteSelectDataTableAsync(
+                    " SELECT LTRIM(RTRIM(CONCAT(poc.FirstName, ' ', poc.LastName))) AS PocName, poc.Email AS PocEmail " +
+                    " FROM dbo.SalesUsers u JOIN dbo.SalesUsers poc ON poc.Id = ISNULL(u.ManagerId, u.Id) WHERE u.Id = @u ",
+                    new[] { P("@u", _user.Id) }, _methodName, _ct);
+                if (!_functionReturn.Status) return (null, _functionReturn);
+                DataRow _poc = _dataTable.FirstRow();
+                _data.PocName = _poc?.GetText("PocName");
+                _data.PocEmail = _poc?.GetText("PocEmail");
+
+                string _name = $"OrderForm_{FileSafe(_data.CustomerName)}_{_data.OrderDate:yyyy-MM-dd}";
+                if (_kind == "word")
+                    return (new OrderFormPdfFile { Content = OrderFormWordDocument.Render(_data, _settings, _assets), FileName = _name + ".docx" }, new FunctionReturn { MethodName = _methodName });
+                OrderFormPdfFonts.EnsureRegistered(_fonts);
+                return (new OrderFormPdfFile { Content = OrderFormPdfDocument.Render(_data, _settings, _assets), FileName = _name + ".pdf" }, new FunctionReturn { MethodName = _methodName });
+            }
+            catch (Exception ex)
+            {
+                _loggerFunctions.Error(_methodName, ex.Message, ex);
+                return (null, ApplicationCommonFunctions.SystemError(_methodName));
+            }
+        }
+
+        /// <summary>Cleans the page's values (tags removed, lengths and ranges checked) into what the documents print.</summary>
+        private static (OrderFormPdfData data, List<string> errors) CleanPreview(HttpOrderFormPreviewParams _p)
+        {
+            var _errors = new List<string>();
+            if (_p == null) return (null, new List<string> { "Fill in the order form first." });
+            string Text(string _value, int _max) { string _c = Clean(_value); return _c != null && _c.Length > _max ? _c[.._max] : _c; }
+            bool Amount(decimal _value) => _value >= 0 && _value <= 1_000_000_000_000m;
+
+            string _customer = Text(_p.CustomerName, 200);
+            if (string.IsNullOrEmpty(_customer)) _errors.Add("Choose a company first.");
+            if (_p.StartDate == null || _p.EndDate == null || _p.EndDate < _p.StartDate) _errors.Add("Enter the start date and the paid months.");
+            if (_p.Quantity < 1 || _p.Quantity > 100000) _errors.Add("Seats must be a whole number from 1 to 100000.");
+            if (_p.TermMonths < 1 || _p.TermMonths > 240 || _p.FreeMonths < 0 || _p.FreeMonths > 120) _errors.Add("Choose the paid months.");
+            if (_p.GstPercent < 0 || _p.GstPercent > 28) _errors.Add("GST must be from 0 to 28%.");
+            if (new[] { _p.UnitPrice, _p.ListAmount, _p.DiscountAmount, _p.SaleAmount, _p.TaxAmount, _p.TotalAmount }.Any(a => !Amount(a))) _errors.Add("The amounts are not valid.");
+            if (_p.IncludedItemQuantity is int _iq && (_iq < 1 || _iq > 1_000_000)) _errors.Add("Team Link Extend seats must be from 1 to 1000000.");
+            OrderContact _primary = OrderFormFunctions.CleanContact(_p.PrimaryContact, "primary contact", false, _errors);
+            OrderWording _wording = OrderFormFunctions.CleanWording(_p.Wording, _errors) ?? new OrderWording();
+            if (_errors.Count > 0) return (null, _errors);
+
+            DateOnly _today = DateOnly.FromDateTime(DateTime.UtcNow.AddMinutes(330));
+            return (new OrderFormPdfData
+            {
+                SaleNumber = "Draft",
+                OrderDate = _p.OrderDate ?? _today,
+                StartDate = _p.StartDate!.Value,
+                EndDate = _p.EndDate!.Value,
+                TermMonths = _p.TermMonths,
+                FreeMonths = _p.FreeMonths,
+                CustomerName = _customer,
+                ProductCode = Text(_p.ProductCode, 50) is string _code && System.Text.RegularExpressions.Regex.IsMatch(_code, "^[A-Za-z0-9_-]+$") ? _code : null,
+                PrimaryContact = _primary,
+                BillingFrequency = Text(_p.BillingFrequency, 100),
+                BillingMethod = Text(_p.BillingMethod, 100),
+                PaymentMethod = Text(_p.PaymentMethod, 100),
+                PaymentTerm = Text(_p.PaymentTerm, 100),
+                Currency = Text(_p.Currency, 20),
+                Quantity = _p.Quantity,
+                UnitPrice = _p.UnitPrice,
+                ListAmount = _p.ListAmount,
+                DiscountAmount = _p.DiscountAmount,
+                SaleAmount = _p.SaleAmount,
+                GstPercent = _p.GstPercent,
+                TaxAmount = _p.TaxAmount,
+                TotalAmount = _p.TotalAmount,
+                IncludedItemQuantity = _p.IncludedItemQuantity,
+                Wording = _wording
+            }, _errors);
+        }
+
+        /// <summary>"Glacier Solutions Pvt Ltd" -> "Glacier_Solutions_Pvt_Ltd" (letters, digits, - and _ only).</summary>
+        private static string FileSafe(string _name)
+        {
+            string _safe = System.Text.RegularExpressions.Regex.Replace(_name ?? string.Empty, "[^A-Za-z0-9-]+", "_").Trim('_');
+            return _safe.Length == 0 ? "Company" : _safe.Length > 60 ? _safe[..60] : _safe;
         }
 
         /// <summary>The order as printed. _userId limits it to the seller or their manager (null = no limit, used right after saving).</summary>

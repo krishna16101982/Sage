@@ -96,6 +96,16 @@ export class SalesList implements OnInit {
     }
   }
 
+  /** The saved order as a Word file ({saleNumber}.docx). */
+  async word(s: Sale): Promise<void> {
+    this.error.set(null);
+    try {
+      await this.orderForms.downloadWord(s.id, s.saleNumber);
+    } catch (err) {
+      this.error.set(errorText(err, 'The Word file could not be made.'));
+    }
+  }
+
   duplicate(s: Sale): void {
     this.router.navigate(['/sales/order-form'], { queryParams: { copyFrom: s.id } });
   }

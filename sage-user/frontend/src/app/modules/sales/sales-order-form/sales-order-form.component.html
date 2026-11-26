@@ -256,8 +256,8 @@
                 <span class="step-badge">5</span>
                 <div style="flex: 1">
                   <h2 class="section-title">Edit wording by section</h2>
-                  <p class="hint">Standard text is filled in. Change any section for this order form only.
-                    @if (changedSections() > 0) { {{ changedSections() }} changed. }</p>
+                  <p class="hint">Standard text is filled in. Change any section for this order form only. Select words to make them bold or add colour and highlight.
+                    @if (changedSections() > 0) { {{ changedSections() }} section(s) changed. }</p>
                 </div>
                 <button type="button" class="link-button text-sm" [attr.aria-expanded]="wordingOpen()" (click)="wordingOpen.set(!wordingOpen())">
                   {{ wordingOpen() ? 'Hide' : 'Show' }}
@@ -268,17 +268,18 @@
               <div class="card-body wording-grid">
                 <!-- Every section is always shown; the free-month note is left off the saved order when free months = 0. -->
                 @for (section of wordingSections; track section.key) {
-                  <label class="field-label" [class.wording-wide]="section.wide">
-                    <span class="row-tight">
+                  <div class="field-label wording-field" [class.wording-wide]="section.wide">
+                    <span class="wording-label">
                       <span>{{ section.label }}</span>
+                      @if (isChanged(section.key)) { <span class="wording-changed">(changed)</span> }
+                      <span class="spacer"></span>
                       @if (isChanged(section.key)) {
-                        <span class="badge badge-warning">Changed</span>
-                        <button type="button" class="link-button text-xs" (click)="resetWording(section.key)">Reset</button>
+                        <button type="button" class="link-button text-xs" (click)="resetWording(section.key)">Reset to standard</button>
                       }
                     </span>
-                    <textarea class="field" [name]="'w-' + section.key" [rows]="section.rows" maxlength="4000"
-                              [ngModel]="wording()[section.key] ?? ''" (ngModelChange)="setWording(section.key, $event)"></textarea>
-                  </label>
+                    <app-rich-text-editor [label]="section.label" [rows]="section.rows" [multiline]="section.rows > 1 || section.key === 'footer'"
+                                          [value]="wording()[section.key] ?? ''" (valueChange)="setWording(section.key, $event)" />
+                  </div>
                   @if (section.key === 'extraItemDescription') {
                     <label class="field-label">Team Link Extend seat: quantity
                       <input class="field" name="includedItemQuantity" type="number" min="1" step="1" placeholder="none"
@@ -345,6 +346,12 @@
             </ul>
           }
           <button type="submit" class="btn btn-primary btn-block" [disabled]="busy() || problems().length > 0">{{ busy() ? 'Saving...' : editing() ? 'Save changes' : 'Save order' }}</button>
+          <!-- The form as filled in, printed without saving (same layout as the saved order's PDF). -->
+          <div class="draft-files">
+            <button type="button" class="btn btn-secondary" [disabled]="!!fileBusy() || problems().length > 0" (click)="printDraft('pdf')">{{ fileBusy() === 'pdf' ? 'Making...' : 'Download PDF' }}</button>
+            <button type="button" class="btn btn-secondary" [disabled]="!!fileBusy() || problems().length > 0" (click)="printDraft('word')">{{ fileBusy() === 'word' ? 'Making...' : 'Download Word' }}</button>
+            <button type="button" class="btn btn-secondary draft-wide" [disabled]="!!fileBusy() || problems().length > 0" (click)="printDraft('preview')">{{ fileBusy() === 'preview' ? 'Opening...' : 'Preview PDF' }}</button>
+          </div>
           @if (editing()) {
             <a class="btn btn-secondary btn-block" [routerLink]="['/sales', id()]">Cancel</a>
           } @else {

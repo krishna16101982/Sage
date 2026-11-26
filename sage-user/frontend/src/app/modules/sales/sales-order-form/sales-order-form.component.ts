@@ -14,8 +14,10 @@ import { DURATION_UNITS, type CatalogCategory, type DurationUnit } from '../../.
 import type { Customer } from '../../../shared/interfaces/customer.interface';
 import type { Lead } from '../../../shared/interfaces/lead.interface';
 import { LeadPicker } from './lead-picker/lead-picker.component';
-import { TRACKING_CANCELLED, trackingStatusesOf, type MasterOption, type OrderContact, type OrderFormOptions, type OrderWording } from '../../../shared/interfaces/order-form.interface';
+import { TRACKING_CANCELLED, trackingStatusesOf, type MasterOption, type OrderContact, type OrderFormOptions, type OrderPreviewInput, type OrderWording } from '../../../shared/interfaces/order-form.interface';
 import { WORDING_SECTIONS, longDate } from '../../../shared/utils/order-wording';
+import { sameRich } from '../../../shared/utils/rich-text';
+import { RichTextEditor } from '../../../component/rich-text-editor/rich-text-editor';
 import { findSeatRange, fyLabel, seatRangeLabel } from '../../../shared/utils/seat-prices';
 import { addDays, addMonths, dmy, formatDate, localDate, today } from '../../../shared/utils/dates';
 import { formatDuration, formatInr } from '../../../shared/utils/format';
@@ -39,7 +41,7 @@ const PHONE = /^(?:\+91|0)?[0-9]{10}$/;
  */
 @Component({
   selector: 'app-sales-order-form',
-  imports: [FormsModule, RouterLink, Alert, CustomerPicker, LeadPicker],
+  imports: [FormsModule, RouterLink, Alert, CustomerPicker, LeadPicker, RichTextEditor],
   templateUrl: './sales-order-form.component.html',
 })
 export class SalesOrderForm implements OnInit {
@@ -440,12 +442,11 @@ export class SalesOrderForm implements OnInit {
       // Sections the seller had changed stay changed; the others follow the standard text (and so the edited values).
       const saved = details.wording;
       if (saved) {
-        const norm = (text: string | null | undefined) => (text ?? '').replace(/\r\n/g, '\n').trim();
         const std = this.standardWording();
         const own: Partial<Record<keyof OrderWording, string>> = {};
         for (const key of Object.keys(std) as (keyof OrderWording)[]) {
           if (key === 'freeMonthNote' && details.freeMonths <= 0) continue;
-          if (norm(saved[key]) !== norm(std[key])) own[key] = saved[key] ?? '';
+          if (!sameRich(saved[key], std[key])) own[key] = saved[key] ?? '';
         }
         this.wordingOverrides.set(own);
       }
@@ -487,7 +488,12 @@ export class SalesOrderForm implements OnInit {
     this.billing.update((c) => ({ ...c, [field]: value }));
   }
 
+  /** A section edited back to the standard text (same words and formatting) counts as unchanged again. */
   setWording(key: keyof OrderWording, value: string): void {
+    if (sameRich(value, this.standardWording()[key])) {
+      this.resetWording(key);
+      return;
+    }
     this.wordingOverrides.update((o) => ({ ...o, [key]: value }));
   }
 
@@ -511,6 +517,49 @@ export class SalesOrderForm implements OnInit {
   /** "Same as primary": copies the primary contact into the billing contact. */
   copyPrimaryToBilling(): void {
     this.billing.set({ ...this.primary() });
+  }
+
+  /** Download PDF / Download Word / Preview PDF: the form as filled in, printed by the API without saving it. */
+  readonly fileBusy = signal<'pdf' | 'word' | 'preview' | null>(null);
+  async printDraft(kind: 'pdf' | 'word' | 'preview'): Promise<void> {
+    if (this.problems().length > 0 || this.fileBusy()) return;
+    this.saveError.set(null);
+    this.fileBusy.set(kind);
+    const o = this.options();
+    const c = this.primary();
+    const body: OrderPreviewInput = {
+      customerName: this.customer()?.name ?? '',
+      productCode: this.product()?.code ?? null,
+      orderDate: this.orderDate(),
+      startDate: this.startDate(),
+      endDate: this.endDate(),
+      termMonths: this.paidMonths() + this.freeMonths(),
+      freeMonths: this.freeMonths(),
+      primaryContact: { name: c.name.trim(), designation: c.designation.trim(), email: c.email.trim(), phone: c.phone.trim() },
+      billingFrequency: this.nameOf(o?.billingFrequencies, this.billingFrequencyId()),
+      billingMethod: this.nameOf(o?.billingMethods, this.billingMethodId()),
+      paymentMethod: this.nameOf(o?.paymentMethods, this.paymentMethodId()),
+      paymentTerm: this.nameOf(o?.paymentTerms, this.paymentTermId()),
+      currency: this.nameOf(o?.currencies, this.currencyId()),
+      quantity: this.quantity() ?? 0,
+      unitPrice: this.termUnitPrice(),
+      listAmount: this.listAmount(),
+      discountAmount: this.discountAmount(),
+      saleAmount: this.saleAmount(),
+      gstPercent: this.gstPercent() ?? 0,
+      taxAmount: this.taxAmount(),
+      totalAmount: this.totalAmount(),
+      includedItemQuantity: this.wording().extraItemTitle && this.includedItemQuantity() ? Number(this.includedItemQuantity()) : null,
+      wording: { ...this.wording(), freeMonthNote: this.freeMonths() > 0 ? this.wording().freeMonthNote : null },
+    };
+    try {
+      if (kind === 'preview') await this.orderFormService.previewDraft(body);
+      else await this.orderFormService.downloadDraft(body, kind);
+    } catch (err) {
+      this.saveError.set(errorText(err, 'The file could not be made. Please try again.'));
+    } finally {
+      this.fileBusy.set(null);
+    }
   }
 
   async save(): Promise<void> {

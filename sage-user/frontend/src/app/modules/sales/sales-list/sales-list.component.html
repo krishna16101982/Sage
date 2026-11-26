@@ -67,6 +67,7 @@
                 @else { <a class="link-button text-sm" [routerLink]="['/sales', s.id]">View</a> }
                 @if (s.hasOrderForm) {
                   <button type="button" class="link-button text-sm" (click)="pdf(s)" title="Open the order form PDF">PDF</button>
+                  <button type="button" class="link-button text-sm" (click)="word(s)" title="Download the order form as a Word file">Word</button>
                   <button type="button" class="link-button text-sm" (click)="duplicate(s)" title="New order form filled from this one">Duplicate</button>
                 }
                 @if (cancelMode(s); as mode) {

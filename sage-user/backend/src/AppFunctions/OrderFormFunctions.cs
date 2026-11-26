@@ -47,6 +47,8 @@ namespace SageUserApi.AppFunctions
 
         private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         private const int MaxWordingLength = 4000;
+        /// <summary>The same section with its formatting tags.</summary>
+        private const int MaxWordingMarkupLength = 20000;
 
         /// <summary>Settings key of each standard wording section.</summary>
         private static readonly (string Key, Action<OrderWording, string> Set)[] WordingSettings =
@@ -60,14 +62,19 @@ namespace SageUserApi.AppFunctions
             ("OrderForm.Footer", (w, v) => w.Footer = v)
         };
 
-        /// <summary>Trims each section, strips tags and checks its length; null when nothing is left.</summary>
-        private static OrderWording CleanWording(OrderWording _wording, List<string> _errors)
+        /// <summary>
+        /// Trims each section and keeps only the editor's formatting (bold, italic, underline, colour, highlight; see
+        /// RichText); any other tag stays as plain text. Checks the length of the words; null when nothing is left.
+        /// </summary>
+        internal static OrderWording CleanWording(OrderWording _wording, List<string> _errors)
         {
             if (_wording == null) return null;
             string Section(string _value, string _label)
             {
-                string _clean = Clean(_value?.Replace("\r\n", "\n"));
-                if (_clean != null && _clean.Length > MaxWordingLength) _errors.Add($"{_label} must be {MaxWordingLength} characters or fewer.");
+                string _clean = RichText.Clean(_value);
+                if (_clean == null) return null;
+                if (RichText.Plain(_clean).Length > MaxWordingLength) _errors.Add($"{_label} must be {MaxWordingLength} characters or fewer.");
+                else if (_clean.Length > MaxWordingMarkupLength) _errors.Add($"{_label} has too much formatting; clear some of it.");
                 return _clean;
             }
             var _result = new OrderWording
@@ -90,11 +97,11 @@ namespace SageUserApi.AppFunctions
 
         private static bool HasMoreThanTwoDecimals(decimal? _value) => _value.HasValue && decimal.Round(_value.Value, 2) != _value.Value;
 
-        private static IFunctionReturn Invalid(List<string> _errors, string _methodName)
+        internal static IFunctionReturn Invalid(List<string> _errors, string _methodName)
             => new FunctionReturn { Status = false, MessageType = Constants.ReturnMessageTypes.ValidationError, Message = _errors, HttpStatusCode = Constants.HttpStatusCodes.BadRequest, MethodName = _methodName };
 
         /// <summary>Trims a contact, removes tags, checks lengths and formats; adds problems to _errors. Null when empty.</summary>
-        private static OrderContact CleanContact(OrderContactParams _contact, string _who, bool _nameRequired, List<string> _errors)
+        internal static OrderContact CleanContact(OrderContactParams _contact, string _who, bool _nameRequired, List<string> _errors)
         {
             string _name = Clean(_contact?.Name), _designation = Clean(_contact?.Designation);
             string _email = _contact?.Email.NullIfWhiteSpace(), _phone = _contact?.Phone.NullIfWhiteSpace();

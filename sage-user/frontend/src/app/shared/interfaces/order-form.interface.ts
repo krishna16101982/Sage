@@ -50,6 +50,33 @@ export interface OrderContact {
   phone: string;
 }
 
+/** POST /api/user/order-form/preview: the form as shown on the page, printed without saving. */
+export interface OrderPreviewInput {
+  customerName: string;
+  productCode: string | null;
+  orderDate: string;
+  startDate: string;
+  endDate: string;
+  termMonths: number;
+  freeMonths: number;
+  primaryContact: OrderContact;
+  billingFrequency: string | null;
+  billingMethod: string | null;
+  paymentMethod: string | null;
+  paymentTerm: string | null;
+  currency: string | null;
+  quantity: number;
+  unitPrice: number;
+  listAmount: number;
+  discountAmount: number;
+  saleAmount: number;
+  gstPercent: number;
+  taxAmount: number;
+  totalAmount: number;
+  includedItemQuantity: number | null;
+  wording: OrderWording;
+}
+
 /** POST /api/user/order-form */
 export interface OrderInput {
   customerId: string;

@@ -44,6 +44,10 @@ namespace SageUserApi.AppFunctions.Interfaces
         Task CreateAsync(Guid _saleId, CancellationToken _ct = default);
         /// <summary>The saved PDF (made now if missing) of an order the user may see.</summary>
         Task<(OrderFormPdfFile file, IFunctionReturn functionReturn)> GetAsync(Guid _saleId, SalesUserContext _user, CancellationToken _ct = default);
+        /// <summary>The saved order as a Word file, made now.</summary>
+        Task<(OrderFormPdfFile file, IFunctionReturn functionReturn)> GetWordAsync(Guid _saleId, SalesUserContext _user, CancellationToken _ct = default);
+        /// <summary>The order form as filled in on the page (not saved), as a PDF or Word file.</summary>
+        Task<(OrderFormPdfFile file, IFunctionReturn functionReturn)> PreviewAsync(HttpOrderFormPreviewParams _params, string _format, SalesUserContext _user, CancellationToken _ct = default);
     }
 
     /// <summary>Lead Records: everyone sees every lead; the creator and their manager change it; managers delete it.</summary>

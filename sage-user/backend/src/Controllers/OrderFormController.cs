@@ -112,5 +112,35 @@ namespace SageUserApi.Controllers
             Response.Headers.ContentDisposition = $"inline; filename=\"{_file.FileName}\"";
             return File(_file.Content, "application/pdf");
         }, _ct);
+
+        private const string WordType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+        /// <summary>The saved order as a Word file ({SaleNumber}.docx), to change in Word.</summary>
+        [HttpGet("{saleId:guid}/word")]
+        public Task<IActionResult> GetWord(Guid saleId, CancellationToken _ct) => WithUserAsync("C:OrderForm:GetWord", async _user =>
+        {
+            var (_file, _fr) = await _orderFormPdfFunctions.GetWordAsync(saleId, _user, _ct);
+            if (!_fr.Status) return Result<object>(null, _fr);
+            Response.Headers.CacheControl = "no-store";
+            return File(_file.Content, WordType, _file.FileName);
+        }, _ct);
+
+        /// <summary>
+        /// Download PDF / Download Word / Preview PDF on the order form, before it is saved: the page's values as a file
+        /// (?format=pdf|word). download=true saves it; a PDF without download opens in the browser. Nothing is saved.
+        /// </summary>
+        [HttpPost("preview")]
+        public Task<IActionResult> Preview([FromBody] HttpOrderFormPreviewParams _params, [FromQuery] string format, [FromQuery] bool download, CancellationToken _ct)
+            => WithUserAsync("C:OrderForm:Preview", async _user =>
+        {
+            var (_file, _fr) = await _orderFormPdfFunctions.PreviewAsync(_params, format, _user, _ct);
+            if (!_fr.Status) return Result<object>(null, _fr);
+            Response.Headers.CacheControl = "no-store";
+            bool _word = _file.FileName.EndsWith(".docx", StringComparison.OrdinalIgnoreCase);
+            if (_word) return File(_file.Content, WordType, _file.FileName);
+            if (download) return File(_file.Content, "application/pdf", _file.FileName);
+            Response.Headers.ContentDisposition = $"inline; filename=\"{_file.FileName}\"";
+            return File(_file.Content, "application/pdf");
+        }, _ct);
     }
 }

@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Alert } from '../../../component/alert/alert';
+import { RichTextView } from '../../../component/rich-text-view/rich-text-view';
 import { errorText } from '../../../services/rest/global-rest-service';
 import { SalesService } from '../../../services/sales/sales.service';
 import type { Sale } from '../../../shared/interfaces/sale.interface';
@@ -11,7 +12,7 @@ import { formatDateTime, formatDuration, formatInr } from '../../../shared/utils
 /** /sales/:id — one sale, read-only (sales are recorded and cancelled in the User Panel). */
 @Component({
   selector: 'app-sales-view',
-  imports: [RouterLink, Alert],
+  imports: [RouterLink, Alert, RichTextView],
   templateUrl: './sales-view.component.html',
 })
 export class SalesView implements OnInit {

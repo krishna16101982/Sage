@@ -1,0 +1,182 @@
+SAGE - COMMANDS TO RUN (git, Docker on this PC, Docker on the server)
+=====================================================================
+Run each command on its own and read the output before the next one.
+Lines starting with # are notes, not commands.
+<...> means: put your own value there.
+
+
+---------------------------------------------------------------------
+1. GIT  (PowerShell on your PC)
+---------------------------------------------------------------------
+cd D:\Project\Sage
+
+# What changed?
+git status
+
+# Stage everything except the backup folder and the publish profiles (your PC's own settings)
+git add -A -- . ':!sage.bak' ':!**/PublishProfiles/**'
+
+# Check: "Changes to be committed" = what goes in. Only sage.bak and PublishProfiles stay "Untracked".
+git status
+
+# Commit (change the message to describe your change)
+git commit -m "<what you changed>" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# Check the commit is there
+git log --oneline -3
+
+# Send it to GitHub. This also starts GitHub Actions: tests, then the 4 Docker images are built and
+# pushed to ghcr.io (about 10-15 minutes). Watch it on GitHub > your repository > Actions.
+git push
+
+# If git push says the remote has newer commits:
+git pull --rebase
+git push
+
+
+---------------------------------------------------------------------
+2. DOCKER ON YOUR PC  (PowerShell, Docker Desktop running)
+---------------------------------------------------------------------
+# ALWAYS run docker compose from the folder that has docker-compose.yml and .env
+# (from another folder you get "no configuration file provided").
+cd D:\Project\Sage
+
+# Build the 4 images from your own code (takes a few minutes)
+docker compose build
+
+# Start them (in the background)
+docker compose up -d
+
+# Are they running?
+docker compose ps
+
+# Open in the browser:
+#   User Panel   http://localhost:9081
+#   Admin Panel  http://localhost:9082
+
+# Logs (Ctrl+C to stop watching)
+docker compose logs -f admin-api
+docker compose logs -f user-api
+
+# After changing code: build and restart in one step
+docker compose up -d --build
+
+# Stop everything
+docker compose down
+
+# List the images (check the CREATED time is now)
+docker images
+
+# Use the images GitHub built instead of building here (after Actions went green):
+docker login ghcr.io -u <your-github-user>
+#   (password = a GitHub token with read:packages, not your GitHub password)
+docker compose pull
+docker compose up -d
+
+
+---------------------------------------------------------------------
+3. DOCKER ON THE SERVER  -  ONE-TIME SETUP
+---------------------------------------------------------------------
+# --- 3a. Checks (PowerShell as Administrator on the server) ---
+Get-ComputerInfo -Property WindowsProductName, OsBuildNumber, HyperVisorPresent, HyperVRequirementVirtualizationFirmwareEnabled
+wsl --status
+# Send the output to Claude before going on: WSL2 needs virtualization on this virtual machine.
+
+# --- 3b. Install WSL2 with Ubuntu (PowerShell as Administrator), then REBOOT the server ---
+wsl --install -d Ubuntu-24.04
+# After the reboot Ubuntu opens and asks for a new Linux user name and password.
+
+# --- 3c. Networking (only Windows Server 2025 / Windows 11) ---
+# Create the file C:\Users\<you>\.wslconfig with these 5 lines:
+#   [wsl2]
+#   networkingMode=mirrored
+#
+#   [experimental]
+#   hostAddressLoopback=true
+# Then:
+wsl --shutdown
+
+# Open the Docker ports (PowerShell as Administrator)
+New-NetFirewallHyperVRule -Name SageDocker -DisplayName "Sage Docker" -Direction Inbound -VMCreatorId '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' -Protocol TCP -LocalPorts 9081,9082
+New-NetFirewallRule -DisplayName "Sage Docker 9081-9082" -Direction Inbound -Protocol TCP -LocalPort 9081,9082 -Action Allow
+
+# --- 3c (other). Windows Server 2019 / 2022 instead: forward the ports to WSL ---
+# WSL's address (it changes after a reboot, then run the two portproxy lines again):
+wsl hostname -I
+netsh interface portproxy add v4tov4 listenport=9081 listenaddress=0.0.0.0 connectport=9081 connectaddress=<WSL address>
+netsh interface portproxy add v4tov4 listenport=9082 listenaddress=0.0.0.0 connectport=9082 connectaddress=<WSL address>
+New-NetFirewallRule -DisplayName "Sage Docker 9081-9082" -Direction Inbound -Protocol TCP -LocalPort 9081,9082 -Action Allow
+
+# --- 3d. SQL Server on a fixed port, so the containers can reach it ---
+# SQL Server Configuration Manager > SQL Server Network Configuration > Protocols for SQLEXPRESS > TCP/IP:
+#   Enabled = Yes; tab IP Addresses > IPAll: clear "TCP Dynamic Ports", set "TCP Port" = 1433.
+# Then restart SQL Server (PowerShell as Administrator):
+Restart-Service 'MSSQL$SQLEXPRESS'
+New-NetFirewallRule -DisplayName "SQL Server 1433" -Direction Inbound -Protocol TCP -LocalPort 1433 -Action Allow
+
+# --- 3e. Docker inside Ubuntu (open Ubuntu from the Start menu; these are Linux commands) ---
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER
+# Close Ubuntu and open it again, then check:
+docker version
+
+# --- 3f. The two Sage files ---
+# On the server in Windows, make the folder C:\sage and put in it:
+#   docker-compose.yml   (from D:\Project\Sage on your PC)
+#   .env                 (copy .env.example and fill it in; NEVER commit it)
+#     DB_CONNECTION=Server=10.10.61.100,1433;Database=SageAdmin_Dev;User Id=sage_user;Password=<sql password>;TrustServerCertificate=true
+#     ADMIN_JWT_KEY / USER_JWT_KEY = two different random secrets, 32+ characters
+#     USER_PANEL_URL=http://userpanel.new.ocpwebserver.com
+#     ADMIN_PANEL_URL=http://adminpanel.new.ocpwebserver.com
+#     COOKIE_SECURE=false
+# Then in Ubuntu:
+mkdir -p ~/sage
+cp /mnt/c/sage/docker-compose.yml /mnt/c/sage/.env ~/sage/
+cd ~/sage
+
+# --- 3g. Log in to GitHub's image registry (once) ---
+docker login ghcr.io -u <your-github-user>
+#   (password = a GitHub token with read:packages)
+
+# --- 3h. Keep WSL running after a reboot (PowerShell as Administrator) ---
+# Asks for your Windows password, so the task also runs when nobody is logged on.
+schtasks /Create /TN "WSL keep-alive" /TR "wsl.exe -d Ubuntu-24.04 -- sleep infinity" /SC ONSTART /RU <windows user> /RP *
+
+
+---------------------------------------------------------------------
+4. DOCKER ON THE SERVER  -  START / UPDATE  (in Ubuntu)
+---------------------------------------------------------------------
+cd ~/sage
+
+# Get the newest images from GitHub (after Actions went green) and start them.
+# --no-build: the server has no source code, it only runs the images.
+docker compose pull
+docker compose up -d --no-build
+
+# Check
+docker compose ps
+docker compose logs -f user-api
+#   User Panel   http://10.10.61.100:9081
+#   Admin Panel  http://10.10.61.100:9082
+
+# Restart one app / stop all
+docker compose restart user-api
+docker compose down
+
+# After changing .env (copy it again from C:\sage first)
+cp /mnt/c/sage/.env ~/sage/
+docker compose up -d --no-build
+
+# Clean old images (frees disk space)
+docker image prune -f
+
+
+---------------------------------------------------------------------
+5. NO INTERNET TO GITHUB ON THE SERVER?  Move the images as a file
+---------------------------------------------------------------------
+# On your PC (PowerShell, after docker compose pull or build):
+docker save -o C:\sage-images.tar ghcr.io/krishna16101982/sage-admin-api:latest ghcr.io/krishna16101982/sage-user-api:latest ghcr.io/krishna16101982/sage-admin-panel:latest ghcr.io/krishna16101982/sage-user-panel:latest
+# Copy C:\sage-images.tar to the server as C:\sage\sage-images.tar, then in Ubuntu:
+docker load -i /mnt/c/sage/sage-images.tar
+cd ~/sage
+docker compose up -d --no-build

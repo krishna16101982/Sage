@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,6 +25,13 @@ namespace SageAdminApi.AppFunctions.Interfaces
         Task<(List<LeadList> lists, IFunctionReturn functionReturn)> GetListsAsync(CancellationToken _ct = default);
         /// <summary>Adds (_id null) or changes one value of the list named in _params.</summary>
         Task<(LeadListValueDto value, IFunctionReturn functionReturn)> SaveAsync(int? _id, HttpLeadListValuePostParams _params, long? _actorUserId, string _ipAddress, CancellationToken _ct = default);
+    }
+
+    /// <summary>The Admin dashboard's lead figures.</summary>
+    public interface ILeadSummaryFunctions
+    {
+        /// <summary>Every lead (_salesUserId null), or the leads one sales user created, generated or is assigned to.</summary>
+        Task<(LeadSummary summary, IFunctionReturn functionReturn)> GetSummaryAsync(Guid? _salesUserId, CancellationToken _ct = default);
     }
 
     public interface IMasterValueFunctions
